@@ -396,62 +396,74 @@ async def get_existing_ids() -> set:
     return {row[0] for row in rows}
 
 
-async def bulk_upsert_agents(agents: list[dict]) -> int:
-    """Insert or update a batch of agents in a single transaction. Much faster than one-by-one."""
+UPSERT_SQL = """
+    INSERT INTO agents (
+        virtuals_id, name, ticker, contract_address, status, agent_type,
+        biography, creation_date, linked_twitter, linked_website,
+        linked_telegram, creator_wallet, image_url,
+        market_cap, volume_24h, volume_6h, price_usd, price_change_24h,
+        liquidity_usd, tx_count_24h, buy_sell_ratio, holder_count,
+        top_10_concentration, twitter_followers, twitter_engagement_rate,
+        twitter_account_age, github_stars, github_commits_30d,
+        github_contributors, github_last_commit,
+        composite_score, tier_classification, scores_json,
+        analysis_json, prediction_json, first_mover, doxx_tier,
+        last_scanned, updated_at
+    ) VALUES (
+        :virtuals_id, :name, :ticker, :contract_address, :status, :agent_type,
+        :biography, :creation_date, :linked_twitter, :linked_website,
+        :linked_telegram, :creator_wallet, :image_url,
+        :market_cap, :volume_24h, :volume_6h, :price_usd, :price_change_24h,
+        :liquidity_usd, :tx_count_24h, :buy_sell_ratio, :holder_count,
+        :top_10_concentration, :twitter_followers, :twitter_engagement_rate,
+        :twitter_account_age, :github_stars, :github_commits_30d,
+        :github_contributors, :github_last_commit,
+        :composite_score, :tier_classification, :scores_json,
+        :analysis_json, :prediction_json, :first_mover, :doxx_tier,
+        :last_scanned, :updated_at
+    )
+    ON CONFLICT(virtuals_id) DO UPDATE SET
+        name=excluded.name,
+        ticker=excluded.ticker,
+        contract_address=excluded.contract_address,
+        status=excluded.status,
+        agent_type=excluded.agent_type,
+        biography=excluded.biography,
+        creation_date=excluded.creation_date,
+        linked_twitter=excluded.linked_twitter,
+        linked_website=excluded.linked_website,
+        linked_telegram=excluded.linked_telegram,
+        creator_wallet=excluded.creator_wallet,
+        image_url=excluded.image_url,
+        market_cap=excluded.market_cap,
+        holder_count=excluded.holder_count,
+        updated_at=excluded.updated_at
+"""
+
+
+async def bulk_upsert_agents(agents: list[dict], batch_size: int = 500) -> int:
+    """Insert or update agents in committed batches to avoid transaction size limits."""
     if not agents:
         return 0
     stored = 0
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("PRAGMA journal_mode=WAL")
-        for agent in agents:
+        for i in range(0, len(agents), batch_size):
+            batch = agents[i:i + batch_size]
             try:
-                await db.execute("""
-                    INSERT INTO agents (
-                        virtuals_id, name, ticker, contract_address, status, agent_type,
-                        biography, creation_date, linked_twitter, linked_website,
-                        linked_telegram, creator_wallet, image_url,
-                        market_cap, volume_24h, volume_6h, price_usd, price_change_24h,
-                        liquidity_usd, tx_count_24h, buy_sell_ratio, holder_count,
-                        top_10_concentration, twitter_followers, twitter_engagement_rate,
-                        twitter_account_age, github_stars, github_commits_30d,
-                        github_contributors, github_last_commit,
-                        composite_score, tier_classification, scores_json,
-                        analysis_json, prediction_json, first_mover, doxx_tier,
-                        last_scanned, updated_at
-                    ) VALUES (
-                        :virtuals_id, :name, :ticker, :contract_address, :status, :agent_type,
-                        :biography, :creation_date, :linked_twitter, :linked_website,
-                        :linked_telegram, :creator_wallet, :image_url,
-                        :market_cap, :volume_24h, :volume_6h, :price_usd, :price_change_24h,
-                        :liquidity_usd, :tx_count_24h, :buy_sell_ratio, :holder_count,
-                        :top_10_concentration, :twitter_followers, :twitter_engagement_rate,
-                        :twitter_account_age, :github_stars, :github_commits_30d,
-                        :github_contributors, :github_last_commit,
-                        :composite_score, :tier_classification, :scores_json,
-                        :analysis_json, :prediction_json, :first_mover, :doxx_tier,
-                        :last_scanned, :updated_at
-                    )
-                    ON CONFLICT(virtuals_id) DO UPDATE SET
-                        name=excluded.name,
-                        ticker=excluded.ticker,
-                        contract_address=excluded.contract_address,
-                        status=excluded.status,
-                        agent_type=excluded.agent_type,
-                        biography=excluded.biography,
-                        creation_date=excluded.creation_date,
-                        linked_twitter=excluded.linked_twitter,
-                        linked_website=excluded.linked_website,
-                        linked_telegram=excluded.linked_telegram,
-                        creator_wallet=excluded.creator_wallet,
-                        image_url=excluded.image_url,
-                        market_cap=excluded.market_cap,
-                        holder_count=excluded.holder_count,
-                        updated_at=excluded.updated_at
-                """, agent)
-                stored += 1
-            except Exception:
-                pass
-        await db.commit()
+                await db.executemany(UPSERT_SQL, batch)
+                await db.commit()
+                stored += len(batch)
+            except Exception as e:
+                await db.rollback()
+                # Fall back to one-by-one so a single bad row doesn't lose the batch
+                for agent in batch:
+                    try:
+                        await db.execute(UPSERT_SQL, agent)
+                        await db.commit()
+                        stored += 1
+                    except Exception:
+                        await db.rollback()
     return stored
 
 
