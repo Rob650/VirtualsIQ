@@ -81,58 +81,59 @@ async def _fetch_page(client: httpx.AsyncClient, page: int, page_size: int = 100
 
 def _parse_agent(item: dict) -> dict:
     """Convert raw Virtuals API item to our agent schema."""
-    attrs = item.get("attributes", item)
+    # Use `or item` so a null "attributes" value falls back to the item itself
+    attrs = item.get("attributes") or item
 
     # Handle nested structures from Virtuals API
-    virtual_id = str(item.get("id", attrs.get("id", "")))
-    name = attrs.get("name", "Unknown")
-    ticker = attrs.get("symbol", attrs.get("ticker", ""))
-    contract = attrs.get("tokenAddress", attrs.get("contractAddress", ""))
-    status_code = attrs.get("status", 4)
+    virtual_id = str(item.get("id") or attrs.get("id") or "")
+    name = attrs.get("name") or "Unknown"
+    ticker = attrs.get("symbol") or attrs.get("ticker") or ""
+    contract = attrs.get("tokenAddress") or attrs.get("contractAddress") or ""
+    status_code = attrs.get("status") or 4
     status = STATUS_MAP.get(status_code, "Prototype")
 
     # Category / type
-    category = attrs.get("category", attrs.get("agentType", ""))
+    category = attrs.get("category") or attrs.get("agentType") or ""
     if isinstance(category, dict):
-        category = category.get("name", "")
+        category = category.get("name") or ""
     agent_type = normalize_agent_type(category)
 
-    # Social links
-    socials = attrs.get("socials", {})
+    # Social links — guard against null socials
+    socials = attrs.get("socials") or {}
     if isinstance(socials, list):
-        socials = {s.get("type", ""): s.get("url", "") for s in socials}
+        socials = {s.get("type", ""): s.get("url", "") for s in socials if isinstance(s, dict)}
 
     linked_twitter = (
         socials.get("twitter", "") or
         attrs.get("twitter", "") or
         attrs.get("linkedTwitter", "")
-    )
+    ) or ""
     linked_website = (
         socials.get("website", "") or
         attrs.get("website", "") or
         attrs.get("linkedWebsite", "")
-    )
+    ) or ""
     linked_telegram = (
         socials.get("telegram", "") or
         attrs.get("telegram", "") or
         attrs.get("linkedTelegram", "")
-    )
+    ) or ""
 
     # Market data (may be enriched later via DexScreener)
-    market_cap = float(attrs.get("marketCap", 0) or 0)
-    price_usd = float(attrs.get("currentPrice", attrs.get("priceUsd", 0)) or 0)
+    market_cap = float(attrs.get("marketCap") or 0)
+    price_usd = float(attrs.get("currentPrice") or attrs.get("priceUsd") or 0)
 
     # Image
-    image_obj = attrs.get("image", {})
+    image_obj = attrs.get("image") or {}
     if isinstance(image_obj, dict):
-        image_url = image_obj.get("url", "")
+        image_url = image_obj.get("url") or ""
     else:
         image_url = str(image_obj or "")
 
     # Creation date
-    created_at_raw = attrs.get("createdAt", attrs.get("createdAt", ""))
-    creator_wallet = attrs.get("creatorWallet", attrs.get("creator", ""))
-    biography = attrs.get("description", attrs.get("bio", attrs.get("biography", "")))
+    created_at_raw = attrs.get("createdAt") or ""
+    creator_wallet = attrs.get("creatorWallet") or attrs.get("creator") or ""
+    biography = attrs.get("description") or attrs.get("bio") or attrs.get("biography") or ""
 
     return {
         "virtuals_id": virtual_id,
@@ -156,7 +157,7 @@ def _parse_agent(item: dict) -> dict:
         "liquidity_usd": 0.0,
         "tx_count_24h": 0,
         "buy_sell_ratio": 1.0,
-        "holder_count": int(attrs.get("holderCount", attrs.get("holders", 0)) or 0),
+        "holder_count": int(attrs.get("holderCount") or attrs.get("holders") or 0),
         "top_10_concentration": 0.0,
         "twitter_followers": 0,
         "twitter_engagement_rate": 0.0,
@@ -243,26 +244,26 @@ async def fetch_dexscreener_data(contract_address: str) -> dict:
                 return {}
 
             # Use the pair with the highest liquidity
-            best_pair = max(pairs, key=lambda p: float(p.get("liquidity", {}).get("usd", 0) or 0))
+            best_pair = max(pairs, key=lambda p: float((p.get("liquidity") or {}).get("usd", 0) or 0))
 
-            volume = best_pair.get("volume", {})
-            txns = best_pair.get("txns", {})
-            h24 = txns.get("h24", {})
+            volume = best_pair.get("volume") or {}
+            txns = best_pair.get("txns") or {}
+            h24 = txns.get("h24") or {}
             buys = int(h24.get("buys", 0) or 0)
             sells = int(h24.get("sells", 0) or 0)
             buy_sell_ratio = (buys / sells) if sells > 0 else (1.0 if buys == 0 else 2.0)
 
-            price_change = best_pair.get("priceChange", {})
+            price_change = best_pair.get("priceChange") or {}
 
             return {
                 "price_usd": float(best_pair.get("priceUsd", 0) or 0),
                 "price_change_24h": float(price_change.get("h24", 0) or 0),
                 "volume_24h": float(volume.get("h24", 0) or 0),
                 "volume_6h": float(volume.get("h6", 0) or 0),
-                "liquidity_usd": float(best_pair.get("liquidity", {}).get("usd", 0) or 0),
+                "liquidity_usd": float((best_pair.get("liquidity") or {}).get("usd", 0) or 0),
                 "tx_count_24h": buys + sells,
                 "buy_sell_ratio": round(buy_sell_ratio, 2),
-                "market_cap": float(best_pair.get("marketCap", best_pair.get("fdv", 0)) or 0),
+                "market_cap": float(best_pair.get("marketCap") or best_pair.get("fdv") or 0),
             }
 
         except httpx.HTTPStatusError as e:
