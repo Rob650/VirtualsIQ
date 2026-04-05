@@ -57,9 +57,10 @@ async def _fetch_page(client: httpx.AsyncClient, page: int, page_size: int = 100
     """Fetch a single page of agents from Virtuals API with retry."""
     url = VIRTUALS_API
     params = {
+        "filters[status]": 5,
         "pagination[page]": page,
         "pagination[pageSize]": page_size,
-        "sort[0]": "marketCap:desc",
+        "sort[0]": "volume24h:desc",
     }
 
     for attempt in range(3):
