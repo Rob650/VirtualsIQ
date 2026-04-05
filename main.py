@@ -28,7 +28,7 @@ from database import (
     update_agent_scores,
     upsert_agent,
 )
-from virtuals_ingestion import detect_new_agents, fetch_dexscreener_data, preload_all_agents
+from virtuals_ingestion import detect_new_agents, enrich_top_agents_dexscreener, fetch_dexscreener_data, preload_all_agents
 
 logging.basicConfig(
     level=logging.INFO,
@@ -109,8 +109,10 @@ async def _daily_scan_loop():
         try:
             await asyncio.sleep(24 * 3600)  # 24 hour interval
             logger.info("Starting daily full refresh...")
-            count = await preload_all_agents()  # Full refresh: new agents + updated market data
-            logger.info(f"Daily scan complete: {count} agents refreshed")
+            count = await preload_all_agents()
+            logger.info(f"Daily Virtuals fetch complete: {count} agents refreshed, starting DexScreener enrichment...")
+            await enrich_top_agents_dexscreener(top_n=100)
+            logger.info("Daily scan complete")
         except asyncio.CancelledError:
             break
         except Exception as e:
@@ -131,7 +133,10 @@ async def lifespan(app: FastAPI):
     async def _preload():
         try:
             count = await preload_all_agents()
-            logger.info(f"Startup preload complete: {count} agents")
+            logger.info(f"Startup preload complete: {count} agents — dashboard is now live")
+            # Enrich top 100 with DexScreener data after agents are already visible
+            await enrich_top_agents_dexscreener(top_n=100)
+            logger.info("DexScreener enrichment complete")
         except Exception as e:
             logger.error(f"Startup preload failed: {e}")
 

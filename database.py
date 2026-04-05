@@ -394,3 +394,94 @@ async def get_existing_ids() -> set:
         async with db.execute("SELECT virtuals_id FROM agents") as cur:
             rows = await cur.fetchall()
     return {row[0] for row in rows}
+
+
+async def bulk_upsert_agents(agents: list[dict]) -> int:
+    """Insert or update a batch of agents in a single transaction. Much faster than one-by-one."""
+    if not agents:
+        return 0
+    stored = 0
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("PRAGMA journal_mode=WAL")
+        for agent in agents:
+            try:
+                await db.execute("""
+                    INSERT INTO agents (
+                        virtuals_id, name, ticker, contract_address, status, agent_type,
+                        biography, creation_date, linked_twitter, linked_website,
+                        linked_telegram, creator_wallet, image_url,
+                        market_cap, volume_24h, volume_6h, price_usd, price_change_24h,
+                        liquidity_usd, tx_count_24h, buy_sell_ratio, holder_count,
+                        top_10_concentration, twitter_followers, twitter_engagement_rate,
+                        twitter_account_age, github_stars, github_commits_30d,
+                        github_contributors, github_last_commit,
+                        composite_score, tier_classification, scores_json,
+                        analysis_json, prediction_json, first_mover, doxx_tier,
+                        last_scanned, updated_at
+                    ) VALUES (
+                        :virtuals_id, :name, :ticker, :contract_address, :status, :agent_type,
+                        :biography, :creation_date, :linked_twitter, :linked_website,
+                        :linked_telegram, :creator_wallet, :image_url,
+                        :market_cap, :volume_24h, :volume_6h, :price_usd, :price_change_24h,
+                        :liquidity_usd, :tx_count_24h, :buy_sell_ratio, :holder_count,
+                        :top_10_concentration, :twitter_followers, :twitter_engagement_rate,
+                        :twitter_account_age, :github_stars, :github_commits_30d,
+                        :github_contributors, :github_last_commit,
+                        :composite_score, :tier_classification, :scores_json,
+                        :analysis_json, :prediction_json, :first_mover, :doxx_tier,
+                        :last_scanned, :updated_at
+                    )
+                    ON CONFLICT(virtuals_id) DO UPDATE SET
+                        name=excluded.name,
+                        ticker=excluded.ticker,
+                        contract_address=excluded.contract_address,
+                        status=excluded.status,
+                        agent_type=excluded.agent_type,
+                        biography=excluded.biography,
+                        creation_date=excluded.creation_date,
+                        linked_twitter=excluded.linked_twitter,
+                        linked_website=excluded.linked_website,
+                        linked_telegram=excluded.linked_telegram,
+                        creator_wallet=excluded.creator_wallet,
+                        image_url=excluded.image_url,
+                        market_cap=excluded.market_cap,
+                        holder_count=excluded.holder_count,
+                        updated_at=excluded.updated_at
+                """, agent)
+                stored += 1
+            except Exception:
+                pass
+        await db.commit()
+    return stored
+
+
+async def update_market_data(virtuals_id: str, data: dict):
+    """Update only DexScreener market data fields without overwriting Virtuals API data."""
+    now = datetime.utcnow().isoformat()
+    dex_mcap = data.get("market_cap", 0) or 0
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            UPDATE agents SET
+                price_usd=?,
+                price_change_24h=?,
+                volume_24h=?,
+                volume_6h=?,
+                liquidity_usd=?,
+                tx_count_24h=?,
+                buy_sell_ratio=?,
+                market_cap=CASE WHEN ? > 0 THEN ? ELSE market_cap END,
+                updated_at=?
+            WHERE virtuals_id=?
+        """, (
+            data.get("price_usd", 0),
+            data.get("price_change_24h", 0),
+            data.get("volume_24h", 0),
+            data.get("volume_6h", 0),
+            data.get("liquidity_usd", 0),
+            data.get("tx_count_24h", 0),
+            data.get("buy_sell_ratio", 1.0),
+            dex_mcap, dex_mcap,
+            now,
+            virtuals_id,
+        ))
+        await db.commit()

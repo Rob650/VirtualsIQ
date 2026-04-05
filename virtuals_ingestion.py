@@ -7,9 +7,10 @@ import asyncio
 import logging
 from datetime import datetime
 
+import aiosqlite
 import httpx
 
-from database import upsert_agent, get_existing_ids
+from database import upsert_agent, get_existing_ids, bulk_upsert_agents, update_market_data, DB_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -294,47 +295,57 @@ async def detect_new_agents(existing_ids: set) -> list[dict]:
 
 async def preload_all_agents():
     """
-    Fetch and store ALL agents by market cap (38,700+).
-    Enriches top 200 with DexScreener data.
-    Paginates until the API returns no more results.
+    Fetch ALL agents from Virtuals API and immediately save them to the database.
+    DexScreener enrichment is NOT done here — call enrich_top_agents_dexscreener()
+    separately after this completes so agents appear in the dashboard right away.
     """
     logger.info("Preloading ALL agents from Virtuals Protocol (this may take a while)...")
 
     agents = await fetch_all_agents()  # No page cap — fetches everything
 
-    # Sort by market cap so most important agents are processed first
+    # Sort by market cap so most important agents get lowest DB row IDs
     agents.sort(key=lambda a: a.get("market_cap", 0), reverse=True)
-    logger.info(f"Fetched {len(agents)} agents total, beginning DexScreener enrichment...")
+    logger.info(f"Fetched {len(agents)} agents, saving to database in bulk...")
 
-    # Enrich top 200 with DexScreener (rate-limit friendly)
-    top_200 = [a for a in agents[:200] if a.get("contract_address")]
-    logger.info(f"Enriching top {len(top_200)} agents with DexScreener data...")
-
-    semaphore = asyncio.Semaphore(5)  # Max 5 concurrent DexScreener calls
-
-    async def enrich(agent: dict):
-        async with semaphore:
-            dex = await fetch_dexscreener_data(agent["contract_address"])
-            if dex:
-                agent.update(dex)
-            await asyncio.sleep(0.2)  # Rate limit courtesy
-        return agent
-
-    enriched = await asyncio.gather(*[enrich(a) for a in top_200], return_exceptions=True)
-    for i, result in enumerate(enriched):
-        if not isinstance(result, Exception):
-            agents[i] = result
-
-    # Store all agents in DB with progress logging every 100
-    stored = 0
-    for agent in agents:
-        try:
-            await upsert_agent(agent)
-            stored += 1
-            if stored % 100 == 0:
-                logger.info(f"Stored {stored}/{len(agents)} agents...")
-        except Exception as e:
-            logger.warning(f"Failed to store agent {agent.get('virtuals_id')}: {e}")
+    stored = await bulk_upsert_agents(agents)
 
     logger.info(f"Preload complete: {stored}/{len(agents)} agents stored in database")
     return stored
+
+
+async def enrich_top_agents_dexscreener(top_n: int = 100):
+    """
+    Enrich the top N agents (by market cap) with DexScreener market data.
+    Call this AFTER preload_all_agents() so agents are already visible in the dashboard.
+    Stays well within DexScreener rate limits by capping at top_n and pacing requests.
+    """
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT virtuals_id, contract_address FROM agents
+               WHERE contract_address IS NOT NULL AND contract_address != ''
+               ORDER BY market_cap DESC LIMIT ?""",
+            (top_n,)
+        ) as cur:
+            rows = [dict(r) for r in await cur.fetchall()]
+
+    if not rows:
+        logger.info("No agents with contract addresses found for DexScreener enrichment")
+        return
+
+    logger.info(f"Enriching top {len(rows)} agents with DexScreener data...")
+
+    semaphore = asyncio.Semaphore(3)  # Conservative concurrency to avoid 429s
+
+    async def enrich_one(row: dict):
+        async with semaphore:
+            try:
+                dex = await fetch_dexscreener_data(row["contract_address"])
+                if dex:
+                    await update_market_data(row["virtuals_id"], dex)
+            except Exception as e:
+                logger.debug(f"DexScreener enrich failed for {row['virtuals_id']}: {e}")
+            await asyncio.sleep(0.3)  # ~3 req/s sustained
+
+    await asyncio.gather(*[enrich_one(r) for r in rows], return_exceptions=True)
+    logger.info(f"DexScreener enrichment complete for top {len(rows)} agents")
