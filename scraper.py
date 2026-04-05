@@ -216,15 +216,18 @@ async def enrich_agent_socials(agent: dict) -> dict:
     twitter_url = agent.get("linked_twitter", "")
     website_url = agent.get("linked_website", "")
 
+    async def _empty():
+        return {}
+
     if twitter_url:
         tasks.append(scrape_twitter_profile(twitter_url))
     else:
-        tasks.append(asyncio.coroutine(lambda: {})())
+        tasks.append(_empty())
 
     if website_url and "github.com" in website_url:
         tasks.append(scrape_github(website_url))
     else:
-        tasks.append(asyncio.coroutine(lambda: {})())
+        tasks.append(_empty())
 
     results = await asyncio.gather(*tasks, return_exceptions=True)
     merged = {}
