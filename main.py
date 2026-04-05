@@ -28,7 +28,7 @@ from database import (
     update_agent_scores,
     upsert_agent,
 )
-from virtuals_ingestion import detect_new_agents, fetch_dexscreener_data, preload_top_agents
+from virtuals_ingestion import detect_new_agents, fetch_dexscreener_data, preload_all_agents
 
 logging.basicConfig(
     level=logging.INFO,
@@ -104,16 +104,13 @@ async def _run_analysis_job(job_id: str, virtuals_id: str):
 
 
 async def _daily_scan_loop():
-    """Periodic background scan: detect new agents and refresh market data."""
+    """Periodic background scan: fetch all agents to detect new launches and refresh market data."""
     while True:
         try:
             await asyncio.sleep(24 * 3600)  # 24 hour interval
-            logger.info("Starting daily scan loop...")
-            existing = await get_existing_ids()
-            new_agents = await detect_new_agents(existing)
-            for agent in new_agents:
-                await upsert_agent(agent)
-            logger.info(f"Daily scan: added {len(new_agents)} new agents")
+            logger.info("Starting daily full refresh...")
+            count = await preload_all_agents()  # Full refresh: new agents + updated market data
+            logger.info(f"Daily scan complete: {count} agents refreshed")
         except asyncio.CancelledError:
             break
         except Exception as e:
@@ -130,10 +127,10 @@ async def lifespan(app: FastAPI):
     logger.info("VirtualsIQ starting up...")
     await init_db()
 
-    # Preload top 1000 agents in background (don't block startup)
+    # Preload ALL agents in background (don't block startup)
     async def _preload():
         try:
-            count = await preload_top_agents(max_agents=1000)
+            count = await preload_all_agents()
             logger.info(f"Startup preload complete: {count} agents")
         except Exception as e:
             logger.error(f"Startup preload failed: {e}")

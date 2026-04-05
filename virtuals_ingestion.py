@@ -279,29 +279,32 @@ async def fetch_dexscreener_data(contract_address: str) -> dict:
 
 
 async def detect_new_agents(existing_ids: set) -> list[dict]:
-    """Compare current API results against known IDs to find new launches."""
-    current = await fetch_all_agents(max_pages=5)  # Quick scan, first 500 agents
+    """
+    Fetch ALL current agents and return those not yet in the database.
+    Full pagination ensures we don't miss new launches anywhere in the list.
+    """
+    current = await fetch_all_agents()  # Full scan — no page cap
     new_agents = [a for a in current if a["virtuals_id"] not in existing_ids]
     if new_agents:
         logger.info(f"Detected {len(new_agents)} new agents")
-    return new_agents
+    return current  # Return all so the daily scan can update market data for everyone
 
 
-async def preload_top_agents(max_agents: int = 1000):
+async def preload_all_agents():
     """
-    Fetch and store top agents by market cap on startup.
-    Enriches each with DexScreener data.
+    Fetch and store ALL agents by market cap (38,700+).
+    Enriches top 200 with DexScreener data.
+    Paginates until the API returns no more results.
     """
-    logger.info(f"Preloading top {max_agents} agents...")
-    pages_needed = (max_agents + 99) // 100
+    logger.info("Preloading ALL agents from Virtuals Protocol (this may take a while)...")
 
-    agents = await fetch_all_agents(max_pages=pages_needed)
-    agents = agents[:max_agents]
+    agents = await fetch_all_agents()  # No page cap — fetches everything
 
-    # Sort by market cap
+    # Sort by market cap so most important agents are processed first
     agents.sort(key=lambda a: a.get("market_cap", 0), reverse=True)
+    logger.info(f"Fetched {len(agents)} agents total, beginning DexScreener enrichment...")
 
-    # Enrich top 200 with DexScreener (avoid hammering the API for all 1000)
+    # Enrich top 200 with DexScreener (rate-limit friendly)
     top_200 = [a for a in agents[:200] if a.get("contract_address")]
     logger.info(f"Enriching top {len(top_200)} agents with DexScreener data...")
 
@@ -320,14 +323,16 @@ async def preload_top_agents(max_agents: int = 1000):
         if not isinstance(result, Exception):
             agents[i] = result
 
-    # Store all agents in DB
+    # Store all agents in DB with progress logging every 100
     stored = 0
     for agent in agents:
         try:
             await upsert_agent(agent)
             stored += 1
+            if stored % 100 == 0:
+                logger.info(f"Stored {stored}/{len(agents)} agents...")
         except Exception as e:
             logger.warning(f"Failed to store agent {agent.get('virtuals_id')}: {e}")
 
-    logger.info(f"Preloaded {stored} agents into database")
+    logger.info(f"Preload complete: {stored}/{len(agents)} agents stored in database")
     return stored
