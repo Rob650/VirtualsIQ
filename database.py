@@ -4,8 +4,11 @@ SQLite with aiosqlite for async access
 """
 
 import json
+import logging
 import aiosqlite
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 DB_PATH = "virtualsiq.db"
 
@@ -396,32 +399,23 @@ async def get_existing_ids() -> set:
     return {row[0] for row in rows}
 
 
-UPSERT_SQL = """
-    INSERT INTO agents (
-        virtuals_id, name, ticker, contract_address, status, agent_type,
-        biography, creation_date, linked_twitter, linked_website,
-        linked_telegram, creator_wallet, image_url,
-        market_cap, volume_24h, volume_6h, price_usd, price_change_24h,
-        liquidity_usd, tx_count_24h, buy_sell_ratio, holder_count,
-        top_10_concentration, twitter_followers, twitter_engagement_rate,
-        twitter_account_age, github_stars, github_commits_30d,
-        github_contributors, github_last_commit,
-        composite_score, tier_classification, scores_json,
-        analysis_json, prediction_json, first_mover, doxx_tier,
-        last_scanned, updated_at
-    ) VALUES (
-        :virtuals_id, :name, :ticker, :contract_address, :status, :agent_type,
-        :biography, :creation_date, :linked_twitter, :linked_website,
-        :linked_telegram, :creator_wallet, :image_url,
-        :market_cap, :volume_24h, :volume_6h, :price_usd, :price_change_24h,
-        :liquidity_usd, :tx_count_24h, :buy_sell_ratio, :holder_count,
-        :top_10_concentration, :twitter_followers, :twitter_engagement_rate,
-        :twitter_account_age, :github_stars, :github_commits_30d,
-        :github_contributors, :github_last_commit,
-        :composite_score, :tier_classification, :scores_json,
-        :analysis_json, :prediction_json, :first_mover, :doxx_tier,
-        :last_scanned, :updated_at
-    )
+UPSERT_COLS = [
+    "virtuals_id", "name", "ticker", "contract_address", "status", "agent_type",
+    "biography", "creation_date", "linked_twitter", "linked_website",
+    "linked_telegram", "creator_wallet", "image_url",
+    "market_cap", "volume_24h", "volume_6h", "price_usd", "price_change_24h",
+    "liquidity_usd", "tx_count_24h", "buy_sell_ratio", "holder_count",
+    "top_10_concentration", "twitter_followers", "twitter_engagement_rate",
+    "twitter_account_age", "github_stars", "github_commits_30d",
+    "github_contributors", "github_last_commit",
+    "composite_score", "tier_classification", "scores_json",
+    "analysis_json", "prediction_json", "first_mover", "doxx_tier",
+    "last_scanned", "updated_at",
+]
+
+UPSERT_SQL = f"""
+    INSERT INTO agents ({', '.join(UPSERT_COLS)})
+    VALUES ({', '.join('?' for _ in UPSERT_COLS)})
     ON CONFLICT(virtuals_id) DO UPDATE SET
         name=excluded.name,
         ticker=excluded.ticker,
@@ -441,6 +435,11 @@ UPSERT_SQL = """
 """
 
 
+def _dict_to_tuple(agent: dict) -> tuple:
+    """Convert agent dict to positional tuple matching UPSERT_COLS order."""
+    return tuple(agent.get(col) for col in UPSERT_COLS)
+
+
 async def bulk_upsert_agents(agents: list[dict], batch_size: int = 500) -> int:
     """Insert or update agents in committed batches to avoid transaction size limits."""
     if not agents:
@@ -449,21 +448,26 @@ async def bulk_upsert_agents(agents: list[dict], batch_size: int = 500) -> int:
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("PRAGMA journal_mode=WAL")
         for i in range(0, len(agents), batch_size):
-            batch = agents[i:i + batch_size]
+            batch_dicts = agents[i:i + batch_size]
+            batch_tuples = [_dict_to_tuple(a) for a in batch_dicts]
             try:
-                await db.executemany(UPSERT_SQL, batch)
+                await db.executemany(UPSERT_SQL, batch_tuples)
                 await db.commit()
-                stored += len(batch)
+                stored += len(batch_tuples)
+                logger.info(f"Batch {i//batch_size + 1}: saved {len(batch_tuples)} agents")
             except Exception as e:
+                logger.error(f"Batch {i//batch_size + 1} failed: {e}")
                 await db.rollback()
                 # Fall back to one-by-one so a single bad row doesn't lose the batch
-                for agent in batch:
+                for j, agent_dict in enumerate(batch_dicts):
                     try:
-                        await db.execute(UPSERT_SQL, agent)
+                        await db.execute(UPSERT_SQL, _dict_to_tuple(agent_dict))
                         await db.commit()
                         stored += 1
-                    except Exception:
+                    except Exception as row_err:
+                        logger.error(f"Row {i+j} failed ({agent_dict.get('virtuals_id')}): {row_err}")
                         await db.rollback()
+    logger.info(f"bulk_upsert_agents complete: {stored}/{len(agents)} stored")
     return stored
 
 
