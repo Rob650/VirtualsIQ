@@ -445,28 +445,32 @@ async def bulk_upsert_agents(agents: list[dict], batch_size: int = 500) -> int:
     if not agents:
         return 0
     stored = 0
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("PRAGMA journal_mode=WAL")
-        for i in range(0, len(agents), batch_size):
-            batch_dicts = agents[i:i + batch_size]
-            batch_tuples = [_dict_to_tuple(a) for a in batch_dicts]
-            try:
+    for i in range(0, len(agents), batch_size):
+        batch_dicts = agents[i:i + batch_size]
+        batch_tuples = [_dict_to_tuple(a) for a in batch_dicts]
+        batch_num = i // batch_size + 1
+        try:
+            # Fresh connection per batch — a failed batch cannot corrupt subsequent ones
+            async with aiosqlite.connect(DB_PATH) as db:
+                await db.execute("PRAGMA journal_mode=WAL")
                 await db.executemany(UPSERT_SQL, batch_tuples)
                 await db.commit()
-                stored += len(batch_tuples)
-                logger.info(f"Batch {i//batch_size + 1}: saved {len(batch_tuples)} agents")
-            except Exception as e:
-                logger.error(f"Batch {i//batch_size + 1} failed: {e}")
-                await db.rollback()
-                # Fall back to one-by-one so a single bad row doesn't lose the batch
-                for j, agent_dict in enumerate(batch_dicts):
-                    try:
+            stored += len(batch_tuples)
+            logger.info(f"Batch {batch_num}: saved {len(batch_tuples)} agents (total so far: {stored})")
+        except Exception as e:
+            logger.error(f"Batch {batch_num} executemany failed: {e!r} — retrying row-by-row")
+            # Fall back to one-by-one so a single bad row doesn't lose the whole batch
+            for j, agent_dict in enumerate(batch_dicts):
+                try:
+                    async with aiosqlite.connect(DB_PATH) as db:
+                        await db.execute("PRAGMA journal_mode=WAL")
                         await db.execute(UPSERT_SQL, _dict_to_tuple(agent_dict))
                         await db.commit()
-                        stored += 1
-                    except Exception as row_err:
-                        logger.error(f"Row {i+j} failed ({agent_dict.get('virtuals_id')}): {row_err}")
-                        await db.rollback()
+                    stored += 1
+                except Exception as row_err:
+                    logger.error(
+                        f"Row {i + j} failed (virtuals_id={agent_dict.get('virtuals_id')!r}): {row_err!r}"
+                    )
     logger.info(f"bulk_upsert_agents complete: {stored}/{len(agents)} stored")
     return stored
 
