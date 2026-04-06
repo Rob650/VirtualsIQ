@@ -22,7 +22,7 @@ HEADERS = {
     "Accept": "application/json",
 }
 
-# Map Virtuals status codes AND strings to human-readable labels
+# Map Virtuals status codes/strings to human-readable labels
 STATUS_MAP = {
     5: "Sentient",
     4: "Prototype",
@@ -31,8 +31,6 @@ STATUS_MAP = {
     1: "Prototype",
     "AVAILABLE": "Sentient",
     "BONDING": "Prototype",
-    "available": "Sentient",
-    "bonding": "Prototype",
 }
 
 AGENT_TYPE_MAP = {
@@ -86,7 +84,7 @@ async def _fetch_page(client: httpx.AsyncClient, page: int, page_size: int = 100
 
 def _parse_agent(item: dict) -> dict:
     """Convert raw Virtuals API item to our agent schema."""
-    # Virtuals API returns flat items (no "attributes" wrapper)
+    # Use `or item` so a null "attributes" value falls back to the item itself
     attrs = item.get("attributes") or item
 
     # Handle nested structures from Virtuals API
@@ -103,37 +101,25 @@ def _parse_agent(item: dict) -> dict:
         category = category.get("name") or ""
     agent_type = normalize_agent_type(category)
 
-    # Social links — handle both uppercase and lowercase keys
+    # Social links — guard against null socials; API returns UPPERCASE keys
     socials = attrs.get("socials") or {}
     if isinstance(socials, list):
         socials = {s.get("type", ""): s.get("url", "") for s in socials if isinstance(s, dict)}
 
-    # Check both cases for social links, plus verified links
-    verified = socials.get("VERIFIED_LINKS") or socials.get("verified_links") or {}
-
     linked_twitter = (
-        socials.get("TWITTER", "") or
-        socials.get("twitter", "") or
-        verified.get("TWITTER", "") or
-        attrs.get("twitter", "") or
-        attrs.get("linkedTwitter", "")
-    ) or ""
+        socials.get("TWITTER") or socials.get("twitter") or
+        attrs.get("twitter") or attrs.get("linkedTwitter") or ""
+    )
     linked_website = (
-        (socials.get("USER_LINKS") or {}).get("WEBSITE", "") or
-        socials.get("WEBSITE", "") or
-        socials.get("website", "") or
-        attrs.get("website", "") or
-        attrs.get("linkedWebsite", "")
-    ) or ""
+        socials.get("WEBSITE") or socials.get("website") or
+        attrs.get("website") or attrs.get("linkedWebsite") or ""
+    )
     linked_telegram = (
-        socials.get("TELEGRAM", "") or
-        socials.get("telegram", "") or
-        verified.get("TELEGRAM", "") or
-        attrs.get("telegram", "") or
-        attrs.get("linkedTelegram", "")
-    ) or ""
+        socials.get("TELEGRAM") or socials.get("telegram") or
+        attrs.get("telegram") or attrs.get("linkedTelegram") or ""
+    )
 
-    # Market data — use actual API field names
+    # Market data — use Virtuals API fields first, fall back to legacy names
     market_cap = float(attrs.get("mcapInVirtual") or attrs.get("marketCap") or 0)
     price_usd = float(attrs.get("currentPrice") or attrs.get("priceUsd") or 0)
 
@@ -146,14 +132,9 @@ def _parse_agent(item: dict) -> dict:
 
     # Creation date
     created_at_raw = attrs.get("createdAt") or ""
-
-    # Creator wallet — CRITICAL: avoid taking the full creator object (dict)
-    raw_creator = attrs.get("creatorWallet") or attrs.get("walletAddress") or ""
-    if isinstance(raw_creator, dict):
-        creator_wallet = ""
-    else:
-        creator_wallet = str(raw_creator)
-
+    # `creator` is a full JSON object in the API response — extract wallet from walletAddress instead
+    _creator_wallet = attrs.get("walletAddress") or attrs.get("creatorWallet") or ""
+    creator_wallet = _creator_wallet if isinstance(_creator_wallet, str) else ""
     biography = attrs.get("description") or attrs.get("bio") or attrs.get("biography") or ""
 
     return {
@@ -179,7 +160,7 @@ def _parse_agent(item: dict) -> dict:
         "tx_count_24h": 0,
         "buy_sell_ratio": 1.0,
         "holder_count": int(attrs.get("holderCount") or attrs.get("holders") or 0),
-        "top_10_concentration": float(attrs.get("top10HolderPercentage") or 0),
+        "top_10_concentration": 0.0,
         "twitter_followers": 0,
         "twitter_engagement_rate": 0.0,
         "twitter_account_age": 0,
@@ -213,7 +194,6 @@ async def fetch_all_agents(max_pages: int = 400) -> list[dict]:
             return []
 
         items = first.get("data", [])
-        logger.info(f"First page: {len(items)} items received")
         agents.extend([_parse_agent(item) for item in items])
 
         pagination = first.get("meta", {}).get("pagination", {})
@@ -324,19 +304,9 @@ async def preload_all_agents():
 
     agents = await fetch_all_agents()  # No page cap — fetches everything
 
-    if not agents:
-        logger.error("No agents fetched from Virtuals API — aborting preload")
-        return 0
-
     # Sort by market cap so most important agents get lowest DB row IDs
     agents.sort(key=lambda a: a.get("market_cap", 0), reverse=True)
     logger.info(f"Fetched {len(agents)} agents, saving to database in bulk...")
-
-    # Log a sample agent for debugging
-    if agents:
-        sample = agents[0]
-        logger.info(f"Sample agent: id={sample.get('virtuals_id')}, name={sample.get('name')}, "
-                     f"mcap={sample.get('market_cap')}, wallet={sample.get('creator_wallet')[:20] if sample.get('creator_wallet') else 'None'}...")
 
     stored = await bulk_upsert_agents(agents)
 
