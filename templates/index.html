@@ -1126,6 +1126,39 @@
       }
     }
 
+    /* ===== DEX CHART ===== */
+    .dex-chart-wrap {
+      width: 100%;
+      height: 400px;
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--bg-3);
+    }
+    .dex-chart-wrap iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+
+    /* ===== TIER BREAKDOWN ===== */
+    .tier-factor-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .tier-factor-row:last-child { border-bottom: none; }
+    .tier-factor-left { display: flex; flex-direction: column; gap: 3px; }
+    .tier-factor-name { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+    .tier-factor-why { font-size: 11px; color: var(--text-dim); line-height: 1.4; }
+    .tier-factor-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: 52px; }
+    .tier-factor-score { font-family: var(--font-data); font-size: 14px; font-weight: 600; }
+    .tier-factor-bar { width: 48px; height: 3px; background: var(--border-2); border-radius: 2px; overflow: hidden; }
+    .tier-factor-bar-fill { height: 100%; border-radius: 2px; }
+
     /* ===== ENRICHMENT BANNER ===== */
     .enrich-banner {
       display: none;
@@ -1716,10 +1749,22 @@ function renderModal(agent) {
     ${hasAnalysis ? `
     <!-- Overview -->
     <div>
-      <div class="report-section-title">Overview</div>
-      <p class="report-narrative">${overview.summary || 'No overview available. Run a full analysis to generate an intelligence report.'}</p>
-      ${overview.value_proposition ? `<p class="report-narrative" style="margin-top:8px;color:var(--teal)">${overview.value_proposition}</p>` : ''}
+      <div class="report-section-title">Intelligence Overview</div>
+      <p class="report-narrative">${overview.summary || 'No overview available.'}</p>
+      ${overview.value_proposition ? `<p class="report-narrative" style="margin-top:8px;color:var(--teal);font-style:italic">${overview.value_proposition}</p>` : ''}
+      ${overview.stage ? `<p style="margin-top:6px;font-size:11px;font-family:var(--font-data);color:var(--text-dim)">Stage: <span style="color:var(--amber)">${overview.stage.toUpperCase()}</span></p>` : ''}
     </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
+      ${riskData.bull_case ? `<div style="padding:10px;background:rgba(34,197,94,0.07);border:1px solid rgba(34,197,94,0.2);border-radius:var(--radius-sm)"><div style="font-size:10px;color:var(--green);font-weight:700;letter-spacing:0.5px;margin-bottom:4px">BULL CASE</div><div style="font-size:12px;color:var(--text-muted)">${riskData.bull_case}</div></div>` : ''}
+      ${riskData.bear_case ? `<div style="padding:10px;background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-sm)"><div style="font-size:10px;color:var(--red);font-weight:700;letter-spacing:0.5px;margin-bottom:4px">BEAR CASE</div><div style="font-size:12px;color:var(--text-muted)">${riskData.bear_case}</div></div>` : ''}
+    </div>
+    ${riskData.key_risks && riskData.key_risks.length ? `
+    <div style="margin-top:8px">
+      <div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Key Risks</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${riskData.key_risks.map(r => `<span style="padding:3px 8px;background:var(--red-dim);border:1px solid rgba(239,68,68,0.25);border-radius:4px;font-size:11px;color:var(--text-muted)">⚠ ${r}</span>`).join('')}
+      </div>
+    </div>` : ''}
     ` : `
     <div>
       <div class="report-section-title">Overview</div>
@@ -1767,36 +1812,24 @@ function renderModal(agent) {
       </div>
     </div>
 
-    <!-- Score Breakdown -->
+    ${agent.contract_address ? `
+    <!-- DexScreener Chart -->
     <div>
-      <div class="report-section-title">VIQ Score Breakdown</div>
-      <div class="score-breakdown-grid">
-        ${renderScoreBreakdown(scores)}
-      </div>
-    </div>
-
-    ${hasAnalysis && riskData.key_risks ? `
-    <!-- Risk Assessment -->
-    <div>
-      <div class="report-section-title">Risk Assessment</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div>
-          <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">Key Risks</div>
-          ${(riskData.key_risks||[]).map(r=>`<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-muted)">⚠ ${r}</div>`).join('')}
-        </div>
-        <div>
-          <div style="margin-bottom:12px">
-            <div style="font-size:11px;color:var(--green);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Bull Case</div>
-            <div style="font-size:13px;color:var(--text-muted)">${riskData.bull_case||'—'}</div>
-          </div>
-          <div>
-            <div style="font-size:11px;color:var(--red);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Bear Case</div>
-            <div style="font-size:13px;color:var(--text-muted)">${riskData.bear_case||'—'}</div>
-          </div>
-        </div>
+      <div class="report-section-title">Price Chart</div>
+      <div class="dex-chart-wrap">
+        <iframe src="https://dexscreener.com/base/${agent.contract_address}?embed=1&theme=dark&trades=0&info=0" loading="lazy" allowfullscreen></iframe>
       </div>
     </div>
     ` : ''}
+
+    <!-- VIQ Tier Breakdown -->
+    <div>
+      <div class="report-section-title">VIQ Intelligence Report</div>
+      <div class="score-breakdown-grid">
+        ${renderTierBreakdown(scores, analysis, agent)}
+      </div>
+    </div>
+
 
     <!-- AI Forecast -->
     <div>
@@ -1820,6 +1853,113 @@ function renderModal(agent) {
 }
 
 function renderScoreBreakdown(scores) {
+  return renderTierBreakdown(scores, {}, {});
+}
+
+function _factorWhy(key, scores, analysis, agent) {
+  const fm = analysis.first_mover || {};
+  const team = analysis.team || {};
+  const product = analysis.product || {};
+  const market = analysis.market || {};
+  const community = analysis.community || {};
+  const v = scores[key] !== undefined ? Math.round(scores[key]) : 50;
+
+  const map = {
+    F1_category_uniqueness: () => fm.category_unique === true
+      ? `Novel category — no direct on-chain comparables identified`
+      : fm.category_unique === false
+        ? `Operates in a crowded vertical with established on-chain rivals`
+        : `Uniqueness score ${v}/100 — insufficient data to confirm originality`,
+    F2_approach_novelty: () => fm.approach_novel === true
+      ? `Approach is architecturally distinct from existing protocol designs`
+      : fm.approach_novel === false
+        ? `Methodology closely mirrors existing live agents`
+        : `Novelty score ${v}/100`,
+    F3_cross_chain_originality: () => fm.cross_chain_original === true
+      ? `No equivalent exists across Base, Ethereum, or Solana ecosystems`
+      : fm.cross_chain_original === false
+        ? `Cross-chain equivalents already live on competing networks`
+        : `Cross-chain originality ${v}/100`,
+    F4_timing_advantage: () => fm.days_ahead_of_competitor
+      ? `~${fm.days_ahead_of_competitor}d ahead of nearest competitor — timing moat is ${v >= 65 ? 'strong' : v >= 45 ? 'moderate' : 'thin'}`
+      : `Timing advantage score ${v}/100 — competitor launch data unavailable`,
+    F5_defensibility: () => fm.analysis
+      ? `${fm.analysis.slice(0, 120)}${fm.analysis.length > 120 ? '…' : ''}`
+      : `Defensibility / moat score ${v}/100`,
+
+    F6_doxx_tier: () => {
+      const tier = team.doxx_tier || agent.doxx_tier || 3;
+      const desc = team.doxx_description || ({1:'Full doxx — identity publicly verified',2:'Social presence — pseudonymous with active socials',3:'Anonymous — no verifiable identity'}[tier] || 'Unknown');
+      return `${desc}${team.red_flags && team.red_flags.length ? ` ⚠ ${team.red_flags[0]}` : ''}`;
+    },
+    F7_track_record: () => team.team_summary
+      ? `${team.team_summary.slice(0, 130)}${team.team_summary.length > 130 ? '…' : ''}`
+      : `Track record score ${v}/100 — limited verifiable history`,
+    F8_code_activity: () => {
+      const commits = agent.github_commits_30d;
+      const stars = agent.github_stars;
+      if (commits || stars) return `${commits ? commits + ' commits in last 30d' : 'Commit data unavailable'}${stars ? ' · ' + stars + ' GitHub stars' : ''}`;
+      return `Code activity score ${v}/100 — no public repository linked`;
+    },
+    F9_shipping_cadence: () => product.status
+      ? `Product status: ${product.status}${product.description ? ' — ' + product.description.slice(0, 100) : ''}`
+      : `Shipping cadence score ${v}/100`,
+    F10_product_status: () => product.description
+      ? product.description.slice(0, 140)
+      : `Product status score ${v}/100 — no shipped deliverables confirmed`,
+    F11_partnerships: () => product.technical_moat
+      ? `${product.technical_moat.slice(0, 130)}${product.technical_moat.length > 130 ? '…' : ''}${product.red_flags && product.red_flags.length ? ' ⚠ ' + product.red_flags[0] : ''}`
+      : `Partnership score ${v}/100`,
+    F12_wallet_behavior: () => team.wallet_behavior_score !== undefined
+      ? `Wallet behavior score ${Math.round(team.wallet_behavior_score)}/100${v < 40 ? ' — unusual wallet activity detected' : v >= 70 ? ' — healthy distribution, no suspicious sells' : ''}`
+      : `Wallet behavior score ${v}/100`,
+
+    F13_tam: () => market.tam_description
+      ? market.tam_description.slice(0, 140)
+      : `TAM score ${v}/100`,
+    F14_real_world_comparables: () => market.real_world_comparable
+      ? `Comparable to ${market.real_world_comparable} — comparables score ${Math.round(market.comparables_score || v)}/100`
+      : `Real-world comparables score ${v}/100`,
+    F15_revenue_model: () => `Revenue model score ${Math.round(market.revenue_model_score || v)}/100${market.saturation_description ? ' — ' + market.saturation_description.slice(0, 80) : ''}`,
+    F16_current_revenue: () => `Current revenue score ${Math.round(market.current_revenue_score || v)}/100${v < 35 ? ' — no confirmed revenue stream' : v >= 65 ? ' — active revenue generation confirmed' : ' — early-stage revenue signals'}`,
+    F17_mcap_to_tam: () => market.mcap_tam_ratio !== undefined
+      ? `MCap/TAM ratio ${market.mcap_tam_ratio.toFixed(4)} — ${market.mcap_tam_ratio < 0.001 ? 'highly undervalued relative to addressable market' : market.mcap_tam_ratio > 0.1 ? 'market cap aggressive vs TAM' : 'reasonable penetration rate'}`
+      : `MCap/TAM score ${v}/100`,
+    F18_saturation: () => market.saturation_description
+      ? market.saturation_description.slice(0, 130)
+      : `Market saturation score ${v}/100`,
+
+    F19_holder_distribution: () => {
+      const holders = agent.holder_count;
+      return holders
+        ? `${fmtNumber(holders)} holders — distribution score ${v}/100${v >= 65 ? ', healthy spread' : v < 40 ? ', concentrated ownership risk' : ''}`
+        : `Holder distribution score ${v}/100`;
+    },
+    F20_twitter_engagement: () => {
+      const followers = agent.twitter_followers;
+      return followers
+        ? `${fmtNumber(followers)} Twitter followers — engagement score ${v}/100`
+        : `Twitter engagement score ${v}/100 — no linked account`;
+    },
+    F21_follower_growth: () => community.follower_growth_score !== undefined
+      ? `Follower growth score ${Math.round(community.follower_growth_score)}/100${v >= 65 ? ' — accelerating growth trend' : v < 40 ? ' — stagnant or declining' : ' — steady growth'}`
+      : `Follower growth score ${v}/100`,
+    F22_community_depth: () => community.community_analysis
+      ? community.community_analysis.slice(0, 140)
+      : `Community depth score ${v}/100`,
+    F23_organic_signals: () => community.organic_score !== undefined
+      ? `Organic signal score ${Math.round(community.organic_score)}/100${v >= 65 ? ' — engagement appears genuine' : v < 40 ? ' — bot/paid signals detected' : ' — mixed organic/paid signals'}`
+      : `Organic vs paid score ${v}/100`,
+    F24_smart_money: () => community.smart_money_score !== undefined
+      ? `Smart money score ${Math.round(community.smart_money_score)}/100${v >= 65 ? ' — known protocol wallets accumulating' : v < 40 ? ' — no smart money participation detected' : ' — some notable wallet activity'}`
+      : `Smart money score ${v}/100`,
+  };
+
+  const fn = map[key];
+  return fn ? fn() : `Score ${v}/100`;
+}
+
+function renderTierBreakdown(scores, analysis, agent) {
   const tiers = [
     { label: 'TIER 1 — FIRST MOVER (30%)', keys: [
       ['F1_category_uniqueness', 'Category Uniqueness'],
@@ -1860,13 +2000,19 @@ function renderScoreBreakdown(scores) {
     ${tier.keys.map(([key, label]) => {
       const v = scores[key] !== undefined ? Math.round(scores[key]) : 50;
       const color = scoreColor(v);
+      const why = _factorWhy(key, scores, analysis, agent);
       return `
-        <div class="score-bar-row">
-          <div class="score-bar-label">${label}</div>
-          <div class="score-bar-track">
-            <div class="score-bar-fill" style="width:${v}%;background:${color}"></div>
+        <div class="tier-factor-row">
+          <div class="tier-factor-left">
+            <div class="tier-factor-name">${label}</div>
+            <div class="tier-factor-why">${why}</div>
           </div>
-          <div class="score-bar-num" style="color:${color}">${v}</div>
+          <div class="tier-factor-right">
+            <div class="tier-factor-score" style="color:${color}">${v}</div>
+            <div class="tier-factor-bar">
+              <div class="tier-factor-bar-fill" style="width:${v}%;background:${color}"></div>
+            </div>
+          </div>
         </div>`;
     }).join('')}
   `).join('');
