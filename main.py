@@ -163,7 +163,7 @@ async def _daily_scan_loop():
             logger.info("Starting daily full refresh...")
             count = await preload_all_agents()
             logger.info(f"Daily Virtuals fetch complete: {count} agents refreshed, starting DexScreener enrichment...")
-            await enrich_top_agents_dexscreener(top_n=100)
+            await enrich_top_agents_dexscreener()
             score_count = await bulk_score_agents()
             logger.info(f"Daily auto-scored {score_count} agents")
             await _auto_analyze_all_agents()
@@ -190,7 +190,7 @@ async def lifespan(app: FastAPI):
             count = await preload_all_agents()
             logger.info(f"Startup preload complete: {count} agents — dashboard is now live")
             # Enrich top 100 with DexScreener data after agents are already visible
-            await enrich_top_agents_dexscreener(top_n=100)
+            await enrich_top_agents_dexscreener()
             logger.info("DexScreener enrichment complete")
             # Score all agents using on-chain data
             score_count = await bulk_score_agents()
