@@ -397,6 +397,24 @@ async def get_stats() -> dict:
     }
 
 
+async def get_all_agents() -> list[dict]:
+    """Return all agents for batch AI analysis."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM agents") as cur:
+            rows = await cur.fetchall()
+    agents = []
+    for row in rows:
+        d = dict(row)
+        for field in ("scores_json", "analysis_json", "prediction_json"):
+            try:
+                d[field] = json.loads(d.get(field) or "{}")
+            except Exception:
+                d[field] = {}
+        agents.append(d)
+    return agents
+
+
 async def get_existing_ids() -> set:
     """Return set of all known virtuals_ids."""
     async with aiosqlite.connect(DB_PATH) as db:

@@ -17,11 +17,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
 
-from analyzer import analyze_agent
+from analyzer import analyze_agent, batch_triage
 from database import (
     bulk_score_agents,
     get_agent_detail,
     get_agents,
+    get_all_agents,
     get_existing_ids,
     get_stats,
     get_trending_agents,
@@ -104,6 +105,56 @@ async def _run_analysis_job(job_id: str, virtuals_id: str):
         jobs[job_id]["completed_at"] = datetime.utcnow().isoformat()
 
 
+async def _auto_analyze_all_agents():
+    """Batch AI triage for all agents. Runs after preload to populate real VIQ scores,
+    first mover flags, and AI analysis without requiring manual clicks."""
+    try:
+        agents = await get_all_agents()
+        if not agents:
+            logger.info("Auto-analyze: no agents in DB yet")
+            return 0
+
+        batch_size = 10
+        analyzed = 0
+        total = len(agents)
+        logger.info(f"Starting AI auto-analysis of {total} agents in batches of {batch_size}...")
+
+        for i in range(0, total, batch_size):
+            batch = agents[i:i + batch_size]
+            try:
+                results = await batch_triage(batch)
+                for r in results:
+                    vid = r["virtuals_id"]
+                    scores = r["scores"]
+                    analysis = r["analysis"]
+                    await update_agent_scores(
+                        virtuals_id=vid,
+                        composite_score=scores["composite_score"],
+                        tier=scores["tier_classification"],
+                        scores_json=scores["scores"],
+                        analysis_json=analysis,
+                        prediction_json=analysis.get("prediction", {}),
+                        first_mover=scores["first_mover"],
+                        doxx_tier=int(analysis.get("team", {}).get("doxx_tier", 3)),
+                    )
+                    analyzed += 1
+                logger.info(f"AI triage batch {i // batch_size + 1}: {analyzed}/{total} agents done")
+            except Exception as e:
+                logger.error(f"AI triage batch at offset {i} failed: {e}")
+                await asyncio.sleep(5)
+                continue
+
+            # Pace requests to avoid Anthropic rate limits
+            if i + batch_size < total:
+                await asyncio.sleep(3)
+
+        logger.info(f"AI auto-analysis complete: {analyzed}/{total} agents scored")
+        return analyzed
+    except Exception as e:
+        logger.error(f"_auto_analyze_all_agents failed: {e}")
+        return 0
+
+
 async def _daily_scan_loop():
     """Periodic background scan: fetch all agents to detect new launches and refresh market data."""
     while True:
@@ -115,6 +166,7 @@ async def _daily_scan_loop():
             await enrich_top_agents_dexscreener(top_n=100)
             score_count = await bulk_score_agents()
             logger.info(f"Daily auto-scored {score_count} agents")
+            await _auto_analyze_all_agents()
             logger.info("Daily scan complete")
         except asyncio.CancelledError:
             break
@@ -143,6 +195,8 @@ async def lifespan(app: FastAPI):
             # Score all agents using on-chain data
             score_count = await bulk_score_agents()
             logger.info(f"Auto-scored {score_count} agents")
+            # Run AI batch triage so every agent has real VIQ scores + first mover detection
+            await _auto_analyze_all_agents()
         except Exception as e:
             logger.error(f"Startup preload failed: {e}")
 
