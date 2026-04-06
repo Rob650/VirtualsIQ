@@ -488,6 +488,49 @@ async def bulk_upsert_agents(agents: list[dict], batch_size: int = 500) -> int:
     return stored
 
 
+async def bulk_score_agents() -> int:
+    """Score all agents using on-chain data. Returns count scored."""
+    from scoring import calculate_composite_score
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM agents") as cur:
+            rows = await cur.fetchall()
+
+    scored = 0
+    batch = []
+    for row in rows:
+        agent = dict(row)
+        for f in ("scores_json", "analysis_json", "prediction_json"):
+            try:
+                agent[f] = json.loads(agent.get(f) or "{}")
+            except Exception:
+                agent[f] = {}
+
+        result = calculate_composite_score(agent, agent.get("analysis_json", {}))
+
+        batch.append((
+            result["composite_score"],
+            result["tier_classification"],
+            json.dumps(result["scores"]),
+            1 if result["first_mover"] else 0,
+            agent["virtuals_id"]
+        ))
+        scored += 1
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("PRAGMA journal_mode=WAL")
+        for i in range(0, len(batch), 500):
+            chunk = batch[i:i + 500]
+            await db.executemany(
+                "UPDATE agents SET composite_score=?, tier_classification=?, scores_json=?, first_mover=?, updated_at=datetime('now') WHERE virtuals_id=?",
+                chunk
+            )
+        await db.commit()
+
+    return scored
+
+
 async def update_market_data(virtuals_id: str, data: dict):
     """Update only DexScreener market data fields without overwriting Virtuals API data."""
     now = datetime.utcnow().isoformat()

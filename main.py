@@ -19,6 +19,7 @@ from starlette.requests import Request
 
 from analyzer import analyze_agent
 from database import (
+    bulk_score_agents,
     get_agent_detail,
     get_agents,
     get_existing_ids,
@@ -112,6 +113,8 @@ async def _daily_scan_loop():
             count = await preload_all_agents()
             logger.info(f"Daily Virtuals fetch complete: {count} agents refreshed, starting DexScreener enrichment...")
             await enrich_top_agents_dexscreener(top_n=100)
+            score_count = await bulk_score_agents()
+            logger.info(f"Daily auto-scored {score_count} agents")
             logger.info("Daily scan complete")
         except asyncio.CancelledError:
             break
@@ -137,6 +140,9 @@ async def lifespan(app: FastAPI):
             # Enrich top 100 with DexScreener data after agents are already visible
             await enrich_top_agents_dexscreener(top_n=100)
             logger.info("DexScreener enrichment complete")
+            # Score all agents using on-chain data
+            score_count = await bulk_score_agents()
+            logger.info(f"Auto-scored {score_count} agents")
         except Exception as e:
             logger.error(f"Startup preload failed: {e}")
 

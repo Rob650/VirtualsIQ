@@ -978,25 +978,6 @@
       100% { background-position: -200% 0; }
     }
 
-    .analyze-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 8px 16px;
-      background: linear-gradient(135deg, var(--teal), var(--purple));
-      border: none;
-      border-radius: var(--radius);
-      color: #fff;
-      font-family: var(--font-ui);
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: opacity 0.15s;
-    }
-
-    .analyze-btn:hover { opacity: 0.85; }
-    .analyze-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
     /* Risk indicator */
     .risk-badge {
       display: inline-flex;
@@ -1702,9 +1683,6 @@ function renderModal(agent) {
         <span style="font-family:var(--font-data);font-size:22px;font-weight:500;color:${color}">${score}</span>
         <span style="font-size:13px;color:${color};margin-left:6px;font-weight:600">${tier}</span>
       </div>
-      <button class="analyze-btn" id="analyze-btn" onclick="triggerAnalysis('${agent.virtuals_id}')">
-        ✦ Run Full Analysis
-      </button>
     </div>
 
     ${hasAnalysis ? `
@@ -1718,7 +1696,7 @@ function renderModal(agent) {
     <div>
       <div class="report-section-title">Overview</div>
       <p class="report-narrative">${agent.biography || 'No biography available for this agent.'}</p>
-      <p style="margin-top:12px;font-size:12px;color:var(--text-dim)">Full AI analysis not yet generated. Click "Run Full Analysis" to generate a complete intelligence report.</p>
+      <p style="margin-top:12px;font-size:12px;color:var(--text-dim)">Full AI analysis not yet generated.</p>
     </div>
     `}
 
@@ -1890,53 +1868,6 @@ function renderForecast(horizon, data) {
       <div class="forecast-range">${signLow}${rangeLow}% / ${signHigh}${rangeHigh}%</div>
       <div class="forecast-catalyst">${data.catalyst || ''}</div>
     </div>`;
-}
-
-// ===== ANALYSIS TRIGGER =====
-async function triggerAnalysis(virtualsId) {
-  const btn = document.getElementById('analyze-btn');
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = '<div class="loading-spinner" style="width:14px;height:14px;border-width:2px"></div> Analyzing...';
-  }
-
-  try {
-    const res = await fetch(`/api/analyze/${virtualsId}`, { method: 'POST' });
-    const job = await res.json();
-
-    showToast(`Analysis queued (Job ${job.job_id}). This may take 30-60 seconds.`);
-    pollJob(job.job_id, virtualsId);
-  } catch(e) {
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = '✦ Run Full Analysis';
-    }
-    showToast('Failed to queue analysis. Please try again.', true);
-  }
-}
-
-function pollJob(jobId, virtualsId) {
-  if (state.jobPollInterval) clearInterval(state.jobPollInterval);
-
-  state.jobPollInterval = setInterval(async () => {
-    try {
-      const res = await fetch(`/api/job/${jobId}`);
-      const job = await res.json();
-
-      if (job.status === 'completed') {
-        clearInterval(state.jobPollInterval);
-        showToast('Analysis complete! Refreshing report...');
-        setTimeout(() => openModal(virtualsId), 800);
-      } else if (job.status === 'failed') {
-        clearInterval(state.jobPollInterval);
-        const btn = document.getElementById('analyze-btn');
-        if (btn) { btn.disabled = false; btn.innerHTML = '✦ Run Full Analysis'; }
-        showToast('Analysis failed: ' + (job.error || 'Unknown error'), true);
-      }
-    } catch(e) {
-      clearInterval(state.jobPollInterval);
-    }
-  }, 3000);
 }
 
 // ===== MODAL CLOSE =====
