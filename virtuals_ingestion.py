@@ -282,79 +282,6 @@ async def fetch_dexscreener_data(contract_address: str) -> dict:
     return {}
 
 
-async def fetch_dexscreener_batch(addresses: list[str]) -> dict[str, dict]:
-    """
-    Fetch DexScreener data for up to 30 contract addresses in a single request.
-    DexScreener supports comma-separated token addresses (max 30 per call).
-    Returns a dict mapping contract_address (lowercase) -> market data dict.
-    """
-    if not addresses:
-        return {}
-
-    joined = ",".join(addresses[:30])
-    url = f"{DEXSCREENER_API}/{joined}"
-
-    for attempt in range(3):
-        try:
-            async with httpx.AsyncClient() as client:
-                resp = await client.get(url, headers=HEADERS, timeout=20.0)
-                resp.raise_for_status()
-                data = resp.json()
-
-            pairs = data.get("pairs") or []
-            result: dict[str, dict] = {}
-
-            for pair in pairs:
-                base_addr = (pair.get("baseToken") or {}).get("address", "").lower()
-                if not base_addr:
-                    continue
-
-                liq = float((pair.get("liquidity") or {}).get("usd", 0) or 0)
-                existing = result.get(base_addr)
-                # Keep the pair with highest liquidity for each token
-                if existing is not None and liq <= existing.get("_liq", 0):
-                    continue
-
-                volume = pair.get("volume") or {}
-                txns = pair.get("txns") or {}
-                h24 = txns.get("h24") or {}
-                buys = int(h24.get("buys", 0) or 0)
-                sells = int(h24.get("sells", 0) or 0)
-                buy_sell_ratio = (buys / sells) if sells > 0 else (1.0 if buys == 0 else 2.0)
-                price_change = pair.get("priceChange") or {}
-
-                result[base_addr] = {
-                    "_liq": liq,
-                    "price_usd": float(pair.get("priceUsd", 0) or 0),
-                    "price_change_24h": float(price_change.get("h24", 0) or 0),
-                    "volume_24h": float(volume.get("h24", 0) or 0),
-                    "volume_6h": float(volume.get("h6", 0) or 0),
-                    "liquidity_usd": liq,
-                    "tx_count_24h": buys + sells,
-                    "buy_sell_ratio": round(buy_sell_ratio, 2),
-                    "market_cap": float(pair.get("marketCap") or pair.get("fdv") or 0),
-                }
-
-            # Remove internal tracking key
-            for addr in result:
-                result[addr].pop("_liq", None)
-
-            return result
-
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code == 429:
-                await asyncio.sleep(2 ** (attempt + 1))
-            else:
-                logger.debug(f"DexScreener batch error: {e}")
-                return {}
-        except Exception as e:
-            logger.debug(f"DexScreener batch error: {e}")
-            if attempt < 2:
-                await asyncio.sleep(1)
-
-    return {}
-
-
 async def detect_new_agents(existing_ids: set) -> list[dict]:
     """
     Fetch ALL current agents and return those not yet in the database.
@@ -367,77 +294,97 @@ async def detect_new_agents(existing_ids: set) -> list[dict]:
     return current  # Return all so the daily scan can update market data for everyone
 
 
-async def preload_all_agents():
+async def preload_all_agents(on_batch=None):
     """
-    Fetch ALL agents from Virtuals API and immediately save them to the database.
-    DexScreener enrichment is NOT done here — call enrich_top_agents_dexscreener()
-    separately after this completes so agents appear in the dashboard right away.
+    Fetch ALL agents from Virtuals API and save them progressively to the database.
+    The first page (top agents by volume) is saved immediately so the dashboard has
+    useful content within seconds. Remaining pages are saved as they arrive.
+    on_batch: optional callable(total_stored_so_far) called after each batch save.
     """
-    logger.info("Preloading ALL agents from Virtuals Protocol (this may take a while)...")
+    logger.info("Preloading ALL agents from Virtuals Protocol (progressive)...")
+    total_stored = 0
 
-    agents = await fetch_all_agents()  # No page cap — fetches everything
+    async with httpx.AsyncClient() as client:
+        # Fetch first page immediately and save it — users see data right away
+        first = await _fetch_page(client, 1, 100)
+        if not first:
+            logger.error("Failed to fetch first page from Virtuals API")
+            return 0
 
-    # Sort by market cap so most important agents get lowest DB row IDs
-    agents.sort(key=lambda a: a.get("market_cap", 0), reverse=True)
-    logger.info(f"Fetched {len(agents)} agents, saving to database in bulk...")
+        items = first.get("data", [])
+        first_batch = [_parse_agent(item) for item in items]
+        first_batch.sort(key=lambda a: a.get("market_cap", 0), reverse=True)
 
-    stored = await bulk_upsert_agents(agents)
+        stored = await bulk_upsert_agents(first_batch)
+        total_stored += stored
+        if on_batch:
+            on_batch(total_stored)
+        logger.info(f"First page saved: {stored} agents now visible in dashboard")
 
-    logger.info(f"Preload complete: {stored}/{len(agents)} agents stored in database")
-    return stored
+        pagination = first.get("meta", {}).get("pagination", {})
+        total_pages = min(pagination.get("pageCount", 1), 400)
+        logger.info(f"Virtuals API: {pagination.get('total', '?')} total agents, {total_pages} pages to fetch")
+
+        # Fetch remaining pages in batches of 10, saving each batch as it arrives
+        page = 2
+        while page <= total_pages:
+            batch_range = range(page, min(page + 10, total_pages + 1))
+            tasks = [_fetch_page(client, p, 100) for p in batch_range]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            batch_agents = []
+            for result in results:
+                if isinstance(result, Exception):
+                    logger.warning(f"Page fetch error: {result}")
+                    continue
+                batch_agents.extend([_parse_agent(item) for item in result.get("data", [])])
+
+            if batch_agents:
+                stored = await bulk_upsert_agents(batch_agents)
+                total_stored += stored
+                if on_batch:
+                    on_batch(total_stored)
+
+            page += 10
+            await asyncio.sleep(0.5)
+
+    logger.info(f"Preload complete: {total_stored} agents stored in database")
+    return total_stored
 
 
-async def enrich_top_agents_dexscreener(top_n: int = None):
+async def enrich_top_agents_dexscreener(top_n: int = 100):
     """
-    Enrich ALL agents with contract addresses with DexScreener market data.
-    Uses batched requests (30 addresses per call) to minimise API traffic.
-    Pass top_n to limit to the top N agents by market cap (useful for quick refreshes).
+    Enrich the top N agents (by market cap) with DexScreener market data.
+    Call this AFTER preload_all_agents() so agents are already visible in the dashboard.
+    Stays well within DexScreener rate limits by capping at top_n and pacing requests.
     """
-    query = """SELECT virtuals_id, contract_address FROM agents
-               WHERE contract_address IS NOT NULL AND contract_address != ''
-               ORDER BY market_cap DESC"""
-    params: tuple = ()
-    if top_n:
-        query += " LIMIT ?"
-        params = (top_n,)
-
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
-        async with db.execute(query, params) as cur:
+        async with db.execute(
+            """SELECT virtuals_id, contract_address FROM agents
+               WHERE contract_address IS NOT NULL AND contract_address != ''
+               ORDER BY market_cap DESC LIMIT ?""",
+            (top_n,)
+        ) as cur:
             rows = [dict(r) for r in await cur.fetchall()]
 
     if not rows:
         logger.info("No agents with contract addresses found for DexScreener enrichment")
         return
 
-    logger.info(f"Enriching {len(rows)} agents with DexScreener data (batched, 30 per request)...")
+    logger.info(f"Enriching top {len(rows)} agents with DexScreener data...")
 
-    BATCH_SIZE = 30
-    enriched = 0
-    total_batches = (len(rows) + BATCH_SIZE - 1) // BATCH_SIZE
+    semaphore = asyncio.Semaphore(3)  # Conservative concurrency to avoid 429s
 
-    for i in range(0, len(rows), BATCH_SIZE):
-        batch = rows[i:i + BATCH_SIZE]
-        addresses = [r["contract_address"] for r in batch]
-        addr_to_vid = {r["contract_address"].lower(): r["virtuals_id"] for r in batch}
-        batch_num = i // BATCH_SIZE + 1
+    async def enrich_one(row: dict):
+        async with semaphore:
+            try:
+                dex = await fetch_dexscreener_data(row["contract_address"])
+                if dex:
+                    await update_market_data(row["virtuals_id"], dex)
+            except Exception as e:
+                logger.debug(f"DexScreener enrich failed for {row['virtuals_id']}: {e}")
+            await asyncio.sleep(0.3)  # ~3 req/s sustained
 
-        try:
-            dex_data = await fetch_dexscreener_batch(addresses)
-            for addr, data in dex_data.items():
-                vid = addr_to_vid.get(addr)
-                if vid and data:
-                    await update_market_data(vid, data)
-                    enriched += 1
-        except Exception as e:
-            logger.debug(f"DexScreener batch {batch_num} failed: {e}")
-
-        # Log progress every 50 batches (~1500 agents)
-        if batch_num % 50 == 0:
-            logger.info(f"DexScreener enrichment: {batch_num}/{total_batches} batches done ({enriched} enriched so far)")
-
-        # ~2 batch requests/sec — well within DexScreener free tier limits
-        if i + BATCH_SIZE < len(rows):
-            await asyncio.sleep(0.5)
-
-    logger.info(f"DexScreener enrichment complete: {enriched}/{len(rows)} agents enriched")
+    await asyncio.gather(*[enrich_one(r) for r in rows], return_exceptions=True)
+    logger.info(f"DexScreener enrichment complete for top {len(rows)} agents")

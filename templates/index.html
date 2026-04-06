@@ -1125,6 +1125,28 @@
         grid-template-columns: 1fr;
       }
     }
+
+    /* ===== ENRICHMENT BANNER ===== */
+    .enrich-banner {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 24px;
+      background: var(--bg-2);
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: var(--font-data);
+    }
+    .enrich-banner.visible { display: flex; }
+    .enrich-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--amber);
+      flex-shrink: 0;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
   </style>
 </head>
 <body>
@@ -1154,6 +1176,12 @@
     </div>
   </div>
 </header>
+
+<!-- ===== ENRICHMENT BANNER ===== -->
+<div class="enrich-banner" id="enrich-banner">
+  <div class="enrich-dot"></div>
+  <span id="enrich-msg">Loading agents...</span>
+</div>
 
 <!-- ===== MAIN ===== -->
 <main class="main">
@@ -1944,11 +1972,66 @@ document.querySelectorAll('.sortable').forEach(th => {
   });
 });
 
+// ===== ENRICHMENT POLLING =====
+let _enrichPollInterval = null;
+let _lastAgentCount = 0;
+
+async function checkEnrichmentStatus() {
+  try {
+    const res = await fetch('/api/status');
+    if (!res.ok) return true;
+    const data = await res.json();
+    const banner = document.getElementById('enrich-banner');
+    const msg = document.getElementById('enrich-msg');
+
+    const done = data.status === 'complete' || data.status === 'idle';
+    if (!done) {
+      const labels = {
+        preloading: 'Loading agents from Virtuals Protocol',
+        enriching: 'Enriching market data via DexScreener',
+        scoring: 'Calculating VIQ scores',
+      };
+      const label = labels[data.status] || 'Updating data';
+      const count = data.total_agents_in_db || 0;
+      msg.textContent = `${label}... ${count.toLocaleString()} agents loaded`;
+      banner.classList.add('visible');
+
+      // Refresh table + stats when new agents arrive
+      if (count !== _lastAgentCount) {
+        _lastAgentCount = count;
+        loadStats();
+        if (state.page === 1) loadAgents();
+      }
+    } else {
+      banner.classList.remove('visible');
+    }
+    return done;
+  } catch(e) {
+    return true;
+  }
+}
+
+async function startEnrichmentPolling() {
+  const done = await checkEnrichmentStatus();
+  if (done) return;
+
+  _enrichPollInterval = setInterval(async () => {
+    const done = await checkEnrichmentStatus();
+    if (done) {
+      clearInterval(_enrichPollInterval);
+      _enrichPollInterval = null;
+      loadAllCarousels();
+      loadStats();
+    }
+  }, 5000);
+}
+
 // ===== BOOT =====
 (async function init() {
   await loadStats();
   await loadAgents();
   loadAllCarousels();
+  startEnrichmentPolling();
 
   // Refresh stats every 5 minutes
   setInterval(loadStats, 5 * 60 * 1000);
