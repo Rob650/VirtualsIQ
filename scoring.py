@@ -218,7 +218,19 @@ def _f16_current_revenue(agent: dict, ai: dict) -> float:
     v = ai.get("market", {}).get("current_revenue_score")
     if v is not None:
         return _clamp(float(v))
-    # Use volume as proxy
+    # Use market_cap as primary proxy (larger MC = more established, more traction)
+    mcap = _safe(agent.get("market_cap"), 0)
+    if mcap > 0:
+        if mcap > 50_000_000:
+            return 95.0
+        if mcap > 10_000_000:
+            return 82.0
+        if mcap > 1_000_000:
+            return 68.0
+        if mcap > 100_000:
+            return 48.0
+        return 25.0
+    # Fall back to volume_24h when market_cap unavailable
     vol = _safe(agent.get("volume_24h"), 0)
     if vol > 1_000_000:
         return 90.0
@@ -232,7 +244,7 @@ def _f16_current_revenue(agent: dict, ai: dict) -> float:
 
 
 def _f17_mcap_to_tam(agent: dict, ai: dict) -> float:
-    """MCap-to-TAM ratio (3%) — lower is better (more upside)"""
+    """MCap-to-TAM ratio (3%) — lower is better (more upside remaining)"""
     v = ai.get("market", {}).get("mcap_tam_ratio")
     if v is not None:
         ratio = float(v)
@@ -245,6 +257,19 @@ def _f17_mcap_to_tam(agent: dict, ai: dict) -> float:
         if ratio < 0.5:
             return 35.0
         return 15.0
+    # Fallback: use raw market_cap as a proxy for how much TAM is already captured.
+    # Smaller MC = more room to grow = higher score here.
+    mcap = _safe(agent.get("market_cap"), 0)
+    if mcap > 0:
+        if mcap < 100_000:
+            return 90.0   # tiny MC → massive upside potential
+        if mcap < 1_000_000:
+            return 78.0
+        if mcap < 10_000_000:
+            return 62.0
+        if mcap < 100_000_000:
+            return 42.0
+        return 22.0       # >$100M → already captured meaningful share of TAM
     return NEUTRAL
 
 
@@ -266,7 +291,9 @@ def _f19_holder_distribution(agent: dict, ai: dict) -> float:
     if holders == 0:
         return NEUTRAL
 
-    holder_score = min(holders / 50, 60)       # up to 60pts
+    # Log scale so more holders always improves the score with no early cap:
+    #   100 → 20pts, 1K → 30pts, 10K → 40pts, 100K → 50pts, 1M → 60pts
+    holder_score = min(math.log10(max(holders, 1)) * 10, 60)
     concentration_score = max(0, 40 - top10 / 2.5)  # up to 40pts (lower conc = better)
     return _clamp(holder_score + concentration_score)
 
