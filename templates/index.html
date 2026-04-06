@@ -1064,6 +1064,86 @@
       from { opacity: 0; transform: translateY(8px); }
       to   { opacity: 1; transform: translateY(0); }
     }
+
+    /* ===== MOBILE RESPONSIVE ===== */
+    @media (max-width: 768px) {
+      /* Header */
+      .header {
+        padding: 0 12px;
+        height: auto;
+        min-height: 56px;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding-top: 8px;
+        padding-bottom: 8px;
+      }
+      .header-right {
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .header-stat {
+        display: none;
+      }
+      .live-badge {
+        font-size: 10px;
+        padding: 2px 8px;
+      }
+
+      /* Main layout */
+      .main {
+        padding: 12px;
+      }
+
+      /* Trending carousel label hidden on mobile */
+      .carousel-label {
+        display: none;
+      }
+      .carousel-row {
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      /* Filter bar */
+      .filter-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+      }
+      .search-input-wrap {
+        min-width: unset;
+        width: 100%;
+      }
+      .filter-select {
+        width: 100%;
+      }
+      .filter-divider {
+        display: none;
+      }
+      .filter-result-count {
+        text-align: center;
+      }
+
+      /* Agent table — horizontal scroll */
+      .agent-table-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .agent-table {
+        min-width: 700px;
+      }
+
+      /* Pagination */
+      .pagination {
+        flex-direction: column;
+        gap: 8px;
+        align-items: center;
+      }
+
+      /* Score ring / modal metrics grid */
+      .score-breakdown-grid {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 <body>

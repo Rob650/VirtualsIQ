@@ -124,6 +124,12 @@ async def init_db():
 
 async def upsert_agent(agent: dict):
     """Insert or update an agent record."""
+    # Serialize any dict/list values for JSON columns before passing to SQLite
+    safe = dict(agent)
+    for f in ("scores_json", "analysis_json", "prediction_json"):
+        if isinstance(safe.get(f), (dict, list)):
+            safe[f] = json.dumps(safe[f])
+    agent = safe
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
             INSERT INTO agents (
@@ -436,8 +442,15 @@ UPSERT_SQL = f"""
 
 
 def _dict_to_tuple(agent: dict) -> tuple:
-    """Convert agent dict to positional tuple matching UPSERT_COLS order."""
-    return tuple(agent.get(col) for col in UPSERT_COLS)
+    """Convert agent dict to positional tuple matching UPSERT_COLS order.
+    Auto-serializes any dict/list values to JSON strings for SQLite."""
+    result = []
+    for col in UPSERT_COLS:
+        val = agent.get(col)
+        if isinstance(val, (dict, list)):
+            val = json.dumps(val)
+        result.append(val)
+    return tuple(result)
 
 
 async def bulk_upsert_agents(agents: list[dict], batch_size: int = 500) -> int:
