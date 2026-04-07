@@ -344,6 +344,10 @@ td.rank-cell { font-size: 13px; color: var(--text-dim); width: 40px; text-align:
   </div>
 </nav>
 
+<script>
+var SERVER_DETAIL_ID = {{ detail_agent_id|tojson if detail_agent_id is defined and detail_agent_id else 'null' }};
+var SERVER_CATEGORY = {{ category_page|tojson if category_page is defined and category_page else 'null' }};
+</script>
 {% raw %}
 <script>
 (function() {
@@ -361,6 +365,7 @@ const SORT_OPTIONS = [
 ];
 const TIER_ORDER = ['Foundation','Traction','On-chain','Narrative'];
 const TIER_PREFIX = { F: 'Foundation', T: 'Traction', O: 'On-chain', N: 'Narrative' };
+const DOXX_LABELS = { 1: 'Full Doxx', 2: 'Social Presence', 3: 'Anonymous' };
 
 /* ====== STATE ====== */
 let S = {
@@ -381,10 +386,6 @@ function loadWatchlist() {
 function saveWatchlist() {
   localStorage.setItem('viq_watchlist', JSON.stringify(S.watchlist));
 }
-
-/* ====== SERVER VARS ====== */
-const SERVER_DETAIL_ID = null;
-const SERVER_CATEGORY = null;
 
 /* ====== FORMAT HELPERS ====== */
 function fmt(n, dec) {
@@ -436,9 +437,9 @@ function tierClass(t) {
 function doxxClass(t) {
   if (!t) return 'doxx-none';
   const s = String(t).toLowerCase();
-  if (s.includes('high') || s.includes('full') || s === '3') return 'doxx-high';
-  if (s.includes('med') || s === '2') return 'doxx-medium';
-  if (s.includes('low') || s === '1') return 'doxx-low';
+  if (s === '1' || s.includes('full') || s.includes('high')) return 'doxx-high';
+  if (s === '2' || s.includes('social') || s.includes('med')) return 'doxx-medium';
+  if (s === '3' || s.includes('anon') || s.includes('low')) return 'doxx-low';
   return 'doxx-none';
 }
 function scoreColor(v) {
@@ -1009,7 +1010,13 @@ function renderHome() {
         popupHtml += '</div>';
       }
       if (a.doxx_tier) {
-        popupHtml += '<div class="viq-doxx">Doxx: <strong>' + esc(a.doxx_tier) + '</strong></div>';
+        var doxxLabel = DOXX_LABELS[a.doxx_tier] || ('Tier ' + a.doxx_tier);
+        popupHtml += '<div class="viq-doxx">Doxx: <strong>' + esc(doxxLabel) + '</strong> (Tier ' + esc(a.doxx_tier) + ')</div>';
+      }
+      /* One-liner summary from scores_json */
+      var scoresData = parseScoresJson(a.scores_json);
+      if (scoresData && scoresData._one_liner) {
+        popupHtml += '<div class="viq-oneliner">' + esc(scoresData._one_liner) + '</div>';
       }
       popupHtml += '</div>';
     }
@@ -1086,7 +1093,7 @@ function renderDetail() {
     var sc = (a.status === 'Available' || a.status === 'available') ? 'status-available' : 'status-unavailable';
     h += ' <span class="status-badge ' + sc + '">' + esc(a.status) + '</span>';
   }
-  if (a.doxx_tier) h += ' <span class="doxx-badge ' + dc + '">Doxx: ' + esc(a.doxx_tier) + '</span>';
+  if (a.doxx_tier) h += ' <span class="doxx-badge ' + dc + '">' + esc(DOXX_LABELS[a.doxx_tier] || ('Doxx Tier ' + a.doxx_tier)) + '</span>';
   h += '</h1>';
   h += '<div class="detail-links">';
   if (a.virtuals_id) h += '<a href="https://app.virtuals.io/virtuals/' + esc(a.virtuals_id) + '" target="_blank">Virtuals</a>';
@@ -1115,6 +1122,7 @@ function renderDetail() {
   h += '<div class="dstat"><div class="dstat-label">Volume 24h</div><div class="dstat-val">' + fmtUsd(a.volume_24h) + '</div></div>';
   h += '<div class="dstat"><div class="dstat-label">Holders</div><div class="dstat-val">' + (a.holder_count != null ? fmt(a.holder_count, 0) : '-') + '</div></div>';
   if (a.created_at) h += '<div class="dstat"><div class="dstat-label">Age</div><div class="dstat-val">' + timeAgo(a.created_at) + '</div></div>';
+  if (a.updated_at) h += '<div class="dstat"><div class="dstat-label">Updated</div><div class="dstat-val">' + timeAgo(a.updated_at) + '</div></div>';
   h += '</div>';
 
   /* DexScreener chart embed */
@@ -1195,10 +1203,24 @@ function renderCategory() {
   h += '<div class="category-header"><h2>' + esc(d.category || S.category) + '</h2>';
   if (d.stats) {
     h += '<div class="cat-stats">';
-    if (d.stats.count != null) h += '<div class="cat-stat"><strong>' + d.stats.count + '</strong> agents</div>';
-    if (d.stats.total_market_cap != null) h += '<div class="cat-stat">MCap <strong>' + fmtUsd(d.stats.total_market_cap) + '</strong></div>';
+    if (d.stats.total != null) h += '<div class="cat-stat"><strong>' + d.stats.total + '</strong> agents</div>';
+    if (d.stats.total_mcap != null) h += '<div class="cat-stat">MCap <strong>' + fmtUsd(d.stats.total_mcap) + '</strong></div>';
     if (d.stats.avg_score != null) h += '<div class="cat-stat">Avg VIQ <strong>' + Number(d.stats.avg_score).toFixed(1) + '</strong></div>';
+    if (d.stats.total_volume != null) h += '<div class="cat-stat">24h Vol <strong>' + fmtUsd(d.stats.total_volume) + '</strong></div>';
     h += '</div>';
+  }
+  /* AI-written category summary */
+  if (d.ai_summary) {
+    h += '<p style="font-size:14px;color:var(--text-muted);margin-top:10px;line-height:1.65">' + esc(d.ai_summary) + '</p>';
+  } else if (d.stats) {
+    var catName = esc(d.category || S.category);
+    var total = d.stats.total || 0;
+    var avgScore = d.stats.avg_score ? Number(d.stats.avg_score).toFixed(1) : 'N/A';
+    var topAgent = (d.top_by_viq && d.top_by_viq.length) ? d.top_by_viq[0].name : null;
+    var summary = catName + ' has ' + total + ' agents with an average VIQ score of ' + avgScore + '.';
+    if (topAgent) summary += ' The top-rated agent is ' + topAgent + '.';
+    if (d.stats.total_mcap > 0) summary += ' Combined market cap is ' + fmtUsd(d.stats.total_mcap) + '.';
+    h += '<p style="font-size:14px;color:var(--text-muted);margin-top:10px;line-height:1.65">' + summary + '</p>';
   }
   h += '</div>';
 
@@ -1243,6 +1265,16 @@ function renderSkeleton(count) {
 
 /* ====== INIT ====== */
 function init() {
+  /* Use server-injected vars for direct page loads (defined outside {% raw %}) */
+  if (typeof SERVER_DETAIL_ID !== 'undefined' && SERVER_DETAIL_ID) {
+    loadDetail(SERVER_DETAIL_ID);
+    return;
+  }
+  if (typeof SERVER_CATEGORY !== 'undefined' && SERVER_CATEGORY) {
+    S.category = SERVER_CATEGORY;
+    loadCategoryPage(SERVER_CATEGORY);
+    return;
+  }
   var path = location.pathname;
   routeFromPath(path);
 }
