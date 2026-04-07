@@ -119,13 +119,25 @@ def _f5_defensibility(agent: dict, ai: dict) -> float:
 def _f6_doxx_tier(agent: dict, ai: dict) -> float:
     """Team visibility: Tier 1=Full Doxx, Tier 2=Social, Tier 3=Anon (5%)"""
     tier = int(agent.get("doxx_tier") or ai.get("team", {}).get("doxx_tier") or 3)
-    return {1: 100.0, 2: 60.0, 3: 20.0}.get(tier, NEUTRAL)
+    base = {1: 100.0, 2: 60.0, 3: 20.0}.get(tier, NEUTRAL)
+    # If overview found team red flags, penalize further
+    team = ai.get("team", {})
+    if team.get("red_flags") and len(team["red_flags"]) > 0:
+        base = max(0, base - len(team["red_flags"]) * 10)
+    return _clamp(base)
 
 
 def _f7_track_record(agent: dict, ai: dict) -> float:
     """Prior track record (5%)"""
     v = ai.get("team", {}).get("track_record_score")
-    return _clamp(float(v)) if v is not None else NEUTRAL
+    if v is not None:
+        score = _clamp(float(v))
+        # Cross-reference: if team is anonymous (tier 3), cap track record
+        tier = int(agent.get("doxx_tier") or ai.get("team", {}).get("doxx_tier") or 3)
+        if tier == 3:
+            score = min(score, 40.0)
+        return score
+    return NEUTRAL
 
 
 def _f8_code_activity(agent: dict, ai: dict) -> float:
@@ -182,7 +194,17 @@ def _f10_product_status(agent: dict, ai: dict) -> float:
 def _f11_partnerships(agent: dict, ai: dict) -> float:
     """Partnership evidence (3%)"""
     v = ai.get("product", {}).get("partnership_score")
-    return _clamp(float(v)) if v is not None else NEUTRAL
+    if v is not None:
+        score = _clamp(float(v))
+        # Boost if product has no red flags and technical moat is described
+        product = ai.get("product", {})
+        if product.get("technical_moat") and not product.get("red_flags"):
+            score = min(100, score + 5)
+        # Penalize if product has red flags
+        if product.get("red_flags") and len(product["red_flags"]) > 0:
+            score = max(0, score - len(product["red_flags"]) * 8)
+        return score
+    return NEUTRAL
 
 
 def _f12_wallet_behavior(agent: dict, ai: dict) -> float:
@@ -406,9 +428,75 @@ def _classify_tier(score: float) -> str:
     return "Avoid"
 
 
+def _build_score_narrative(agent_data: dict, ai_analysis: dict, scores: dict,
+                           composite: float, tier_scores: dict) -> str:
+    """Build a human-readable narrative explaining WHY the score is what it is,
+    citing specific findings from the AI overview."""
+    name = agent_data.get("name", "This agent")
+    parts = []
+
+    # Team insight
+    team = ai_analysis.get("team", {})
+    doxx_tier = int(agent_data.get("doxx_tier") or team.get("doxx_tier") or 3)
+    if doxx_tier == 3:
+        parts.append(f"Team is anonymous (no verifiable identity), limiting trust score")
+    elif doxx_tier == 1:
+        parts.append(f"Team is fully doxxed, boosting credibility")
+    if team.get("red_flags"):
+        parts.append(f"Team red flags: {', '.join(team['red_flags'][:2])}")
+
+    # Product insight
+    product = ai_analysis.get("product", {})
+    if product.get("status"):
+        parts.append(f"Product status: {product['status']}")
+    if product.get("red_flags"):
+        parts.append(f"Product concerns: {', '.join(product['red_flags'][:2])}")
+
+    # Market data insight
+    mcap = float(agent_data.get("market_cap") or 0)
+    vol = float(agent_data.get("volume_24h") or 0)
+    holders = int(agent_data.get("holder_count") or 0)
+    if vol < 10000 and vol > 0:
+        parts.append(f"Very low 24h volume (${vol:,.0f}) indicates limited trading activity")
+    if holders < 100 and holders > 0:
+        parts.append(f"Only {holders} holders — very early or low adoption")
+    elif holders > 5000:
+        parts.append(f"{holders:,} holders indicates solid distribution")
+
+    # SWOT insight
+    swot = ai_analysis.get("swot", {})
+    if swot.get("strengths"):
+        parts.append(f"Key strength: {swot['strengths'][0]}")
+    if swot.get("weaknesses"):
+        parts.append(f"Key weakness: {swot['weaknesses'][0]}")
+
+    # First mover insight
+    fm = ai_analysis.get("first_mover", {})
+    if fm.get("category_unique") is True:
+        parts.append("First mover advantage: unique category positioning")
+    elif fm.get("category_unique") is False:
+        parts.append("Operates in a crowded category with established competitors")
+
+    # Tier summary
+    strongest_tier = max(tier_scores, key=tier_scores.get) if tier_scores else None
+    weakest_tier = min(tier_scores, key=tier_scores.get) if tier_scores else None
+    tier_labels = {"first_mover": "First Mover", "team": "Team & Execution",
+                   "value": "Value Pool/TAM", "community": "Community"}
+    if strongest_tier and weakest_tier and strongest_tier != weakest_tier:
+        parts.append(
+            f"Strongest dimension: {tier_labels.get(strongest_tier, strongest_tier)} "
+            f"({tier_scores[strongest_tier]:.0f}). "
+            f"Weakest: {tier_labels.get(weakest_tier, weakest_tier)} "
+            f"({tier_scores[weakest_tier]:.0f})"
+        )
+
+    return ". ".join(parts) + "." if parts else ""
+
+
 def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
     """
     Run all 24 factors and return composite score with breakdown.
+    Scores are INFORMED by the deep AI analysis findings.
 
     Returns:
         {
@@ -417,6 +505,7 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
             "scores": {factor_name: float, ...},
             "tier_scores": {tier_name: float, ...},
             "first_mover": bool,
+            "score_narrative": str,
         }
     """
     scores = {}
@@ -432,6 +521,23 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
         weighted_sum += score * weight
 
     composite = _clamp(round(weighted_sum, 1))
+
+    # SWOT-based adjustment: if the analysis found critical weaknesses/threats,
+    # apply a small penalty; if strong strengths, small boost
+    swot = ai_analysis.get("swot", {})
+    weakness_count = len(swot.get("weaknesses", []))
+    strength_count = len(swot.get("strengths", []))
+    threat_count = len(swot.get("threats", []))
+    swot_adjust = (strength_count - weakness_count - threat_count * 0.5) * 0.5
+    composite = _clamp(round(composite + swot_adjust, 1))
+
+    # Technical bonus: if open source and audited, small boost
+    tech = ai_analysis.get("technical", {})
+    if tech.get("open_source") is True:
+        composite = _clamp(round(composite + 1.0, 1))
+    if tech.get("audit_status") == "audited":
+        composite = _clamp(round(composite + 1.5, 1))
+
     tier = _classify_tier(composite)
 
     # Tier-level rollups
@@ -450,10 +556,16 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
         scores.get("F2_approach_novelty", NEUTRAL) >= 80
     )
 
+    # Build narrative citing actual findings
+    narrative = _build_score_narrative(
+        agent_data, ai_analysis, scores, composite, tier_scores
+    )
+
     return {
         "composite_score": composite,
         "tier_classification": tier,
         "scores": scores,
         "tier_scores": tier_scores,
         "first_mover": first_mover,
+        "score_narrative": narrative,
     }
