@@ -5,12 +5,15 @@ SQLite with aiosqlite for async access
 
 import json
 import logging
+import os
 import aiosqlite
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = "virtualsiq.db"
+# Use Railway persistent volume if available, otherwise local
+_vol = os.environ.get("RAILWAY_VOLUME_MOUNT_PATH", "")
+DB_PATH = os.path.join(_vol, "virtualsiq.db") if _vol else "virtualsiq.db"
 
 
 async def get_db() -> aiosqlite.Connection:
