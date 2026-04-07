@@ -38,6 +38,43 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
+# Category inference helpers
+# ---------------------------------------------------------------------------
+
+GENERIC_CATEGORIES = {"IP", "Unknown", "", None}
+
+CAT_KEYWORDS = {
+    "DeFi": ["defi", "swap", "lend", "yield", "liquidity", "amm", "vault", "stake", "borrow", "finance", "dex", "pool", "bridge"],
+    "Gaming": ["game", "play", "quest", "battle", "arena", "nft game", "rpg", "metaverse", "world", "land"],
+    "Social": ["social", "chat", "community", "dao", "governance", "vote", "forum", "message", "friend", "connect"],
+    "Trading": ["trade", "signal", "bot", "alpha", "snipe", "copy", "arbitrage", "hedge", "leverage", "margin"],
+    "Infra": ["infra", "protocol", "sdk", "api", "oracle", "node", "chain", "layer", "bridge", "index", "data", "analytics"],
+    "Info": ["info", "news", "research", "learn", "education", "wiki", "guide", "report", "insight", "intelligence"],
+    "Entertainment": ["entertainment", "music", "art", "meme", "fun", "comedy", "video", "stream", "creator", "content"],
+    "NFT": ["nft", "collectible", "pfp", "mint", "collection", "generative", "art"],
+}
+
+
+def _infer_category(agent: dict) -> str:
+    """Infer a meaningful category from agent data if the API gives a generic one."""
+    current = agent.get("agent_type", "")
+    if current and current not in GENERIC_CATEGORIES:
+        return current
+
+    text = " ".join([
+        str(agent.get("name", "")),
+        str(agent.get("biography", "")),
+        str(agent.get("ticker", "")),
+    ]).lower()
+
+    for cat, keywords in CAT_KEYWORDS.items():
+        for kw in keywords:
+            if kw in text:
+                return cat
+    return current or "Other"
+
+
+# ---------------------------------------------------------------------------
 # Enrichment state tracker (used by /api/status)
 # ---------------------------------------------------------------------------
 
@@ -95,6 +132,20 @@ async def _run_analysis_job(job_id: str, virtuals_id: str):
         analysis = result["analysis"]
 
         prediction_json = analysis.get("prediction", {})
+
+        # Infer category from analysis if current is generic
+        inferred_category = _infer_category(agent)
+        if inferred_category != agent.get("agent_type"):
+            # Update the agent_type in the database
+            from database import get_db
+            import aiosqlite
+            async with aiosqlite.connect("virtualsiq.db") as db:
+                await db.execute(
+                    "UPDATE agents SET agent_type=? WHERE virtuals_id=?",
+                    (inferred_category, virtuals_id)
+                )
+                await db.commit()
+            logger.info(f"Updated category for {virtuals_id}: {agent.get('agent_type')} -> {inferred_category}")
 
         await update_agent_scores(
             virtuals_id=virtuals_id,
@@ -280,13 +331,14 @@ async def trending_feed(feed: str, limit: int = Query(20, ge=1, le=50)):
 
 
 @app.post("/api/analyze/{virtuals_id}")
-async def trigger_analysis(virtuals_id: str, background_tasks: BackgroundTasks):
+async def trigger_analysis(virtuals_id: str):
     agent = await get_agent_detail(virtuals_id)
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
 
     job_id = create_job(virtuals_id)
-    background_tasks.add_task(_run_analysis_job, job_id, virtuals_id)
+    # Use asyncio.create_task for proper async execution
+    asyncio.create_task(_run_analysis_job(job_id, virtuals_id))
 
     return {
         "job_id": job_id,
