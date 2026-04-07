@@ -91,10 +91,8 @@ async def _fetch_page(
 
 def _parse_agent(item: dict) -> dict:
     """Convert raw Virtuals API item to our agent schema."""
-    # Use `or item` so a null "attributes" value falls back to the item itself
     attrs = item.get("attributes") or item
 
-    # Handle nested structures from Virtuals API
     virtual_id = str(item.get("id") or attrs.get("id") or "")
     name = attrs.get("name") or "Unknown"
     ticker = attrs.get("symbol") or attrs.get("ticker") or ""
@@ -102,13 +100,11 @@ def _parse_agent(item: dict) -> dict:
     status_code = attrs.get("status") or 4
     status = STATUS_MAP.get(status_code, "Prototype")
 
-    # Category / type
     category = attrs.get("category") or attrs.get("agentType") or attrs.get("role") or ""
     if isinstance(category, dict):
         category = category.get("name") or ""
     agent_type = normalize_agent_type(category)
 
-    # Social links — guard against null socials; API returns UPPERCASE keys
     socials = attrs.get("socials") or {}
     if isinstance(socials, list):
         socials = {s.get("type", ""): s.get("url", "") for s in socials if isinstance(s, dict)}
@@ -126,20 +122,16 @@ def _parse_agent(item: dict) -> dict:
         attrs.get("telegram") or attrs.get("linkedTelegram") or ""
     )
 
-    # Market data — use Virtuals API fields first, fall back to legacy names
     market_cap = float(attrs.get("mcapInVirtual") or attrs.get("marketCap") or 0)
     price_usd = float(attrs.get("currentPrice") or attrs.get("priceUsd") or 0)
 
-    # Image
     image_obj = attrs.get("image") or {}
     if isinstance(image_obj, dict):
         image_url = image_obj.get("url") or ""
     else:
         image_url = str(image_obj or "")
 
-    # Creation date
     created_at_raw = attrs.get("createdAt") or ""
-    # `creator` is a full JSON object in the API response — extract wallet from walletAddress instead
     _creator_wallet = attrs.get("walletAddress") or attrs.get("creatorWallet") or ""
     creator_wallet = _creator_wallet if isinstance(_creator_wallet, str) else ""
     biography = attrs.get("description") or attrs.get("bio") or attrs.get("biography") or ""
@@ -180,6 +172,7 @@ def _parse_agent(item: dict) -> dict:
         "scores_json": "{}",
         "analysis_json": "{}",
         "prediction_json": "{}",
+        "overview_json": "{}",
         "first_mover": 0,
         "doxx_tier": 3,
         "last_scanned": None,
@@ -188,13 +181,9 @@ def _parse_agent(item: dict) -> dict:
 
 
 async def fetch_all_agents(max_pages: int = 500) -> list[dict]:
-    """
-    Paginate through the full Virtuals API and return all agents.
-    Virtuals has 38k+ agents; at 100/page that's ~387 pages.
-    """
+    """Paginate through the full Virtuals API and return all agents."""
     agents = []
     async with httpx.AsyncClient() as client:
-        # Fetch first page to get total count
         first = await _fetch_page(client, 1, 100, status_filter=None)
         if not first:
             logger.error("Failed to fetch first page from Virtuals API")
@@ -210,7 +199,6 @@ async def fetch_all_agents(max_pages: int = 500) -> list[dict]:
         )
         logger.info(f"Virtuals API: {pagination.get('total', '?')} total agents, {total_pages} pages")
 
-        # Fetch remaining pages concurrently in batches of 10
         page = 2
         while page <= total_pages:
             batch = range(page, min(page + 10, total_pages + 1))
@@ -225,7 +213,6 @@ async def fetch_all_agents(max_pages: int = 500) -> list[dict]:
                 agents.extend([_parse_agent(item) for item in items])
 
             page += 10
-            # Brief pause between batches to be a good API citizen
             await asyncio.sleep(0.5)
 
     logger.info(f"Fetched {len(agents)} total agents from Virtuals Protocol")
@@ -233,10 +220,7 @@ async def fetch_all_agents(max_pages: int = 500) -> list[dict]:
 
 
 async def fetch_dexscreener_data(contract_address: str) -> dict:
-    """
-    Enrich agent with DexScreener market data.
-    Returns price, volume, liquidity, tx counts.
-    """
+    """Enrich agent with DexScreener market data."""
     if not contract_address:
         return {}
 
@@ -252,7 +236,6 @@ async def fetch_dexscreener_data(contract_address: str) -> dict:
             if not pairs:
                 return {}
 
-            # Use the pair with the highest liquidity
             best_pair = max(pairs, key=lambda p: float((p.get("liquidity") or {}).get("usd", 0) or 0))
 
             volume = best_pair.get("volume") or {}
@@ -290,29 +273,20 @@ async def fetch_dexscreener_data(contract_address: str) -> dict:
 
 
 async def detect_new_agents(existing_ids: set) -> list[dict]:
-    """
-    Fetch ALL current agents and return those not yet in the database.
-    Full pagination ensures we don't miss new launches anywhere in the list.
-    """
-    current = await fetch_all_agents()  # Full scan — no page cap
+    """Fetch ALL current agents and return those not yet in the database."""
+    current = await fetch_all_agents()
     new_agents = [a for a in current if a["virtuals_id"] not in existing_ids]
     if new_agents:
         logger.info(f"Detected {len(new_agents)} new agents")
-    return current  # Return all so the daily scan can update market data for everyone
+    return current
 
 
 async def preload_all_agents(on_batch=None):
-    """
-    Fetch ALL agents from Virtuals API and save them progressively to the database.
-    The first page (top agents by volume) is saved immediately so the dashboard has
-    useful content within seconds. Remaining pages are saved as they arrive.
-    on_batch: optional callable(total_stored_so_far) called after each batch save.
-    """
+    """Fetch ALL agents from Virtuals API and save progressively."""
     logger.info("Preloading ALL agents from Virtuals Protocol (progressive)...")
     total_stored = 0
 
     async with httpx.AsyncClient() as client:
-        # Fetch first page immediately and save it — users see data right away
         first = await _fetch_page(client, 1, 100, status_filter=None)
         if not first:
             logger.error("Failed to fetch first page from Virtuals API")
@@ -332,7 +306,6 @@ async def preload_all_agents(on_batch=None):
         total_pages = min(pagination.get("pageCount", 1), 500)
         logger.info(f"Virtuals API: {pagination.get('total', '?')} total agents, {total_pages} pages to fetch")
 
-        # Fetch remaining pages in batches of 10, saving each batch as it arrives
         page = 2
         while page <= total_pages:
             batch_range = range(page, min(page + 10, total_pages + 1))
@@ -360,11 +333,7 @@ async def preload_all_agents(on_batch=None):
 
 
 async def enrich_top_agents_dexscreener(top_n: int = 100):
-    """
-    Enrich the top N agents (by market cap) with DexScreener market data.
-    Call this AFTER preload_all_agents() so agents are already visible in the dashboard.
-    Stays well within DexScreener rate limits by capping at top_n and pacing requests.
-    """
+    """Enrich the top N agents (by market cap) with DexScreener market data."""
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
@@ -381,7 +350,7 @@ async def enrich_top_agents_dexscreener(top_n: int = 100):
 
     logger.info(f"Enriching top {len(rows)} agents with DexScreener data...")
 
-    semaphore = asyncio.Semaphore(3)  # Conservative concurrency to avoid 429s
+    semaphore = asyncio.Semaphore(3)
 
     async def enrich_one(row: dict):
         async with semaphore:
@@ -391,18 +360,52 @@ async def enrich_top_agents_dexscreener(top_n: int = 100):
                     await update_market_data(row["virtuals_id"], dex)
             except Exception as e:
                 logger.debug(f"DexScreener enrich failed for {row['virtuals_id']}: {e}")
-            await asyncio.sleep(0.3)  # ~3 req/s sustained
+            await asyncio.sleep(0.3)
 
     await asyncio.gather(*[enrich_one(r) for r in rows], return_exceptions=True)
     logger.info(f"DexScreener enrichment complete for top {len(rows)} agents")
 
 
+async def refresh_holder_counts(limit: int = 100):
+    """Refresh holder counts for top agents by re-fetching from Virtuals API."""
+    from database import update_holder_count
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT virtuals_id FROM agents
+               ORDER BY market_cap DESC LIMIT ?""",
+            (limit,)
+        ) as cur:
+            rows = [dict(r) for r in await cur.fetchall()]
+
+    if not rows:
+        return 0
+
+    updated = 0
+    async with httpx.AsyncClient() as client:
+        for row in rows:
+            try:
+                resp = await client.get(
+                    f"{VIRTUALS_API}/{row['virtuals_id']}",
+                    headers=HEADERS, timeout=15.0
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    attrs = data.get("data", {}).get("attributes", data.get("data", {}))
+                    holder_count = int(attrs.get("holderCount") or attrs.get("holders") or 0)
+                    if holder_count > 0:
+                        await update_holder_count(row["virtuals_id"], holder_count)
+                        updated += 1
+                await asyncio.sleep(0.2)
+            except Exception as e:
+                logger.debug(f"Holder refresh failed for {row['virtuals_id']}: {e}")
+
+    logger.info(f"Holder count refresh: updated {updated}/{len(rows)} agents")
+    return updated
+
+
 async def scan_newest_agents(pages: int = 5) -> int:
-    """
-    Quick scan: fetch the newest agents sorted by createdAt:desc.
-    Upserts any agents not yet in the database and returns the count of new agents found.
-    Stops early if all agents on a page are already known.
-    """
+    """Quick scan: fetch newest agents and upsert new ones."""
     existing_ids = await get_existing_ids()
     new_count = 0
 
@@ -426,7 +429,6 @@ async def scan_newest_agents(pages: int = 5) -> int:
                 new_count += len(new_agents)
                 logger.info(f"scan_newest_agents page {page}: {len(new_agents)} new agents upserted")
             else:
-                # All agents on this page are already known — stop early
                 logger.info(f"scan_newest_agents: no new agents on page {page}, stopping early")
                 break
 
@@ -435,7 +437,7 @@ async def scan_newest_agents(pages: int = 5) -> int:
 
 
 async def get_api_total_count() -> int:
-    """Fetch page 1 with pageSize=1 to retrieve the total agent count from pagination metadata."""
+    """Fetch page 1 with pageSize=1 to retrieve the total agent count."""
     async with httpx.AsyncClient() as client:
         result = await _fetch_page(client, 1, 1, status_filter=None)
     total = result.get("meta", {}).get("pagination", {}).get("total", 0)
