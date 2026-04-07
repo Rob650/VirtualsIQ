@@ -15,8 +15,8 @@
       --bg-4:       #E4E4E8;
       --border:     #E2E2E6;
       --border-2:   #CBCBD0;
-      --text:       #0F0F12;
-      --text-muted: #55556A;
+      --text:       #0E0E2C;
+      --text-muted: #4A4A6A;
       --text-dim:   #8E8EA0;
 
       --green:      #22C55E;
@@ -51,6 +51,8 @@
       min-height: 100vh;
       overflow-x: hidden;
       padding-bottom: 116px;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
 
     ::-webkit-scrollbar { width: 4px; height: 4px; }
@@ -129,38 +131,6 @@
     .search-input:focus { border-color: var(--accent); background: #fff; }
     .search-input::placeholder { color: var(--text-dim); }
 
-    /* ===== FILTER TABS ===== */
-    .filter-tabs-wrap {
-      padding: 10px 16px 0;
-      background: #fff;
-    }
-
-    .filter-tabs {
-      display: flex;
-      gap: 6px;
-      overflow-x: auto;
-      scrollbar-width: none;
-      padding-bottom: 10px;
-    }
-    .filter-tabs::-webkit-scrollbar { display: none; }
-
-    .filter-tab {
-      flex-shrink: 0;
-      padding: 6px 16px;
-      border-radius: var(--radius-pill);
-      border: 1px solid var(--border);
-      background: #fff;
-      color: var(--text-muted);
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.15s;
-      white-space: nowrap;
-    }
-
-    .filter-tab:hover { border-color: var(--accent); color: var(--text); }
-    .filter-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-
     /* ===== CATEGORY TABS ===== */
     .category-tabs-wrap {
       padding: 0 16px;
@@ -188,6 +158,7 @@
       transition: all 0.15s;
       white-space: nowrap;
       margin-bottom: -1px;
+      font-family: var(--font-ui);
     }
 
     .category-tab:hover { color: var(--text); }
@@ -259,7 +230,6 @@
     }
 
     /* ===== TABLE HEADER ===== */
-    /* FIX #1 & #6: wider columns to prevent MC/VIQ overlap; nowrap headers */
     .table-header {
       display: grid;
       grid-template-columns: 36px 1fr 120px 80px 72px;
@@ -276,6 +246,7 @@
       letter-spacing: 0.5px;
       color: var(--text-dim);
       white-space: nowrap;
+      font-family: var(--font-ui);
     }
     .th.sortable { cursor: pointer; user-select: none; }
     .th.sortable:hover { color: var(--text-muted); }
@@ -361,6 +332,7 @@
 
     .agent-links {
       display: flex;
+      flex-direction: row;
       gap: 4px;
       margin-top: 2px;
       flex-wrap: wrap;
@@ -521,6 +493,7 @@
       cursor: pointer;
       transition: all 0.15s;
       white-space: nowrap;
+      font-family: var(--font-ui);
     }
 
     .bottom-filter-btn:hover { border-color: var(--accent); }
@@ -543,10 +516,68 @@
       font-weight: 500;
       cursor: pointer;
       transition: color 0.15s;
+      font-family: var(--font-ui);
     }
 
     .bottom-tab.active { color: var(--accent); }
     .bottom-tab svg { width: 20px; height: 20px; }
+
+    /* ===== CATEGORY POPUP ===== */
+    .cat-popup-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.35);
+      backdrop-filter: blur(2px);
+      z-index: 300;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .cat-popup-overlay.active { display: flex; }
+
+    .cat-popup {
+      background: #fff;
+      border-radius: 16px 16px 0 0;
+      width: 100%;
+      max-width: 500px;
+      padding: 16px;
+      box-shadow: 0 -4px 24px rgba(0,0,0,0.12);
+      animation: slideUp 0.2s ease;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to   { transform: translateY(0); }
+    }
+
+    .cat-popup-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    .cat-popup-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .cat-popup-item {
+      padding: 10px 8px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--bg-2);
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 500;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: var(--font-ui);
+    }
+    .cat-popup-item:hover { border-color: var(--accent); color: var(--text); }
+    .cat-popup-item.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
     /* ===== MODAL ===== */
     .modal-overlay {
@@ -671,6 +702,7 @@
       justify-content: center;
       font-size: 16px;
       transition: all 0.15s;
+      font-family: var(--font-ui);
     }
     .modal-close:hover { background: var(--red-bg); border-color: var(--red); color: var(--red); }
 
@@ -705,6 +737,31 @@
       line-height: 1.7;
     }
 
+    /* Research report rendered from markdown */
+    .research-report h2 {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      margin: 20px 0 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--border);
+    }
+    .research-report h2:first-child { margin-top: 0; }
+    .research-report p {
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--text-muted);
+      margin: 6px 0;
+    }
+    .research-report ul, .research-report ol {
+      margin: 6px 0 6px 20px;
+      color: var(--text-muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .research-report li { margin-bottom: 3px; }
+    .research-report strong { color: var(--text); font-weight: 600; }
+
     .metrics-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -724,6 +781,7 @@
       text-transform: uppercase;
       letter-spacing: 0.3px;
       margin-bottom: 4px;
+      font-family: var(--font-ui);
     }
     .metric-tile-value {
       font-family: var(--font-data);
@@ -890,7 +948,6 @@
       to   { opacity: 1; transform: translateY(0); }
     }
 
-    /* FIX #4: VIQ reasoning summary in modal */
     .viq-reasoning {
       background: var(--bg-2);
       border: 1px solid var(--border);
@@ -925,18 +982,45 @@
       border-top: 1px solid var(--border);
     }
 
+    /* Generate Analysis button */
+    .generate-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #7C3AED, #06B6D4);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      font-family: var(--font-ui);
+    }
+    .generate-btn:hover { opacity: 0.9; }
+    .generate-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .analysis-loading {
+      text-align: center;
+      padding: 32px;
+      color: var(--text-dim);
+    }
+    .analysis-loading .loading-spinner { margin: 0 auto 12px; }
+
     /* ===== DESKTOP ===== */
     @media (min-width: 768px) {
       body { padding-bottom: 0; }
       .bottom-nav { display: none; }
       .header { padding: 12px 24px; }
-      .filter-tabs-wrap { padding: 12px 24px 0; }
       .category-tabs-wrap { padding: 0 24px; }
       .stats-bar { padding: 7px 24px; }
       .enrich-banner { padding: 6px 24px; }
       .table-header { padding: 7px 24px; grid-template-columns: 44px 1fr 150px 96px 84px; }
       .agent-row { padding: 12px 24px; grid-template-columns: 44px 1fr 150px 96px 84px; }
       .pagination { padding: 12px 24px; }
+      .cat-popup-overlay { align-items: center; }
+      .cat-popup { border-radius: 16px; max-width: 400px; }
     }
 
     @media (min-width: 1024px) {
@@ -959,6 +1043,8 @@
     <button class="category-tab" data-category="Trading">Trading</button>
     <button class="category-tab" data-category="Infra">Infra</button>
     <button class="category-tab" data-category="Info">Info</button>
+    <button class="category-tab" data-category="Entertainment">Entertainment</button>
+    <button class="category-tab" data-category="NFT">NFT</button>
   </div>
 </div>
 <div class="table-header">
@@ -970,6 +1056,15 @@
 </div>
 <div id="agent-list"><div class="loading-row"><div class="loading-spinner"></div>Loading agents...</div></div>
 <div class="pagination" id="pagination"></div>
+
+<!-- Category popup for bottom nav -->
+<div class="cat-popup-overlay" id="cat-popup-overlay">
+  <div class="cat-popup">
+    <div class="cat-popup-title">Filter by Category</div>
+    <div class="cat-popup-grid" id="cat-popup-grid"></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-overlay">
     <div class="modal-sheet" id="modal-sheet">
         <div class="modal-handle"></div>
@@ -987,6 +1082,7 @@
 </div>
 <nav class="bottom-nav">
     <div class="bottom-filters">
+      <button class="bottom-filter-btn" id="btn-category">Category: All</button>
       <button class="bottom-filter-btn" id="btn-status">Any Status</button>
       <button class="bottom-filter-btn" id="btn-doxx">Any Doxx</button>
       <button class="bottom-filter-btn" id="btn-sort"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M7 12h10M11 18h2"/></svg> Sort: MCap</button>
@@ -999,8 +1095,8 @@
 // ===== STATE =====
 const state = {
   page: 1,
-  pageSize: 100,       // FIX #12: increased from 25 to 100
-  sort: 'market_cap',  // FIX #2: default sort by market cap descending
+  pageSize: 100,
+  sort: 'market_cap',
   category: '',
   status: '',
   doxxTier: '',
@@ -1012,7 +1108,8 @@ const state = {
   totalPages: 1,
 };
 
-// ===== CATEGORY INFERENCE (FIX #11) =====
+// ===== CATEGORY INFERENCE =====
+const GENERIC_CATS = new Set(['IP', 'Unknown', '', null, undefined]);
 const CAT_KEYWORDS = {
   DeFi: ['defi','swap','lend','yield','liquidity','amm','vault','stake','borrow','finance','dex','pool','bridge'],
   Gaming: ['game','play','quest','battle','arena','nft game','rpg','metaverse','world','land'],
@@ -1020,24 +1117,24 @@ const CAT_KEYWORDS = {
   Trading: ['trade','signal','bot','alpha','snipe','copy','arbitrage','hedge','leverage','margin'],
   Infra: ['infra','protocol','sdk','api','oracle','node','chain','layer','bridge','index','data','analytics'],
   Info: ['info','news','research','learn','education','wiki','guide','report','insight','intelligence'],
+  Entertainment: ['entertainment','music','art','meme','fun','comedy','video','stream','creator','content'],
+  NFT: ['nft','collectible','pfp','mint','collection','generative'],
 };
 
 function inferCategory(a) {
-  // FIX #11: prefer agent_type from API, fallback to keyword inference
   const t = a.agent_type;
-  if (t && t !== 'Unknown' && t !== '') return t;
+  if (t && !GENERIC_CATS.has(t)) return t;
   const text = ((a.name || '') + ' ' + (a.biography || '') + ' ' + (a.ticker || '')).toLowerCase();
   for (const cat in CAT_KEYWORDS) {
     for (const kw of CAT_KEYWORDS[cat]) {
       if (text.includes(kw)) return cat;
     }
   }
-  return '';
+  return t || 'Other';
 }
 
 // ===== FORMATTERS =====
 function fmtMcap(v) {
-  // FIX #13: parseFloat and handle null
   if (v === null || v === undefined || v === '') return '\u2014';
   const n = parseFloat(v);
   if (isNaN(n)) return '\u2014';
@@ -1096,12 +1193,29 @@ function escHtml(s) {
   return d.innerHTML;
 }
 
-// FIX #3: clean factor key - strip F1_/F2_ prefixes, underscores to spaces, title case
 function cleanFactorLabel(key) {
   return key
     .replace(/^F\d+_/, '')
     .replace(/_/g, ' ')
     .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// Simple markdown-to-HTML for research reports
+function mdToHtml(md) {
+  if (!md) return '';
+  return md
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/\n/g, '<br/>')
+    .replace(/^(?!<[hulo])/gm, function(match, offset, str) {
+      // Wrap plain text blocks in <p>
+      return match;
+    });
 }
 
 // ===== LOAD STATS =====
@@ -1110,7 +1224,6 @@ async function loadStats() {
   try {
     const r = await fetch('/api/stats');
     cachedStats = await r.json();
-    // stats bar is optional — update if elements exist
   } catch(e) { console.error('Stats error:', e); }
 }
 
@@ -1120,7 +1233,6 @@ async function loadAgents() {
   list.innerHTML = '<div class="loading-row"><div class="loading-spinner"></div>Loading agents...</div>';
 
   try {
-    // FIX #12: use larger page size for category views
     const effectivePageSize = state.category ? 500 : state.pageSize;
 
     const params = new URLSearchParams({
@@ -1146,7 +1258,7 @@ async function loadAgents() {
       return;
     }
 
-    // FIX #11: client-side category filter for agents whose API category might not match
+    // Client-side category filter (handles "IP" and generic categories)
     let filtered = agents;
     if (state.category) {
       filtered = agents.filter(a => {
@@ -1155,7 +1267,6 @@ async function loadAgents() {
       });
     }
 
-    // FIX #2: sort by market cap descending for "All" tab
     if (state.sort === 'market_cap') {
       filtered.sort((a, b) => (parseFloat(b.market_cap) || 0) - (parseFloat(a.market_cap) || 0));
     } else if (state.sort === 'composite_score') {
@@ -1168,7 +1279,6 @@ async function loadAgents() {
 
     list.innerHTML = filtered.map((a, i) => {
       const rank = offset + i + 1;
-      // FIX #13: parseFloat for market_cap, handle null
       const mcap = parseFloat(a.market_cap) || 0;
       const change = parseFloat(a.price_change_24h || 0);
       const changeClass = change >= 0 ? 'positive' : 'negative';
@@ -1181,15 +1291,12 @@ async function loadAgents() {
       const metricLine = [vol, hl].filter(Boolean).join('  ');
       const priceStr = a.price_usd ? '$' + parseFloat(a.price_usd).toPrecision(4) : '\u2014';
 
-      // FIX #7: link to virtuals.io
       const virtualsLink = a.virtuals_id
         ? `<a class="agent-ext-link" href="https://app.virtuals.io/virtuals/${a.virtuals_id}" target="_blank" rel="noopener" onclick="event.stopPropagation()">VRT</a>`
         : '';
-      // FIX #8: link to dexscreener
       const dexLink = a.contract_address
         ? `<a class="agent-ext-link" href="https://dexscreener.com/base/${a.contract_address}" target="_blank" rel="noopener" onclick="event.stopPropagation()">DEX</a>`
         : '';
-      // FIX #9: show socials
       const twitterLink = a.linked_twitter
         ? `<a class="agent-ext-link" href="${a.linked_twitter}" target="_blank" rel="noopener" onclick="event.stopPropagation()">&#x1D54F;</a>`
         : '';
@@ -1239,7 +1346,6 @@ async function loadAgents() {
   }
 }
 
-// FIX #14: show agent count per tab like "1-25 of 38,830"
 function updateTabCounts() {
   const tabs = document.querySelectorAll('.category-tab');
   tabs.forEach(tab => {
@@ -1279,6 +1385,61 @@ function gotoPage(p) {
   state.page = p;
   loadAgents();
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ===== TRIGGER ANALYSIS =====
+async function triggerAnalysis(virtualsId) {
+  const btn = document.getElementById('generate-analysis-btn');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<div class="loading-spinner" style="width:16px;height:16px;margin:0;border-width:2px;display:inline-block;vertical-align:middle"></div> Analyzing...';
+  }
+
+  const statusEl = document.getElementById('analysis-status');
+  if (statusEl) statusEl.style.display = 'block';
+
+  try {
+    const res = await fetch(`/api/analyze/${virtualsId}`, { method: 'POST' });
+    if (!res.ok) throw new Error('Analysis request failed');
+    const data = await res.json();
+    const jobId = data.job_id;
+
+    // Poll for completion
+    if (state.jobPollInterval) clearInterval(state.jobPollInterval);
+    state.jobPollInterval = setInterval(async () => {
+      try {
+        const jobRes = await fetch(`/api/job/${jobId}`);
+        const job = await jobRes.json();
+
+        if (statusEl) {
+          if (job.status === 'running') {
+            statusEl.innerHTML = '<div class="loading-spinner" style="width:20px;height:20px;margin:0 auto 8px"></div><div>AI is researching this project... This takes 30-60 seconds.</div>';
+          }
+        }
+
+        if (job.status === 'completed') {
+          clearInterval(state.jobPollInterval);
+          state.jobPollInterval = null;
+          showToast('Analysis complete!');
+          // Reload the modal with fresh data
+          openModal(virtualsId);
+        } else if (job.status === 'failed') {
+          clearInterval(state.jobPollInterval);
+          state.jobPollInterval = null;
+          showToast('Analysis failed: ' + (job.error || 'Unknown error'), true);
+          if (btn) { btn.disabled = false; btn.textContent = 'Retry Analysis'; }
+          if (statusEl) statusEl.style.display = 'none';
+        }
+      } catch(e) {
+        console.error('Job poll error:', e);
+      }
+    }, 3000);
+
+  } catch(e) {
+    showToast('Failed to start analysis', true);
+    if (btn) { btn.disabled = false; btn.textContent = 'Generate Analysis'; }
+    if (statusEl) statusEl.style.display = 'none';
+  }
 }
 
 // ===== MODAL =====
@@ -1347,11 +1508,12 @@ function renderModal(agent) {
   const analysis = agent.analysis_json || {};
   const scores = agent.scores_json || {};
   const prediction = agent.prediction_json || {};
-  const hasAnalysis = Object.keys(analysis).length > 0;
+  const hasAnalysis = Object.keys(analysis).length > 0 && (analysis.overview || analysis.swot);
   const overview = analysis.overview || {};
   const riskData = analysis.risk || {};
   const name = agent.name || 'This agent';
   const cat = inferCategory(agent) || 'AI';
+  const researchReport = analysis.research_report || '';
 
   const body = document.getElementById('modal-body');
   body.innerHTML = `
@@ -1371,7 +1533,33 @@ function renderModal(agent) {
 
     ${renderVIQReasoning(scores, score, name, cat)}
 
+    <div>
+      <div class="report-section-title">Price &amp; Liquidity</div>
+      <div class="metrics-grid" style="grid-template-columns:repeat(4,1fr)">
+        <div class="metric-tile" style="border-left:3px solid var(--accent)"><div class="metric-tile-label">Price</div><div class="metric-tile-value" style="font-size:17px;color:var(--text)">${agent.price_usd ? '$' + parseFloat(agent.price_usd).toPrecision(4) : '\u2014'}</div></div>
+        <div class="metric-tile" style="border-left:3px solid var(--teal)"><div class="metric-tile-label">Market Cap</div><div class="metric-tile-value teal">${fmtMcap(agent.market_cap)}</div></div>
+        <div class="metric-tile" style="border-left:3px solid var(--purple)"><div class="metric-tile-label">24h Volume</div><div class="metric-tile-value purple">${fmtVol(agent.volume_24h)}</div></div>
+        <div class="metric-tile" style="border-left:3px solid ${parseFloat(agent.price_change_24h||0)>=0?'var(--green)':'var(--red)'}"><div class="metric-tile-label">24h Change</div><div class="metric-tile-value ${parseFloat(agent.price_change_24h||0)>=0?'green':'red'}">${fmtChange(agent.price_change_24h)}</div></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="report-section-title">On-Chain Metrics</div>
+      <div class="metrics-grid">
+        <div class="metric-tile"><div class="metric-tile-label">Liquidity</div><div class="metric-tile-value teal">${fmtMcap(agent.liquidity_usd)}</div></div>
+        <div class="metric-tile"><div class="metric-tile-label">Buy/Sell Ratio</div><div class="metric-tile-value ${parseFloat(agent.buy_sell_ratio||1)>=1?'green':'red'}">${parseFloat(agent.buy_sell_ratio||1).toFixed(2)}x</div></div>
+        <div class="metric-tile"><div class="metric-tile-label">Holders</div><div class="metric-tile-value">${fmtNumber(agent.holder_count)}</div></div>
+        <div class="metric-tile"><div class="metric-tile-label">Twitter Followers</div><div class="metric-tile-value">${fmtNumber(agent.twitter_followers)}</div></div>
+      </div>
+    </div>
+
     ${hasAnalysis ? `
+    ${researchReport ? `
+    <div>
+      <div class="report-section-title">Research Report</div>
+      <div class="research-report">${mdToHtml(researchReport)}</div>
+    </div>` : ''}
+
     <div>
       <div class="report-section-title">What It Is</div>
       <p class="report-narrative">${overview.what_it_is || overview.summary || 'No overview available.'}</p>
@@ -1438,33 +1626,19 @@ function renderModal(agent) {
       </div>
     </div>` : ''}
     ` : `
-    <div>
-      <div class="report-section-title">Overview</div>
-      <p class="report-narrative">${escHtml(agent.biography || 'No biography available for this agent.')}</p>
-      <p style="margin-top:12px;font-size:12px;color:var(--text-dim)">Full AI analysis not yet generated.</p>
+    <div style="text-align:center;padding:24px">
+      <div class="report-section-title" style="justify-content:center">AI Intelligence Report</div>
+      <p class="report-narrative" style="margin-bottom:16px">${escHtml(agent.biography || 'No biography available for this agent.')}</p>
+      <p style="margin-bottom:20px;font-size:13px;color:var(--text-dim)">Deep AI analysis has not been generated yet. Click below to generate a comprehensive research report with scoring context, SWOT analysis, and investment thesis.</p>
+      <button class="generate-btn" id="generate-analysis-btn" onclick="triggerAnalysis('${agent.virtuals_id}')">
+        Generate Deep Analysis
+      </button>
+      <div id="analysis-status" class="analysis-loading" style="display:none;margin-top:16px">
+        <div class="loading-spinner" style="width:24px;height:24px;margin:0 auto 10px"></div>
+        <div>AI is researching this project... This takes 30-60 seconds.</div>
+      </div>
     </div>
     `}
-
-    <div>
-      <div class="report-section-title">Price &amp; Liquidity (DexScreener)</div>
-      <div class="metrics-grid" style="grid-template-columns:repeat(4,1fr)">
-        <div class="metric-tile" style="border-left:3px solid var(--accent)"><div class="metric-tile-label">Price</div><div class="metric-tile-value" style="font-size:17px;color:var(--text)">${agent.price_usd ? '$' + parseFloat(agent.price_usd).toPrecision(4) : '\u2014'}</div></div>
-        <div class="metric-tile" style="border-left:3px solid var(--teal)"><div class="metric-tile-label">Market Cap</div><div class="metric-tile-value teal">${fmtMcap(agent.market_cap)}</div></div>
-        <div class="metric-tile" style="border-left:3px solid var(--purple)"><div class="metric-tile-label">24h Volume</div><div class="metric-tile-value purple">${fmtVol(agent.volume_24h)}</div></div>
-        <div class="metric-tile" style="border-left:3px solid ${parseFloat(agent.price_change_24h||0)>=0?'var(--green)':'var(--red)'}"><div class="metric-tile-label">24h Change</div><div class="metric-tile-value ${parseFloat(agent.price_change_24h||0)>=0?'green':'red'}">${fmtChange(agent.price_change_24h)}</div></div>
-      </div>
-    </div>
-
-    <div>
-      <div class="report-section-title">On-Chain Metrics</div>
-      <div class="metrics-grid">
-        <div class="metric-tile"><div class="metric-tile-label">Liquidity</div><div class="metric-tile-value teal">${fmtMcap(agent.liquidity_usd)}</div></div>
-        <div class="metric-tile"><div class="metric-tile-label">Buy/Sell Ratio</div><div class="metric-tile-value ${parseFloat(agent.buy_sell_ratio||1)>=1?'green':'red'}">${parseFloat(agent.buy_sell_ratio||1).toFixed(2)}x</div></div>
-        <div class="metric-tile"><div class="metric-tile-label">Holders</div><div class="metric-tile-value">${fmtNumber(agent.holder_count)}</div></div>
-        <div class="metric-tile"><div class="metric-tile-label">Twitter Followers</div><div class="metric-tile-value">${fmtNumber(agent.twitter_followers)}</div></div>
-        <div class="metric-tile"><div class="metric-tile-label">GitHub Stars</div><div class="metric-tile-value">${fmtNumber(agent.github_stars)}</div></div>
-      </div>
-    </div>
 
     ${agent.contract_address ? `
     <div>
@@ -1494,11 +1668,9 @@ function renderModal(agent) {
   `;
 }
 
-// FIX #4: VIQ score reasoning — top 5 weighted scores with explanation
 function renderVIQReasoning(scores, totalScore, name, cat) {
   if (!scores || !Object.keys(scores).length) return '';
 
-  // Get all scores, sort by value descending, take top 5
   const entries = Object.entries(scores)
     .map(([k, v]) => ({ key: k, label: cleanFactorLabel(k), score: typeof v === 'object' ? (v.score || v.value || 0) : (v || 0) }))
     .sort((a, b) => b.score - a.score)
@@ -1527,7 +1699,6 @@ function renderVIQReasoning(scores, totalScore, name, cat) {
   </div>`;
 }
 
-// FIX #15: TAM and prediction specific to project
 function renderProjectTAM(agent, analysis) {
   const market = analysis.market || {};
   const cat = inferCategory(agent) || 'AI';
@@ -1670,7 +1841,6 @@ function _factorWhy(key, scores, analysis, agent) {
   return fn ? fn() : `Score ${v}/100`;
 }
 
-// FIX #3: render tier breakdown without F1_/F2_ prefixes
 function renderTierBreakdown(scores, analysis, agent) {
   const tiers = [
     { label: 'First Mover (30%)', keys: [
@@ -1729,7 +1899,6 @@ function renderTierBreakdown(scores, analysis, agent) {
   `).join('');
 }
 
-// FIX #15: forecast specific to project
 function renderForecast(horizon, data, agent) {
   const name = (agent || {}).name || 'This agent';
   if (!data) {
@@ -1790,10 +1959,12 @@ document.querySelectorAll('.category-tab').forEach(btn => {
     document.querySelectorAll('.category-tab').forEach(b => b.classList.remove('active'));
     this.classList.add('active');
     state.category = this.dataset.category;
-    // FIX #2: "All" tab defaults to market_cap sort
     if (!state.category) state.sort = 'market_cap';
     state.page = 1;
     loadAgents();
+    // Update bottom nav button label
+    document.getElementById('btn-category').textContent = 'Category: ' + (state.category || 'All');
+    document.getElementById('btn-category').classList.toggle('active', state.category !== '');
   });
 });
 
@@ -1816,7 +1987,42 @@ document.getElementById('search-input').addEventListener('input', function() {
   }, 350);
 });
 
+// ===== CATEGORY POPUP =====
+const ALL_CATEGORIES = ['', 'DeFi', 'Gaming', 'Social', 'Trading', 'Infra', 'Info', 'Entertainment', 'NFT'];
+
+function openCategoryPopup() {
+  const overlay = document.getElementById('cat-popup-overlay');
+  const grid = document.getElementById('cat-popup-grid');
+  grid.innerHTML = ALL_CATEGORIES.map(cat => {
+    const label = cat || 'All';
+    const isActive = state.category === cat;
+    return `<div class="cat-popup-item ${isActive ? 'active' : ''}" data-cat="${cat}">${label}</div>`;
+  }).join('');
+  overlay.classList.add('active');
+
+  grid.querySelectorAll('.cat-popup-item').forEach(item => {
+    item.addEventListener('click', function() {
+      state.category = this.dataset.cat;
+      state.page = 1;
+      // Update top tabs
+      document.querySelectorAll('.category-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.category === state.category);
+      });
+      document.getElementById('btn-category').textContent = 'Category: ' + (state.category || 'All');
+      document.getElementById('btn-category').classList.toggle('active', state.category !== '');
+      overlay.classList.remove('active');
+      loadAgents();
+    });
+  });
+}
+
+document.getElementById('cat-popup-overlay').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('active');
+});
+
 // ===== BOTTOM FILTER BUTTONS =====
+document.getElementById('btn-category').addEventListener('click', openCategoryPopup);
+
 document.getElementById('btn-status').addEventListener('click', function() {
   const sel = document.getElementById('filter-status');
   const options = Array.from(sel.options);
