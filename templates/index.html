@@ -853,6 +853,101 @@
       to   { opacity: 1; transform: translateY(0); }
     }
 
+    /* ===== TRENDING STRIP ===== */
+    #trending-strip {
+      background: var(--bg-2);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 16px;
+      overflow: hidden;
+    }
+    #trending-strip-inner {
+      display: flex;
+      gap: 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+      align-items: flex-start;
+    }
+    #trending-strip-inner::-webkit-scrollbar { display: none; }
+    .trending-section { flex-shrink: 0; }
+    .trending-section-label {
+      font-size: 9px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.6px; color: var(--text-dim); margin-bottom: 4px;
+    }
+    .trending-cards { display: flex; gap: 5px; }
+    .trending-card {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 9px; background: #fff; border: 1px solid var(--border);
+      border-radius: var(--radius-sm); cursor: pointer;
+      transition: border-color 0.15s; white-space: nowrap;
+    }
+    .trending-card:hover { border-color: var(--green); }
+    .trending-card-name { font-size: 12px; font-weight: 600; color: var(--text); }
+    .trending-card-val { font-family: var(--font-data); font-size: 11px; }
+    .trending-sep {
+      width: 1px; background: var(--border); align-self: stretch;
+      margin: 0 10px; flex-shrink: 0;
+    }
+
+    /* ===== DETAIL VIEW ===== */
+    #detail-view { display: none; }
+    .detail-back-bar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 16px; border-bottom: 1px solid var(--border);
+      background: var(--bg-2);
+    }
+    .detail-back-btn {
+      display: flex; align-items: center; gap: 5px;
+      padding: 6px 12px; background: #fff; border: 1px solid var(--border);
+      border-radius: var(--radius-sm); color: var(--text-muted); font-size: 13px;
+      font-weight: 500; cursor: pointer; transition: all 0.15s; font-family: var(--font-ui);
+    }
+    .detail-back-btn:hover { border-color: var(--green); color: var(--text); }
+    .detail-breadcrumb { font-size: 12px; color: var(--text-muted); }
+    .detail-header {
+      padding: 20px 16px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap;
+    }
+    .detail-avatar {
+      width: 64px; height: 64px; border-radius: 50%; background: var(--bg-3);
+      overflow: hidden; flex-shrink: 0; border: 2px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-data); font-size: 18px; color: var(--text-muted);
+    }
+    .detail-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .detail-title-wrap { flex: 1; min-width: 180px; }
+    .detail-agent-name { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; margin-bottom: 2px; }
+    .detail-agent-ticker { font-family: var(--font-data); font-size: 14px; color: var(--text-muted); margin-bottom: 8px; }
+    .detail-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .detail-ext-link {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 10px; border-radius: var(--radius-pill);
+      font-size: 11px; font-weight: 600; text-decoration: none; transition: all 0.15s;
+    }
+    .detail-ext-link.virtuals {
+      background: var(--green-bg); border: 1px solid rgba(22,131,137,0.3); color: var(--green-dark);
+    }
+    .detail-ext-link.virtuals:hover { background: var(--green); color: #fff; }
+    .detail-ext-link.dex {
+      background: rgba(8,145,178,0.08); border: 1px solid rgba(8,145,178,0.25); color: var(--teal);
+    }
+    .detail-ext-link.dex:hover { background: var(--teal); color: #fff; }
+    .detail-score-wrap { flex-shrink: 0; text-align: center; }
+    .detail-body { padding: 16px; display: flex; flex-direction: column; gap: 20px; }
+    @media (min-width: 768px) {
+      .detail-body { max-width: 860px; margin: 0 auto; padding: 20px 24px; }
+      .detail-header { padding: 20px 24px; }
+      .detail-back-bar { padding: 10px 24px; }
+    }
+
+    /* ===== WATCHLIST ===== */
+    .star-btn {
+      background: none; border: none; cursor: pointer; color: var(--text-dim);
+      padding: 2px 2px; font-size: 14px; line-height: 1;
+      transition: color 0.15s, transform 0.1s; flex-shrink: 0; display: block;
+    }
+    .star-btn:hover { color: var(--amber); transform: scale(1.2); }
+    .star-btn.starred { color: var(--amber); }
+
     /* ===== DESKTOP ===== */
     @media (min-width: 768px) {
       body { padding-bottom: 0; }
@@ -886,6 +981,7 @@
   </div>
 </header>
 
+<div id="main-content">
 <!-- FILTER TABS -->
 <div class="filter-tabs-wrap">
   <div class="filter-tabs">
@@ -936,6 +1032,11 @@
 </div>
 <div id="last-updated-label" style="display:none;font-size:11px;color:var(--text-dim);font-family:var(--font-data);padding:4px 16px 0;letter-spacing:0.3px"></div>
 
+<!-- TRENDING STRIP -->
+<div id="trending-strip" style="display:none">
+  <div id="trending-strip-inner"></div>
+</div>
+
 <!-- TABLE HEADER -->
 <div class="table-header">
   <div class="th">#</div>
@@ -957,6 +1058,25 @@
 <div class="pagination" id="pagination-bar" style="display:none">
   <div class="pagination-info" id="pagination-info"></div>
   <div class="pagination-controls" id="pagination-controls"></div>
+</div>
+
+</div><!-- /main-content -->
+
+<!-- DETAIL VIEW -->
+<div id="detail-view">
+  <div class="detail-back-bar">
+    <button class="detail-back-btn" onclick="navigateBack()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      Back
+    </button>
+    <span class="detail-breadcrumb" id="detail-breadcrumb"></span>
+  </div>
+  <div id="detail-content">
+    <div style="text-align:center;padding:60px">
+      <div class="loading-spinner" style="margin:0 auto 16px"></div>
+      <div style="color:var(--text-dim);font-size:13px">Loading agent...</div>
+    </div>
+  </div>
 </div>
 
 <!-- MODAL -->
@@ -1004,6 +1124,7 @@
     </button>
     <button class="bottom-filter-btn" id="btn-status">All Status</button>
     <button class="bottom-filter-btn" id="btn-doxx">All Doxx</button>
+    <button class="bottom-filter-btn" id="btn-watchlist" style="display:none">★ Watchlist</button>
   </div>
   <div class="bottom-tabs">
     <button class="bottom-tab active" id="tab-dashboard">
@@ -1035,6 +1156,8 @@
 </select>
 
 <script>
+const DETAIL_AGENT_ID = '{{ detail_agent_id or "" }}';
+
 // ===== STATE =====
 const state = {
   page: 1,
@@ -1049,6 +1172,7 @@ const state = {
   searchTimeout: null,
   currentAgent: null,
   jobPollInterval: null,
+  watchlistFilter: false,
 };
 
 // ===== UTILITIES =====
@@ -1177,7 +1301,8 @@ async function loadAgents() {
       const metricLine = [vol, mc, hl].filter(Boolean).join('  ');
       const priceStr = a.price ? '$' + parseFloat(a.price).toPrecision(4) : '—';
 
-      return `<div class="agent-row" onclick="openModal('${a.virtuals_id}')">
+      const watched = isWatched(a.virtuals_id);
+      return `<div class="agent-row" onclick="navigateToAgent('${a.virtuals_id}')">
         <div class="rank">${rank}</div>
         <div class="agent-cell">
           <div class="avatar">
@@ -1201,6 +1326,9 @@ async function loadAgents() {
         </div>
         <div class="viq-col">
           <div class="viq-val" style="color:${scoreClr}">${scoreNum}</div>
+          <button class="star-btn ${watched ? 'starred' : ''}" data-id="${a.virtuals_id}"
+            onclick="event.stopPropagation();toggleWatchlist('${a.virtuals_id}')"
+            title="${watched ? 'Remove from watchlist' : 'Add to watchlist'}">${watched ? '★' : '☆'}</button>
         </div>
       </div>`;
     }).join('');
@@ -1631,6 +1759,438 @@ function renderForecast(horizon, data) {
   </div>`;
 }
 
+// ===== WATCHLIST =====
+function getWatchlist() {
+  try { return new Set(JSON.parse(localStorage.getItem('viq_watchlist') || '[]')); }
+  catch(e) { return new Set(); }
+}
+function saveWatchlist(wl) {
+  localStorage.setItem('viq_watchlist', JSON.stringify([...wl]));
+}
+function isWatched(id) { return getWatchlist().has(String(id)); }
+
+function toggleWatchlist(id) {
+  const wl = getWatchlist();
+  const sid = String(id);
+  if (wl.has(sid)) { wl.delete(sid); } else { wl.add(sid); }
+  saveWatchlist(wl);
+  document.querySelectorAll(`.star-btn[data-id="${sid}"]`).forEach(btn => {
+    const now = wl.has(sid);
+    btn.textContent = now ? '★' : '☆';
+    btn.classList.toggle('starred', now);
+    btn.title = now ? 'Remove from watchlist' : 'Add to watchlist';
+  });
+  updateWatchlistBtn();
+}
+
+function updateWatchlistBtn() {
+  const wl = getWatchlist();
+  const btn = document.getElementById('btn-watchlist');
+  if (!btn) return;
+  if (wl.size > 0) {
+    btn.style.display = 'flex';
+    btn.innerHTML = `★ Watchlist (${wl.size})`;
+    btn.classList.toggle('active', state.watchlistFilter);
+  } else {
+    btn.style.display = 'none';
+    state.watchlistFilter = false;
+  }
+}
+
+document.getElementById('btn-watchlist').addEventListener('click', function() {
+  state.watchlistFilter = !state.watchlistFilter;
+  this.classList.toggle('active', state.watchlistFilter);
+  state.page = 1;
+  if (state.watchlistFilter) {
+    renderWatchlistView();
+  } else {
+    loadAgents();
+  }
+});
+
+async function renderWatchlistView() {
+  const wl = getWatchlist();
+  if (wl.size === 0) {
+    document.getElementById('agent-list').innerHTML = `<div class="empty-state">
+      <div class="empty-state-icon">☆</div>
+      <div class="empty-state-title">No watchlist items</div>
+      <div>Tap ☆ on any agent row to add it</div>
+    </div>`;
+    document.getElementById('pagination-bar').style.display = 'none';
+    return;
+  }
+  const list = document.getElementById('agent-list');
+  list.innerHTML = '<div class="loading-row"><div class="loading-spinner"></div>Loading watchlist...</div>';
+  try {
+    const ids = [...wl];
+    const results = await Promise.all(ids.map(id => fetch(`/api/agent/${id}`).then(r => r.ok ? r.json() : null)));
+    const agents = results.filter(Boolean);
+    if (!agents.length) {
+      list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">☆</div><div class="empty-state-title">No agents found</div></div>`;
+      return;
+    }
+    list.innerHTML = agents.map((a, i) => {
+      const change = parseFloat(a.price_change_24h || 0);
+      const changeClass = change >= 0 ? 'positive' : 'negative';
+      const scoreNum = Math.round(a.composite_score || 50);
+      const scoreClr = scoreColor(scoreNum);
+      const categoryLabel = a.agent_type || '';
+      const statusLabel = a.status || 'Prototype';
+      const vol  = a.volume_24h   ? 'VOL '  + fmtMcap(a.volume_24h)      : '';
+      const mc   = a.market_cap   ? 'MCAP ' + fmtMcap(a.market_cap)      : '';
+      const hl   = a.holder_count ? 'HL '   + fmtCompact(a.holder_count) : '';
+      const metricLine = [vol, mc, hl].filter(Boolean).join('  ');
+      const priceStr = a.price ? '$' + parseFloat(a.price).toPrecision(4) : '—';
+      return `<div class="agent-row" onclick="navigateToAgent('${a.virtuals_id}')">
+        <div class="rank">${i + 1}</div>
+        <div class="agent-cell">
+          <div class="avatar">${a.image_url ? `<img src="${a.image_url}" alt="${a.name}" onerror="this.parentElement.textContent='${initials(a.name)}'"/>` : initials(a.name)}</div>
+          <div class="agent-info">
+            <div class="agent-name">${a.name}</div>
+            <div class="agent-ticker">${a.ticker || ''}</div>
+            ${categoryLabel || statusLabel ? `<div class="agent-category">${categoryLabel}${categoryLabel && statusLabel ? ' · ' : ''}${statusLabel}</div>` : ''}
+            ${metricLine ? `<div class="agent-metrics">${metricLine}</div>` : ''}
+          </div>
+        </div>
+        <div class="price-col"><div class="price-val">${priceStr}</div><div class="mcap-val">${fmtMcap(a.market_cap)}</div></div>
+        <div class="change-col"><div class="change-val ${changeClass}">${fmtChange(a.price_change_24h)}</div></div>
+        <div class="viq-col">
+          <div class="viq-val" style="color:${scoreClr}">${scoreNum}</div>
+          <button class="star-btn starred" data-id="${a.virtuals_id}" onclick="event.stopPropagation();toggleWatchlist('${a.virtuals_id}')" title="Remove from watchlist">★</button>
+        </div>
+      </div>`;
+    }).join('');
+    document.getElementById('pagination-bar').style.display = 'none';
+  } catch(e) {
+    list.innerHTML = `<div class="loading-row" style="color:var(--red)">Error loading watchlist.</div>`;
+  }
+}
+
+// ===== TRENDING STRIP =====
+async function loadTrendingStrip() {
+  try {
+    const res = await fetch('/api/trending-strip');
+    if (!res.ok) return;
+    const data = await res.json();
+    renderTrendingStrip(data);
+  } catch(e) {}
+}
+
+function renderTrendingStrip(data) {
+  const strip = document.getElementById('trending-strip');
+  const inner = document.getElementById('trending-strip-inner');
+  if (!strip || !inner) return;
+
+  const movers  = data.top_movers   || data.movers        || [];
+  const newAgts  = data.new_launches || data.new_agents    || [];
+  const changes = data.score_changes || data.score_deltas  || [];
+
+  if (!movers.length && !newAgts.length && !changes.length) return;
+
+  const sections = [];
+
+  if (movers.length) {
+    sections.push(`<div class="trending-section">
+      <div class="trending-section-label">🔥 Top Movers</div>
+      <div class="trending-cards">
+        ${movers.slice(0, 5).map(a => `
+          <div class="trending-card" onclick="navigateToAgent('${a.virtuals_id}')">
+            <span class="trending-card-name">${a.ticker || a.name}</span>
+            <span class="trending-card-val ${parseFloat(a.price_change_24h||0)>=0?'positive':'negative'}" style="color:${parseFloat(a.price_change_24h||0)>=0?'var(--green-dark)':'var(--red)'}">${fmtChange(a.price_change_24h)}</span>
+          </div>`).join('')}
+      </div>
+    </div>`);
+  }
+
+  if (newAgts.length) {
+    if (sections.length) sections.push('<div class="trending-sep"></div>');
+    sections.push(`<div class="trending-section">
+      <div class="trending-section-label">🆕 New Launches</div>
+      <div class="trending-cards">
+        ${newAgts.slice(0, 5).map(a => `
+          <div class="trending-card" onclick="navigateToAgent('${a.virtuals_id}')">
+            <span class="trending-card-name">${a.ticker || a.name}</span>
+            <span class="trending-card-val" style="color:var(--teal)">${fmtMcap(a.market_cap) !== '—' ? fmtMcap(a.market_cap) : 'New'}</span>
+          </div>`).join('')}
+      </div>
+    </div>`);
+  }
+
+  if (changes.length) {
+    if (sections.length) sections.push('<div class="trending-sep"></div>');
+    sections.push(`<div class="trending-section">
+      <div class="trending-section-label">📈 Score Changes</div>
+      <div class="trending-cards">
+        ${changes.slice(0, 5).map(a => `
+          <div class="trending-card" onclick="navigateToAgent('${a.virtuals_id}')">
+            <span class="trending-card-name">${a.ticker || a.name}</span>
+            <span class="trending-card-val" style="color:var(--purple)">VIQ ${Math.round(a.composite_score||a.score||50)}</span>
+          </div>`).join('')}
+      </div>
+    </div>`);
+  }
+
+  inner.innerHTML = sections.join('');
+  strip.style.display = 'block';
+}
+
+// ===== SPA NAVIGATION =====
+function navigateToAgent(id) {
+  window.history.pushState({ agentId: id }, '', `/agent/${id}`);
+  showDetailPage(id);
+}
+
+function navigateBack() {
+  window.history.pushState({}, '', '/');
+  hideDetailPage();
+  loadAgents();
+}
+
+function showDetailPage(id) {
+  document.getElementById('main-content').style.display = 'none';
+  document.getElementById('detail-view').style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  loadDetailAgent(id);
+}
+
+function hideDetailPage() {
+  document.getElementById('detail-view').style.display = 'none';
+  document.getElementById('main-content').style.display = 'block';
+  document.getElementById('detail-breadcrumb').textContent = '';
+}
+
+async function loadDetailAgent(id) {
+  const content = document.getElementById('detail-content');
+  content.innerHTML = `<div style="text-align:center;padding:60px">
+    <div class="loading-spinner" style="margin:0 auto 16px"></div>
+    <div style="color:var(--text-dim);font-size:13px">Loading intelligence report...</div>
+  </div>`;
+  try {
+    const res = await fetch(`/api/agent/${id}`);
+    if (!res.ok) throw new Error('Not found');
+    const agent = await res.json();
+    document.getElementById('detail-breadcrumb').textContent = agent.name || '';
+    renderDetailContent(agent);
+  } catch(e) {
+    content.innerHTML = `<div style="text-align:center;padding:60px;color:var(--red)">
+      Failed to load agent.
+      <br><button onclick="loadDetailAgent('${id}')" style="margin-top:12px;padding:6px 16px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-size:13px">Retry</button>
+    </div>`;
+  }
+}
+
+function renderDetailContent(agent) {
+  const score = Math.round(agent.composite_score || 50);
+  const tier  = agent.tier_classification || 'Moderate';
+  const color = scoreColor(score);
+  const statusClass = agent.status === 'Sentient' ? 'sentient' : 'prototype';
+  const doxxClass   = `tier-${agent.doxx_tier || 3}`;
+  const doxxLabel   = {1:'Full Doxx', 2:'Social Presence', 3:'Anonymous'}[agent.doxx_tier] || 'Anonymous';
+  const risk        = (agent.analysis_json?.risk?.overall_risk || 'medium').toLowerCase();
+  const r = 29;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (score / 100) * circ;
+
+  const virtualsUrl = `https://app.virtuals.io/virtuals/${agent.virtuals_id}`;
+  const dexUrl = agent.contract_address ? `https://dexscreener.com/base/${agent.contract_address}` : null;
+
+  const watched = isWatched(agent.virtuals_id);
+
+  document.getElementById('detail-content').innerHTML = `
+    <div class="detail-header">
+      <div class="detail-avatar">
+        ${agent.image_url
+          ? `<img src="${agent.image_url}" alt="${agent.name}" onerror="this.parentElement.textContent='${initials(agent.name)}'"/>`
+          : initials(agent.name)}
+      </div>
+      <div class="detail-title-wrap">
+        <div class="detail-agent-name">${agent.name}</div>
+        <div class="detail-agent-ticker">${agent.ticker || ''}</div>
+        <div class="detail-meta">
+          <span class="status-badge ${statusClass}">${agent.status || 'Prototype'}</span>
+          <span class="category-badge">${agent.agent_type || '—'}</span>
+          <span class="doxx-badge ${doxxClass}">${doxxLabel}</span>
+          <span class="risk-badge ${risk}">${risk} risk</span>
+          ${agent.first_mover ? '<div class="first-mover-badge" title="First Mover">1ST</div>' : ''}
+          <a href="${virtualsUrl}" target="_blank" rel="noopener" class="detail-ext-link virtuals">↗ Virtuals</a>
+          ${dexUrl ? `<a href="${dexUrl}" target="_blank" rel="noopener" class="detail-ext-link dex">📊 DexScreener</a>` : ''}
+          <button class="star-btn ${watched ? 'starred' : ''}" data-id="${agent.virtuals_id}"
+            onclick="toggleWatchlist('${agent.virtuals_id}')"
+            title="${watched ? 'Remove from watchlist' : 'Add to watchlist'}">${watched ? '★' : '☆'}</button>
+        </div>
+      </div>
+      <div class="detail-score-wrap">
+        <div style="position:relative;width:72px;height:72px">
+          <svg width="72" height="72" viewBox="0 0 72 72" style="transform:rotate(-90deg)">
+            <circle cx="36" cy="36" r="${r}" fill="none" stroke="var(--bg-4)" stroke-width="5"/>
+            <circle cx="36" cy="36" r="${r}" fill="none" stroke="${color}" stroke-width="5"
+              stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}" stroke-linecap="round"/>
+          </svg>
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+            <div style="font-family:var(--font-data);font-size:18px;font-weight:700;color:${color};line-height:1">${score}</div>
+            <div style="font-size:8px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px">VIQ</div>
+          </div>
+        </div>
+        <div style="font-size:11px;font-weight:600;color:${color};text-align:center;margin-top:4px">${tier}</div>
+      </div>
+    </div>
+    <div class="detail-body">
+      ${buildAgentReportHTML(agent)}
+    </div>
+  `;
+}
+
+function buildAgentReportHTML(agent) {
+  const score = Math.round(agent.composite_score || 50);
+  const tier  = agent.tier_classification || 'Moderate';
+  const color = scoreColor(score);
+
+  const analysis   = agent.analysis_json || {};
+  const scores     = agent.scores_json   || {};
+  const prediction = agent.prediction_json || {};
+
+  const hasAnalysis  = Object.keys(analysis).length > 0;
+  const overview     = analysis.overview    || {};
+  const riskData     = analysis.risk        || {};
+  const teamData     = analysis.team        || {};
+  const productData  = analysis.product     || {};
+  const fmData       = analysis.first_mover || {};
+
+  const factorScores = scores.scores      || {};
+  const tierScores   = scores.tier_scores || {};
+
+  const FACTOR_LABELS = {
+    F1_category_uniqueness:'Category Uniqueness', F2_approach_novelty:'Approach Novelty',
+    F3_cross_chain_originality:'Cross-Chain Original', F4_timing_advantage:'Timing Advantage',
+    F5_defensibility:'Defensibility / Moat', F6_doxx_tier:'Team Visibility',
+    F7_track_record:'Track Record', F8_code_activity:'Code Activity',
+    F9_shipping_cadence:'Shipping Cadence', F10_product_status:'Product Status',
+    F11_partnerships:'Partnerships', F12_wallet_behavior:'Wallet Behavior',
+    F13_tam:'Total Addressable Market', F14_real_world_comparables:'Real-World Comparables',
+    F15_revenue_model:'Revenue Model', F16_current_revenue:'Current Revenue',
+    F17_mcap_to_tam:'MCap / TAM Ratio', F18_saturation:'Market Saturation',
+    F19_holder_distribution:'Holder Distribution', F20_twitter_engagement:'Twitter Engagement',
+    F21_follower_growth:'Follower Growth', F22_community_depth:'Community Depth',
+    F23_organic_signals:'Organic vs Paid', F24_smart_money:'Smart Money',
+  };
+  const TIER_NAMES = {first_mover:'First Mover', team:'Team & Execution', value:'Value Pool', community:'Community'};
+
+  const sortedFactors = Object.entries(factorScores).sort((a, b) => b[1] - a[1]);
+  const topHelped = sortedFactors.slice(0, 3).map(([k, v]) => ({ label: FACTOR_LABELS[k] || k, score: Math.round(v) }));
+  const topHurt   = sortedFactors.slice(-3).reverse().map(([k, v]) => ({ label: FACTOR_LABELS[k] || k, score: Math.round(v) }));
+
+  let oneLiner = '';
+  if (Object.keys(tierScores).length) {
+    const entries = Object.entries(tierScores).sort((a, b) => b[1] - a[1]);
+    const best = entries[0], worst = entries[entries.length - 1];
+    if (best && worst && best[0] !== worst[0]) {
+      oneLiner = `Strong on ${TIER_NAMES[best[0]] || best[0]}, weak on ${TIER_NAMES[worst[0]] || worst[0]}`;
+    }
+  }
+
+  const lastAnalyzed = agent.updated_at ? (() => {
+    const diffMs  = Date.now() - new Date(agent.updated_at + 'Z').getTime();
+    const diffMin = Math.round(diffMs / 60000);
+    return diffMin < 1 ? 'just now' : diffMin < 60 ? `${diffMin}m ago` : diffMin < 1440 ? `${Math.round(diffMin/60)}h ago` : `${Math.round(diffMin/1440)}d ago`;
+  })() : null;
+
+  return `
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div>
+        <span style="font-family:var(--font-data);font-size:24px;font-weight:700;color:${color}">${score}</span>
+        <span style="font-size:13px;color:${color};margin-left:6px;font-weight:600">${tier}</span>
+      </div>
+      ${oneLiner ? `<div style="flex:1;font-size:12px;color:var(--text-muted);font-style:italic;min-width:140px">${oneLiner}</div>` : ''}
+    </div>
+
+    ${topHelped.length || topHurt.length ? `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      ${topHelped.length ? `<div style="padding:10px;background:rgba(22,131,137,0.06);border:1px solid rgba(22,131,137,0.2);border-radius:var(--radius-sm)">
+        <div style="font-size:10px;color:var(--green-dark);font-weight:700;letter-spacing:0.5px;margin-bottom:6px">STRENGTHS</div>
+        ${topHelped.map(f => `<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-bottom:3px"><span>${f.label}</span><span style="color:var(--green);font-family:var(--font-data)">${f.score}</span></div>`).join('')}
+      </div>` : ''}
+      ${topHurt.length ? `<div style="padding:10px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-sm)">
+        <div style="font-size:10px;color:var(--red);font-weight:700;letter-spacing:0.5px;margin-bottom:6px">RISKS</div>
+        ${topHurt.map(f => `<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-bottom:3px"><span>${f.label}</span><span style="color:var(--red);font-family:var(--font-data)">${f.score}</span></div>`).join('')}
+      </div>` : ''}
+    </div>` : ''}
+
+    ${hasAnalysis ? `
+    <div>
+      <div class="report-section-title">AI Analyst Overview
+        ${lastAnalyzed ? `<span style="font-size:10px;color:var(--text-dim);font-weight:400;margin-left:8px;font-family:var(--font-data)">Last analyzed: ${lastAnalyzed}</span>` : ''}
+      </div>
+      ${overview.summary ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--teal);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">What it does</div><p class="report-narrative">${overview.summary}</p></div>` : ''}
+      ${teamData.team_summary ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--text-dim);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">Who is behind it</div><p class="report-narrative">${teamData.team_summary}</p></div>` : ''}
+      ${analysis.intelligence_notes ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--text-dim);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">What is notable</div><p class="report-narrative">${analysis.intelligence_notes}</p></div>` : ''}
+      ${(riskData.bear_case || (riskData.key_risks && riskData.key_risks.length)) ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--red);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">What is concerning</div><p class="report-narrative">${riskData.bear_case || riskData.key_risks.join('. ')}</p></div>` : ''}
+      ${(productData.description || fmData.analysis) ? `<div><div style="font-size:10px;color:var(--text-dim);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">Recent activity</div><p class="report-narrative">${productData.description || fmData.analysis}</p></div>` : ''}
+    </div>
+    ` : `
+    <div>
+      <div class="report-section-title">Overview</div>
+      <p class="report-narrative">${agent.biography || 'No biography available for this agent.'}</p>
+      <p style="margin-top:12px;font-size:12px;color:var(--text-dim)">Full AI analysis not yet generated. <button onclick="triggerAnalysis('${agent.virtuals_id}')" style="margin-left:6px;padding:3px 10px;background:var(--green-bg);border:1px solid rgba(22,131,137,0.3);border-radius:var(--radius-sm);color:var(--green-dark);font-size:11px;cursor:pointer;font-weight:600">Run Analysis</button></p>
+    </div>
+    `}
+
+    <div>
+      <div class="report-section-title">Key Metrics</div>
+      <div class="metrics-grid">
+        <div class="metric-tile"><div class="metric-tile-label">Market Cap</div><div class="metric-tile-value teal">${fmtMcap(agent.market_cap)}</div></div>
+        <div class="metric-tile"><div class="metric-tile-label">24h Volume</div><div class="metric-tile-value purple">${fmtMcap(agent.volume_24h)}</div></div>
+        <div class="metric-tile"><div class="metric-tile-label">Price Change 24h</div><div class="metric-tile-value ${parseFloat(agent.price_change_24h||0)>=0?'green':'red'}">${fmtChange(agent.price_change_24h)}</div></div>
+        <div class="metric-tile"><div class="metric-tile-label">Holders</div><div class="metric-tile-value">${fmtNumber(agent.holder_count)}</div></div>
+        <div class="metric-tile"><div class="metric-tile-label">Liquidity</div><div class="metric-tile-value">${fmtMcap(agent.liquidity_usd)}</div></div>
+        <div class="metric-tile"><div class="metric-tile-label">Buy/Sell Ratio</div><div class="metric-tile-value ${parseFloat(agent.buy_sell_ratio||1)>=1?'green':'red'}">${parseFloat(agent.buy_sell_ratio||1).toFixed(2)}x</div></div>
+        <div class="metric-tile"><div class="metric-tile-label">Twitter Followers</div><div class="metric-tile-value">${fmtNumber(agent.twitter_followers)}</div></div>
+        <div class="metric-tile"><div class="metric-tile-label">GitHub Stars</div><div class="metric-tile-value">${fmtNumber(agent.github_stars)}</div></div>
+      </div>
+    </div>
+
+    ${agent.contract_address ? `
+    <div>
+      <div class="report-section-title">Price Chart</div>
+      <div class="dex-chart-wrap">
+        <iframe src="https://dexscreener.com/base/${agent.contract_address}?embed=1&theme=light&trades=0&info=0" loading="lazy" allowfullscreen></iframe>
+      </div>
+    </div>` : ''}
+
+    <div>
+      <div class="report-section-title">VIQ Intelligence Report</div>
+      <div class="score-breakdown-grid">
+        ${renderTierBreakdown(scores, analysis, agent)}
+      </div>
+    </div>
+
+    <div>
+      <div class="report-section-title">AI Forecast</div>
+      <div class="forecast-grid">
+        ${renderForecast('7d', prediction['7d'])}
+        ${renderForecast('30d', prediction['30d'])}
+        ${renderForecast('90d', prediction['90d'])}
+      </div>
+    </div>
+
+    ${agent.linked_twitter || agent.linked_website || agent.linked_telegram ? `
+    <div>
+      <div class="report-section-title">Links</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${agent.linked_twitter ? `<a href="${agent.linked_twitter}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none">𝕏 Twitter</a>` : ''}
+        ${agent.linked_website ? `<a href="${agent.linked_website}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none">🌐 Website</a>` : ''}
+        ${agent.linked_telegram ? `<a href="${agent.linked_telegram}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none">✈ Telegram</a>` : ''}
+      </div>
+    </div>` : ''}
+  `;
+}
+
+async function triggerAnalysis(virtualsId) {
+  try {
+    showToast('Analysis queued — refresh in ~30s');
+    await fetch(`/api/analyze/${virtualsId}`, { method: 'POST' });
+  } catch(e) { showToast('Failed to queue analysis', true); }
+}
+
 // ===== MODAL CLOSE =====
 function closeModal() {
   document.getElementById('modal-overlay').classList.remove('active');
@@ -1804,12 +2364,37 @@ async function startEnrichmentPolling() {
   }, 5000);
 }
 
+// ===== POPSTATE (browser back/forward) =====
+window.addEventListener('popstate', function(e) {
+  const path = window.location.pathname;
+  if (path.startsWith('/agent/')) {
+    const id = path.split('/agent/')[1];
+    document.getElementById('main-content').style.display = 'none';
+    document.getElementById('detail-view').style.display = 'block';
+    loadDetailAgent(id);
+  } else {
+    hideDetailPage();
+    loadAgents();
+  }
+});
+
 // ===== BOOT =====
 (async function init() {
   await loadStats();
-  await loadAgents();
+
+  if (DETAIL_AGENT_ID) {
+    // Server-side rendered detail URL (/agent/123)
+    document.getElementById('main-content').style.display = 'none';
+    document.getElementById('detail-view').style.display = 'block';
+    await loadDetailAgent(DETAIL_AGENT_ID);
+  } else {
+    await loadAgents();
+    loadTrendingStrip();
+  }
+
   startEnrichmentPolling();
   setInterval(loadStats, 5 * 60 * 1000);
+  updateWatchlistBtn();
 })();
 </script>
 </body>
