@@ -581,4 +581,3 @@ async def update_market_data(virtuals_id: str, data: dict):
             virtuals_id,
         ))
         await db.commit()
-average_score
