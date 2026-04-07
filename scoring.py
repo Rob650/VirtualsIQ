@@ -601,6 +601,13 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
     # Build narrative
     narrative = _build_score_narrative(agent_data, ai_analysis, scores, composite, tier_scores)
 
+    # Embed metadata into scores dict so it's available in scores_json on the frontend
+    scores["_tier_scores"] = tier_scores
+    scores["_one_liner"] = one_liner
+    scores["_top_helped"] = top_helped
+    scores["_top_hurt"] = top_hurt
+    scores["_doxx_tier_detail"] = doxx_detail
+
     return {
         "composite_score": composite,
         "tier_classification": tier,
