@@ -29,7 +29,7 @@ from database import (
     update_agent_scores,
     upsert_agent,
 )
-from virtuals_ingestion import detect_new_agents, enrich_top_agents_dexscreener, fetch_dexscreener_data, preload_all_agents
+from virtuals_ingestion import detect_new_agents, enrich_top_agents_dexscreener, fetch_dexscreener_data, get_api_total_count, preload_all_agents, scan_newest_agents
 
 logging.basicConfig(
     level=logging.INFO,
@@ -46,6 +46,9 @@ enrichment_state: dict = {
     "agents_loaded": 0,
     "started_at": None,
     "completed_at": None,
+    "api_total": 0,
+    "last_new_scan": None,
+    "new_agents_found": 0,
 }
 
 # ---------------------------------------------------------------------------
@@ -115,6 +118,26 @@ async def _run_analysis_job(job_id: str, virtuals_id: str):
         jobs[job_id]["completed_at"] = datetime.utcnow().isoformat()
 
 
+async def _new_agent_scan_loop():
+    """Every 15 minutes: scan newest agents, upsert new ones, re-score if any found."""
+    while True:
+        try:
+            await asyncio.sleep(15 * 60)  # 15 minute interval
+            logger.info("Starting 15-min new-agent scan...")
+            new_count = await scan_newest_agents(pages=5)
+            enrichment_state["last_new_scan"] = datetime.utcnow().isoformat()
+            enrichment_state["new_agents_found"] = new_count
+            if new_count > 0:
+                logger.info(f"New-agent scan: {new_count} new agents — re-scoring...")
+                await bulk_score_agents()
+            enrichment_state["api_total"] = await get_api_total_count()
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"New-agent scan error: {e}")
+            await asyncio.sleep(300)  # retry in 5 min on error
+
+
 async def _daily_scan_loop():
     """Periodic background scan: fetch all agents to detect new launches and refresh market data."""
     while True:
@@ -147,6 +170,7 @@ async def lifespan(app: FastAPI):
     async def _preload():
         enrichment_state["status"] = "preloading"
         enrichment_state["started_at"] = datetime.utcnow().isoformat()
+        enrichment_state["api_total"] = await get_api_total_count()
 
         def _on_batch(n: int):
             enrichment_state["agents_loaded"] = n
@@ -172,15 +196,18 @@ async def lifespan(app: FastAPI):
 
     preload_task = asyncio.create_task(_preload())
     scan_task = asyncio.create_task(_daily_scan_loop())
+    new_agent_task = asyncio.create_task(_new_agent_scan_loop())
 
     yield
 
     # Cleanup
     preload_task.cancel()
     scan_task.cancel()
+    new_agent_task.cancel()
     try:
         await preload_task
         await scan_task
+        await new_agent_task
     except asyncio.CancelledError:
         pass
     logger.info("VirtualsIQ shutdown complete")
@@ -286,6 +313,27 @@ async def ecosystem_stats():
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "version": "1.0.0", "timestamp": datetime.utcnow().isoformat()}
+
+
+@app.get("/api/sync/health")
+async def sync_health():
+    """Returns API vs DB coverage metrics and sync status."""
+    stats = await get_stats()
+    db_count = stats.get("total_agents", 0)
+    api_total = enrichment_state.get("api_total", 0)
+    missing = max(0, api_total - db_count) if api_total else 0
+    coverage_percent = round((db_count / api_total * 100), 2) if api_total else None
+    return {
+        "api_total": api_total,
+        "db_count": db_count,
+        "missing": missing,
+        "coverage_percent": coverage_percent,
+        "is_synced": missing <= 10,
+        "last_full_preload": enrichment_state.get("completed_at"),
+        "last_new_scan": enrichment_state.get("last_new_scan"),
+        "new_agents_found_last_scan": enrichment_state.get("new_agents_found", 0),
+        "status": enrichment_state.get("status"),
+    }
 
 
 @app.get("/api/status")

@@ -56,15 +56,22 @@ def normalize_agent_type(raw: str) -> str:
     return AGENT_TYPE_MAP.get(key, raw.title())
 
 
-async def _fetch_page(client: httpx.AsyncClient, page: int, page_size: int = 100) -> dict:
+async def _fetch_page(
+    client: httpx.AsyncClient,
+    page: int,
+    page_size: int = 100,
+    status_filter=None,
+    sort: str = "volume24h:desc",
+) -> dict:
     """Fetch a single page of agents from Virtuals API with retry."""
     url = VIRTUALS_API
     params = {
-        "filters[status]": 5,
         "pagination[page]": page,
         "pagination[pageSize]": page_size,
-        "sort[0]": "volume24h:desc",
+        "sort[0]": sort,
     }
+    if status_filter is not None:
+        params["filters[status]"] = status_filter
 
     for attempt in range(3):
         try:
@@ -96,7 +103,7 @@ def _parse_agent(item: dict) -> dict:
     status = STATUS_MAP.get(status_code, "Prototype")
 
     # Category / type
-    category = attrs.get("category") or attrs.get("agentType") or ""
+    category = attrs.get("category") or attrs.get("agentType") or attrs.get("role") or ""
     if isinstance(category, dict):
         category = category.get("name") or ""
     agent_type = normalize_agent_type(category)
@@ -180,7 +187,7 @@ def _parse_agent(item: dict) -> dict:
     }
 
 
-async def fetch_all_agents(max_pages: int = 400) -> list[dict]:
+async def fetch_all_agents(max_pages: int = 500) -> list[dict]:
     """
     Paginate through the full Virtuals API and return all agents.
     Virtuals has 38k+ agents; at 100/page that's ~387 pages.
@@ -188,7 +195,7 @@ async def fetch_all_agents(max_pages: int = 400) -> list[dict]:
     agents = []
     async with httpx.AsyncClient() as client:
         # Fetch first page to get total count
-        first = await _fetch_page(client, 1, 100)
+        first = await _fetch_page(client, 1, 100, status_filter=None)
         if not first:
             logger.error("Failed to fetch first page from Virtuals API")
             return []
@@ -207,7 +214,7 @@ async def fetch_all_agents(max_pages: int = 400) -> list[dict]:
         page = 2
         while page <= total_pages:
             batch = range(page, min(page + 10, total_pages + 1))
-            tasks = [_fetch_page(client, p, 100) for p in batch]
+            tasks = [_fetch_page(client, p, 100, status_filter=None) for p in batch]
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
             for result in results:
@@ -306,7 +313,7 @@ async def preload_all_agents(on_batch=None):
 
     async with httpx.AsyncClient() as client:
         # Fetch first page immediately and save it — users see data right away
-        first = await _fetch_page(client, 1, 100)
+        first = await _fetch_page(client, 1, 100, status_filter=None)
         if not first:
             logger.error("Failed to fetch first page from Virtuals API")
             return 0
@@ -322,14 +329,14 @@ async def preload_all_agents(on_batch=None):
         logger.info(f"First page saved: {stored} agents now visible in dashboard")
 
         pagination = first.get("meta", {}).get("pagination", {})
-        total_pages = min(pagination.get("pageCount", 1), 400)
+        total_pages = min(pagination.get("pageCount", 1), 500)
         logger.info(f"Virtuals API: {pagination.get('total', '?')} total agents, {total_pages} pages to fetch")
 
         # Fetch remaining pages in batches of 10, saving each batch as it arrives
         page = 2
         while page <= total_pages:
             batch_range = range(page, min(page + 10, total_pages + 1))
-            tasks = [_fetch_page(client, p, 100) for p in batch_range]
+            tasks = [_fetch_page(client, p, 100, status_filter=None) for p in batch_range]
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
             batch_agents = []
@@ -388,3 +395,48 @@ async def enrich_top_agents_dexscreener(top_n: int = 100):
 
     await asyncio.gather(*[enrich_one(r) for r in rows], return_exceptions=True)
     logger.info(f"DexScreener enrichment complete for top {len(rows)} agents")
+
+
+async def scan_newest_agents(pages: int = 5) -> int:
+    """
+    Quick scan: fetch the newest agents sorted by createdAt:desc.
+    Upserts any agents not yet in the database and returns the count of new agents found.
+    Stops early if all agents on a page are already known.
+    """
+    existing_ids = await get_existing_ids()
+    new_count = 0
+
+    async with httpx.AsyncClient() as client:
+        for page in range(1, pages + 1):
+            result = await _fetch_page(client, page, 100, status_filter=None, sort="createdAt:desc")
+            if not result:
+                break
+
+            items = result.get("data", [])
+            if not items:
+                break
+
+            agents = [_parse_agent(item) for item in items]
+            new_agents = [a for a in agents if a["virtuals_id"] not in existing_ids]
+
+            if new_agents:
+                await bulk_upsert_agents(new_agents)
+                for a in new_agents:
+                    existing_ids.add(a["virtuals_id"])
+                new_count += len(new_agents)
+                logger.info(f"scan_newest_agents page {page}: {len(new_agents)} new agents upserted")
+            else:
+                # All agents on this page are already known — stop early
+                logger.info(f"scan_newest_agents: no new agents on page {page}, stopping early")
+                break
+
+    logger.info(f"scan_newest_agents complete: {new_count} new agents found")
+    return new_count
+
+
+async def get_api_total_count() -> int:
+    """Fetch page 1 with pageSize=1 to retrieve the total agent count from pagination metadata."""
+    async with httpx.AsyncClient() as client:
+        result = await _fetch_page(client, 1, 1, status_filter=None)
+    total = result.get("meta", {}).get("pagination", {}).get("total", 0)
+    return int(total)
