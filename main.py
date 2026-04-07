@@ -17,11 +17,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
 
-from analyzer import analyze_agent
+from analyzer import analyze_agent, batch_triage
 from database import (
     bulk_score_agents,
     get_agent_detail,
     get_agents,
+    get_agents_needing_reanalysis,
     get_category_summary,
     get_existing_ids,
     get_stats,
@@ -183,6 +184,98 @@ async def _run_analysis_job(job_id: str, virtuals_id: str):
         jobs[job_id]["completed_at"] = datetime.utcnow().isoformat()
 
 
+async def _auto_analyze_all():
+    """
+    Startup background task: run AI analysis on ALL agents after preload.
+    - Top 100 by market cap: full analyze_agent (Sonnet/Haiku per MC)
+    - Remaining: batch_triage in batches of 20
+    This ensures VIQ scores are real, not all 50, after every deploy.
+    """
+    try:
+        logger.info("Auto-analysis starting for all agents...")
+        enrichment_state["status"] = "analyzing"
+
+        top_ids_list = await get_top_agent_ids(100)
+        top_ids_set = set(top_ids_list)
+
+        # Semaphore: max 5 concurrent full analyses to avoid API overload
+        sem = asyncio.Semaphore(5)
+
+        async def _analyze_one(virtuals_id: str):
+            async with sem:
+                try:
+                    agent = await get_agent_detail(virtuals_id)
+                    if not agent:
+                        return
+                    result = await analyze_agent(agent, top_ids=top_ids_set)
+                    scores = result["scores"]
+                    analysis = result["analysis"]
+                    overview = result.get("overview", {})
+                    prediction_json = result.get("prediction", {})
+
+                    inferred_category = _infer_category(agent)
+                    if inferred_category != agent.get("agent_type"):
+                        import aiosqlite
+                        async with aiosqlite.connect("virtualsiq.db") as db:
+                            await db.execute(
+                                "UPDATE agents SET agent_type=? WHERE virtuals_id=?",
+                                (inferred_category, virtuals_id)
+                            )
+                            await db.commit()
+
+                    await update_agent_scores(
+                        virtuals_id=virtuals_id,
+                        composite_score=scores["composite_score"],
+                        tier=scores["tier_classification"],
+                        scores_json=scores["scores"],
+                        analysis_json=analysis,
+                        prediction_json=prediction_json,
+                        overview_json=overview,
+                        first_mover=scores["first_mover"],
+                        doxx_tier=int(analysis.get("team", {}).get("doxx_tier", 3)),
+                    )
+                    logger.info(f"Auto-analyzed {agent.get('name')}: score={scores['composite_score']}")
+                except Exception as e:
+                    logger.error(f"Auto-analysis failed for {virtuals_id}: {e}")
+
+        # Full analysis for top 100 (concurrent, throttled)
+        tasks = [_analyze_one(vid) for vid in top_ids_list]
+        await asyncio.gather(*tasks)
+        logger.info(f"Full analysis complete for top {len(top_ids_list)} agents")
+
+        # Batch triage for remaining unanalyzed agents
+        remaining = await get_agents_needing_reanalysis(limit=5000)
+        remaining = [a for a in remaining if str(a["virtuals_id"]) not in top_ids_set]
+
+        for i in range(0, len(remaining), 20):
+            batch = remaining[i:i + 20]
+            try:
+                results = await batch_triage(batch)
+                for r in results:
+                    vid = r["virtuals_id"]
+                    s = r["scores"]
+                    await update_agent_scores(
+                        virtuals_id=vid,
+                        composite_score=s["composite_score"],
+                        tier=s["tier_classification"],
+                        scores_json=s["scores"],
+                        analysis_json=r["analysis"],
+                        prediction_json={},
+                        overview_json={},
+                        first_mover=s["first_mover"],
+                        doxx_tier=int(r["analysis"].get("team", {}).get("doxx_tier", 3)),
+                    )
+                logger.info(f"Batch triage: {min(i + 20, len(remaining))}/{len(remaining)} agents")
+            except Exception as e:
+                logger.error(f"Batch triage failed for batch {i}: {e}")
+
+        enrichment_state["status"] = "complete"
+        logger.info("Auto-analysis complete for all agents")
+    except Exception as e:
+        logger.error(f"Auto-analyze-all failed: {e}")
+        enrichment_state["status"] = "complete"
+
+
 # ---------------------------------------------------------------------------
 # Tiered refresh loops
 # ---------------------------------------------------------------------------
@@ -249,8 +342,9 @@ async def _daily_refresh_loop():
             logger.info(f"Daily fetch: {count} agents refreshed, enriching DexScreener...")
             await enrich_top_agents_dexscreener(top_n=100)
             score_count = await bulk_score_agents()
-            logger.info(f"Daily auto-scored {score_count} agents")
+            logger.info(f"Daily auto-scored {score_count} agents — queuing AI re-analysis")
             enrichment_state["last_description_refresh"] = datetime.utcnow().isoformat()
+            asyncio.create_task(_auto_analyze_all())
         except asyncio.CancelledError:
             break
         except Exception as e:
@@ -286,10 +380,11 @@ async def lifespan(app: FastAPI):
 
             enrichment_state["status"] = "scoring"
             score_count = await bulk_score_agents()
-            logger.info(f"Auto-scored {score_count} agents")
+            logger.info(f"Auto-scored {score_count} agents (on-chain only, AI analysis queued)")
 
-            enrichment_state["status"] = "complete"
             enrichment_state["completed_at"] = datetime.utcnow().isoformat()
+            # Kick off full AI analysis in background — doesn't block server startup
+            asyncio.create_task(_auto_analyze_all())
         except Exception as e:
             logger.error(f"Startup preload failed: {e}")
             enrichment_state["status"] = "complete"
