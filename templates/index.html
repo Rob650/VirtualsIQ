@@ -10,14 +10,14 @@
   <style>
     :root {
       --bg:         #FFFFFF;
-      --bg-2:       #F8F9FA;
-      --bg-3:       #F1F3F5;
-      --bg-4:       #E9ECEF;
-      --border:     #E5E7EB;
-      --border-2:   #D1D5DB;
-      --text:       #111827;
-      --text-muted: #6B7280;
-      --text-dim:   #9CA3AF;
+      --bg-2:       #F7F7F8;
+      --bg-3:       #EDEDF0;
+      --bg-4:       #E4E4E8;
+      --border:     #E2E2E6;
+      --border-2:   #CBCBD0;
+      --text:       #0F0F12;
+      --text-muted: #55556A;
+      --text-dim:   #8E8EA0;
 
       --green:      #22C55E;
       --green-bg:   rgba(34,197,94,0.10);
@@ -26,12 +26,17 @@
       --red-bg:     rgba(239,68,68,0.10);
       --amber:      #F59E0B;
       --teal:       #0891B2;
-      --purple:     #A855F7;
+      --purple:     #7C3AED;
+
+      --accent:     #7C3AED;
+      --accent-bg:  rgba(124,58,237,0.08);
+      --accent-dark:#6D28D9;
+      --accent-light:#A78BFA;
 
       --radius:     8px;
       --radius-sm:  6px;
       --radius-pill:100px;
-      --font-ui:    'Inter', sans-serif;
+      --font-ui:    'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       --font-data:  'DM Mono', monospace;
     }
 
@@ -75,7 +80,7 @@
     .logo-mark {
       width: 34px;
       height: 34px;
-      background: linear-gradient(135deg, #22C55E, #14B8A6);
+      background: linear-gradient(135deg, #7C3AED, #06B6D4);
       border-radius: 9px;
       display: flex;
       align-items: center;
@@ -121,7 +126,7 @@
       transition: border-color 0.15s;
     }
 
-    .search-input:focus { border-color: var(--green); background: #fff; }
+    .search-input:focus { border-color: var(--accent); background: #fff; }
     .search-input::placeholder { color: var(--text-dim); }
 
     /* ===== FILTER TABS ===== */
@@ -153,8 +158,8 @@
       white-space: nowrap;
     }
 
-    .filter-tab:hover { border-color: var(--green); color: var(--text); }
-    .filter-tab.active { background: var(--green); border-color: var(--green); color: #fff; }
+    .filter-tab:hover { border-color: var(--accent); color: var(--text); }
+    .filter-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
     /* ===== CATEGORY TABS ===== */
     .category-tabs-wrap {
@@ -186,7 +191,7 @@
     }
 
     .category-tab:hover { color: var(--text); }
-    .category-tab.active { color: var(--text); border-bottom-color: var(--green); font-weight: 600; }
+    .category-tab.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
 
     /* ===== STATS BAR ===== */
     .stats-bar {
@@ -375,7 +380,7 @@
       background: var(--bg-2);
       transition: all 0.12s;
     }
-    .agent-ext-link:hover { border-color: var(--green); color: var(--green-dark); background: var(--green-bg); }
+    .agent-ext-link:hover { border-color: var(--accent); color: var(--accent-dark); background: var(--accent-bg); }
 
     .price-col { text-align: right; }
 
@@ -423,7 +428,7 @@
       width: 28px;
       height: 28px;
       border: 2px solid var(--border);
-      border-top-color: var(--green);
+      border-top-color: var(--accent);
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
       margin: 0 auto 12px;
@@ -466,8 +471,8 @@
       font-family: var(--font-data);
     }
 
-    .page-btn:hover:not(:disabled) { border-color: var(--green); color: var(--green-dark); }
-    .page-btn.active { background: var(--green); border-color: var(--green); color: #fff; }
+    .page-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-dark); }
+    .page-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
     .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
     /* ===== EMPTY STATE ===== */
@@ -518,8 +523,8 @@
       white-space: nowrap;
     }
 
-    .bottom-filter-btn:hover { border-color: var(--green); }
-    .bottom-filter-btn.active { background: var(--green); border-color: var(--green); color: #fff; }
+    .bottom-filter-btn:hover { border-color: var(--accent); }
+    .bottom-filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
     .bottom-tabs { display: flex; }
 
@@ -540,7 +545,7 @@
       transition: color 0.15s;
     }
 
-    .bottom-tab.active { color: var(--green); }
+    .bottom-tab.active { color: var(--accent); }
     .bottom-tab svg { width: 20px; height: 20px; }
 
     /* ===== MODAL ===== */
@@ -973,7 +978,7 @@
             <div class="modal-avatar" id="modal-avatar"></div>
             <div class="modal-title-wrap"><div class="modal-agent-name" id="modal-agent-name">Loading...</div><div class="modal-agent-meta" id="modal-agent-meta"></div></div>
             <div class="modal-score-ring" id="modal-score-ring">
-                <svg viewBox="0 0 72 72"><circle cx="36" cy="36" r="30" fill="none" stroke="var(--bg-3)" stroke-width="4"/><circle id="modal-ring-arc" cx="36" cy="36" r="30" fill="none" stroke="var(--green)" stroke-width="4" stroke-linecap="round" stroke-dasharray="188.5" stroke-dashoffset="188.5"/></svg>
+                <svg viewBox="0 0 72 72"><circle cx="36" cy="36" r="30" fill="none" stroke="var(--bg-3)" stroke-width="4"/><circle id="modal-ring-arc" cx="36" cy="36" r="30" fill="none" stroke="var(--accent)" stroke-width="4" stroke-linecap="round" stroke-dasharray="188.5" stroke-dashoffset="188.5"/></svg>
                 <div class="modal-score-value"><div class="modal-score-num" id="modal-score-num">&#x2014;</div><div class="modal-score-label">VIQ</div></div>
             </div>
         </div>
@@ -1072,12 +1077,12 @@ function fmtCompact(v) {
 }
 
 function scoreColor(s) {
-  if (!s && s !== 0) return '#64748b';
-  if (s >= 80) return '#05df72';
-  if (s >= 60) return '#69c9cf';
-  if (s >= 40) return '#fbbf24';
+  if (!s && s !== 0) return '#8E8EA0';
+  if (s >= 80) return '#16A34A';
+  if (s >= 60) return '#7C3AED';
+  if (s >= 40) return '#F59E0B';
   if (s >= 20) return '#fb923c';
-  return '#fb2c36';
+  return '#EF4444';
 }
 
 function initials(n) {
@@ -1368,11 +1373,59 @@ function renderModal(agent) {
 
     ${hasAnalysis ? `
     <div>
-      <div class="report-section-title">Intelligence Overview</div>
-      <p class="report-narrative">${overview.summary || 'No overview available.'}</p>
-      ${overview.value_proposition ? `<p class="report-narrative" style="margin-top:8px;color:var(--teal);font-style:italic">${overview.value_proposition}</p>` : ''}
-      ${overview.stage ? `<p style="margin-top:6px;font-size:11px;font-family:var(--font-data);color:var(--text-dim)">Stage: <span style="color:var(--amber)">${overview.stage.toUpperCase()}</span></p>` : ''}
+      <div class="report-section-title">What It Is</div>
+      <p class="report-narrative">${overview.what_it_is || overview.summary || 'No overview available.'}</p>
+      ${overview.summary && overview.what_it_is ? `<p class="report-narrative" style="margin-top:8px">${overview.summary}</p>` : ''}
+      ${overview.value_proposition ? `<p class="report-narrative" style="margin-top:8px;color:var(--accent);font-weight:500">${overview.value_proposition}</p>` : ''}
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        ${overview.niche ? `<span style="padding:3px 10px;background:var(--accent-bg);border:1px solid rgba(124,58,237,0.2);border-radius:100px;font-size:11px;color:var(--accent);font-weight:500">${overview.niche}</span>` : ''}
+        ${overview.stage ? `<span style="padding:3px 10px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:100px;font-size:11px;color:var(--amber);font-weight:500;font-family:var(--font-data)">${overview.stage.toUpperCase()}</span>` : ''}
+      </div>
+      ${overview.competitive_advantages ? `<p class="report-narrative" style="margin-top:10px"><strong style="color:var(--text);font-size:12px">Competitive Edge:</strong> ${overview.competitive_advantages}</p>` : ''}
     </div>
+
+    ${analysis.swot ? `
+    <div>
+      <div class="report-section-title">SWOT Analysis</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="padding:10px;background:rgba(34,197,94,0.05);border:1px solid rgba(34,197,94,0.15);border-radius:var(--radius-sm)">
+          <div style="font-size:10px;color:var(--green-dark);font-weight:700;letter-spacing:0.5px;margin-bottom:6px">STRENGTHS</div>
+          ${(analysis.swot.strengths||[]).map(s => '<div style="font-size:12px;color:var(--text-muted);padding:2px 0">\u2022 '+s+'</div>').join('')}
+        </div>
+        <div style="padding:10px;background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.15);border-radius:var(--radius-sm)">
+          <div style="font-size:10px;color:var(--red);font-weight:700;letter-spacing:0.5px;margin-bottom:6px">WEAKNESSES</div>
+          ${(analysis.swot.weaknesses||[]).map(s => '<div style="font-size:12px;color:var(--text-muted);padding:2px 0">\u2022 '+s+'</div>').join('')}
+        </div>
+        <div style="padding:10px;background:rgba(124,58,237,0.05);border:1px solid rgba(124,58,237,0.15);border-radius:var(--radius-sm)">
+          <div style="font-size:10px;color:var(--accent);font-weight:700;letter-spacing:0.5px;margin-bottom:6px">OPPORTUNITIES</div>
+          ${(analysis.swot.opportunities||[]).map(s => '<div style="font-size:12px;color:var(--text-muted);padding:2px 0">\u2022 '+s+'</div>').join('')}
+        </div>
+        <div style="padding:10px;background:rgba(245,158,11,0.05);border:1px solid rgba(245,158,11,0.15);border-radius:var(--radius-sm)">
+          <div style="font-size:10px;color:var(--amber);font-weight:700;letter-spacing:0.5px;margin-bottom:6px">THREATS</div>
+          ${(analysis.swot.threats||[]).map(s => '<div style="font-size:12px;color:var(--text-muted);padding:2px 0">\u2022 '+s+'</div>').join('')}
+        </div>
+      </div>
+    </div>` : ''}
+
+    ${analysis.technical ? `
+    <div>
+      <div class="report-section-title">Technical Background</div>
+      <p class="report-narrative">${analysis.technical.architecture_summary || ''}</p>
+      ${analysis.technical.ai_model_details ? `<p class="report-narrative" style="margin-top:6px"><strong style="color:var(--text);font-size:12px">AI/ML:</strong> ${analysis.technical.ai_model_details}</p>` : ''}
+      ${analysis.technical.blockchain_integration ? `<p class="report-narrative" style="margin-top:6px"><strong style="color:var(--text);font-size:12px">Chain Integration:</strong> ${analysis.technical.blockchain_integration}</p>` : ''}
+      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+        ${analysis.technical.open_source ? '<span style="padding:2px 8px;background:var(--green-bg);border:1px solid rgba(34,197,94,0.2);border-radius:100px;font-size:10px;color:var(--green-dark)">Open Source</span>' : '<span style="padding:2px 8px;background:var(--bg-3);border:1px solid var(--border);border-radius:100px;font-size:10px;color:var(--text-dim)">Closed Source</span>'}
+        <span style="padding:2px 8px;background:var(--bg-3);border:1px solid var(--border);border-radius:100px;font-size:10px;color:var(--text-dim)">${analysis.technical.audit_status || 'Audit Unknown'}</span>
+      </div>
+    </div>` : ''}
+
+    ${analysis.team ? `
+    <div>
+      <div class="report-section-title">Team Review</div>
+      <p class="report-narrative">${analysis.team.team_summary || 'No team information available.'}</p>
+      ${analysis.team.red_flags && analysis.team.red_flags.length ? `<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">${analysis.team.red_flags.map(r => '<span style="padding:2px 8px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.15);border-radius:4px;font-size:10px;color:var(--red)">\u26A0 '+r+'</span>').join('')}</div>` : ''}
+    </div>` : ''}
+
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       ${riskData.bull_case ? `<div style="padding:10px;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:var(--radius-sm)"><div style="font-size:10px;color:var(--green-dark);font-weight:700;letter-spacing:0.5px;margin-bottom:4px">BULL CASE</div><div style="font-size:12px;color:var(--text-muted)">${riskData.bull_case}</div></div>` : ''}
       ${riskData.bear_case ? `<div style="padding:10px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-sm)"><div style="font-size:10px;color:var(--red);font-weight:700;letter-spacing:0.5px;margin-bottom:4px">BEAR CASE</div><div style="font-size:12px;color:var(--text-muted)">${riskData.bear_case}</div></div>` : ''}
@@ -1393,14 +1446,21 @@ function renderModal(agent) {
     `}
 
     <div>
-      <div class="report-section-title">Key Metrics</div>
+      <div class="report-section-title">Price &amp; Liquidity (DexScreener)</div>
+      <div class="metrics-grid" style="grid-template-columns:repeat(4,1fr)">
+        <div class="metric-tile" style="border-left:3px solid var(--accent)"><div class="metric-tile-label">Price</div><div class="metric-tile-value" style="font-size:17px;color:var(--text)">${agent.price_usd ? '$' + parseFloat(agent.price_usd).toPrecision(4) : '\u2014'}</div></div>
+        <div class="metric-tile" style="border-left:3px solid var(--teal)"><div class="metric-tile-label">Market Cap</div><div class="metric-tile-value teal">${fmtMcap(agent.market_cap)}</div></div>
+        <div class="metric-tile" style="border-left:3px solid var(--purple)"><div class="metric-tile-label">24h Volume</div><div class="metric-tile-value purple">${fmtVol(agent.volume_24h)}</div></div>
+        <div class="metric-tile" style="border-left:3px solid ${parseFloat(agent.price_change_24h||0)>=0?'var(--green)':'var(--red)'}"><div class="metric-tile-label">24h Change</div><div class="metric-tile-value ${parseFloat(agent.price_change_24h||0)>=0?'green':'red'}">${fmtChange(agent.price_change_24h)}</div></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="report-section-title">On-Chain Metrics</div>
       <div class="metrics-grid">
-        <div class="metric-tile"><div class="metric-tile-label">Market Cap</div><div class="metric-tile-value teal">${fmtMcap(agent.market_cap)}</div></div>
-        <div class="metric-tile"><div class="metric-tile-label">24h Volume</div><div class="metric-tile-value purple">${fmtVol(agent.volume_24h)}</div></div>
-        <div class="metric-tile"><div class="metric-tile-label">Price Change 24h</div><div class="metric-tile-value ${parseFloat(agent.price_change_24h||0)>=0?'green':'red'}">${fmtChange(agent.price_change_24h)}</div></div>
-        <div class="metric-tile"><div class="metric-tile-label">Holders</div><div class="metric-tile-value">${fmtNumber(agent.holder_count)}</div></div>
-        <div class="metric-tile"><div class="metric-tile-label">Liquidity</div><div class="metric-tile-value">${fmtMcap(agent.liquidity_usd)}</div></div>
+        <div class="metric-tile"><div class="metric-tile-label">Liquidity</div><div class="metric-tile-value teal">${fmtMcap(agent.liquidity_usd)}</div></div>
         <div class="metric-tile"><div class="metric-tile-label">Buy/Sell Ratio</div><div class="metric-tile-value ${parseFloat(agent.buy_sell_ratio||1)>=1?'green':'red'}">${parseFloat(agent.buy_sell_ratio||1).toFixed(2)}x</div></div>
+        <div class="metric-tile"><div class="metric-tile-label">Holders</div><div class="metric-tile-value">${fmtNumber(agent.holder_count)}</div></div>
         <div class="metric-tile"><div class="metric-tile-label">Twitter Followers</div><div class="metric-tile-value">${fmtNumber(agent.twitter_followers)}</div></div>
         <div class="metric-tile"><div class="metric-tile-label">GitHub Stars</div><div class="metric-tile-value">${fmtNumber(agent.github_stars)}</div></div>
       </div>
@@ -1478,27 +1538,34 @@ function renderProjectTAM(agent, analysis) {
   if (market.tam_description) {
     tamDesc = market.tam_description;
   } else {
-    // Generate project-specific TAM based on category
     const tamMap = {
-      DeFi: `${name} operates in the decentralized finance sector. The on-chain DeFi TAM on Base/L2s is estimated at $5-15B by 2027, driven by yield aggregation, lending, and DEX volume growth.`,
-      Gaming: `${name} targets the blockchain gaming vertical. Web3 gaming TAM is projected at $8-25B by 2027, with AI-driven NPCs and autonomous game agents as a growing sub-segment.`,
-      Social: `${name} is positioned in the decentralized social/DAO space. Social token and community governance TAM is estimated at $3-10B as on-chain identity and social graphs mature.`,
-      Trading: `${name} competes in the AI trading agent market. Automated crypto trading TAM is estimated at $4-12B, with copy trading and signal aggregation showing strongest growth.`,
-      Infra: `${name} provides infrastructure for the Virtuals ecosystem. AI-crypto infra TAM is projected at $10-30B by 2027, spanning oracles, compute, and agent orchestration.`,
-      Info: `${name} focuses on intelligence and data in the crypto-AI space. On-chain analytics and AI research TAM is estimated at $2-8B with growing institutional demand.`,
+      DeFi: `${name} operates in the decentralized finance sector. The on-chain DeFi TAM on Base/L2s is estimated at $5-15B by 2027.`,
+      Gaming: `${name} targets the blockchain gaming vertical. Web3 gaming TAM is projected at $8-25B by 2027.`,
+      Social: `${name} is positioned in the decentralized social/DAO space. Social token and community governance TAM is estimated at $3-10B.`,
+      Trading: `${name} competes in the AI trading agent market. Automated crypto trading TAM is estimated at $4-12B.`,
+      Infra: `${name} provides infrastructure for the Virtuals ecosystem. AI-crypto infra TAM is projected at $10-30B by 2027.`,
+      Info: `${name} focuses on intelligence and data in the crypto-AI space. On-chain analytics TAM is estimated at $2-8B.`,
     };
-    tamDesc = tamMap[cat] || `${name} operates in the ${cat} sector of the Virtuals AI agent ecosystem. The addressable market for AI agents in crypto is estimated at $10-50B by 2027.`;
+    tamDesc = tamMap[cat] || `${name} operates in the ${cat} sector of the Virtuals AI agent ecosystem.`;
   }
 
   let mcapContext = '';
-  if (mcap > 100e6) mcapContext = `At ${fmtMcap(mcap)}, ${name} has achieved significant scale relative to its TAM. Growth depends on ecosystem expansion and sustained utility.`;
-  else if (mcap > 10e6) mcapContext = `At ${fmtMcap(mcap)}, ${name} has room to grow within its addressable market if execution continues.`;
+  if (mcap > 100e6) mcapContext = `At ${fmtMcap(mcap)}, ${name} has achieved significant scale relative to its TAM.`;
+  else if (mcap > 10e6) mcapContext = `At ${fmtMcap(mcap)}, ${name} has room to grow within its addressable market.`;
   else if (mcap > 0) mcapContext = `At ${fmtMcap(mcap)}, ${name} is early-stage with significant upside potential but elevated risk.`;
+
+  const tamSize = market.tam_size_estimate || '';
+  const growth = market.growth_trajectory || '';
+  const competitors = market.competitor_landscape || '';
 
   return `<div>
     <div class="report-section-title">TAM &amp; Market Position</div>
     <p class="report-narrative">${tamDesc}</p>
+    ${tamSize ? `<p class="report-narrative" style="margin-top:6px"><strong style="color:var(--text);font-size:12px">Est. TAM:</strong> ${tamSize}</p>` : ''}
+    ${growth ? `<p class="report-narrative" style="margin-top:4px"><strong style="color:var(--text);font-size:12px">Growth:</strong> ${growth}</p>` : ''}
+    ${competitors ? `<p class="report-narrative" style="margin-top:4px"><strong style="color:var(--text);font-size:12px">Competitors:</strong> ${competitors}</p>` : ''}
     ${mcapContext ? `<p class="report-narrative" style="margin-top:8px">${mcapContext}</p>` : ''}
+    ${market.real_world_comparable ? `<p class="report-narrative" style="margin-top:4px"><strong style="color:var(--text);font-size:12px">Web2 Comparable:</strong> ${market.real_world_comparable}</p>` : ''}
   </div>`;
 }
 
