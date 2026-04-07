@@ -1,921 +1,903 @@
 <!DOCTYPE html>
+<!-- All data loaded from API. No Jinja2 template variables needed. -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VirtualsIQ — AI Agent Intelligence Terminal</title>
+  <title>VirtualsIQ — Agent Intelligence Terminal</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
     :root {
-      --bg:         #FFFFFF;
-      --bg-2:       #F8F9FA;
-      --bg-3:       #F1F3F5;
-      --bg-4:       #E9ECEF;
-      --border:     #E5E7EB;
-      --border-2:   #D1D5DB;
-      --text:       #111827;
-      --text-muted: #6B7280;
-      --text-dim:   #9CA3AF;
-      --green:      #00C853;
-      --green-bg:   rgba(0,200,83,0.10);
-      --green-dark: #00A843;
-      --red:        #EF4444;
-      --red-bg:     rgba(239,68,68,0.10);
-      --amber:      #F59E0B;
-      --teal:       #0891B2;
-      --purple:     #A855F7;
-      --radius:     8px;
-      --radius-sm:  6px;
-      --radius-pill:100px;
-      --font-ui:    'Inter', sans-serif;
-      --font-data:  'JetBrains Mono', monospace;
-      --shadow-sm:  0 1px 3px rgba(0,0,0,0.06),0 1px 2px rgba(0,0,0,0.04);
-      --shadow-md:  0 4px 12px rgba(0,0,0,0.08),0 2px 4px rgba(0,0,0,0.04);
-      --shadow-lg:  0 20px 40px rgba(0,0,0,0.12),0 8px 16px rgba(0,0,0,0.06);
+      --green:       #00C853;
+      --green-hover: #00E676;
+      --green-dark:  #007E33;
+      --green-bg:    #E8F5E9;
+      --white:       #FFFFFF;
+      --card:        #F8F9FA;
+      --border:      #E0E0E0;
+      --text:        #1A1A1A;
+      --text-sec:    #555555;
+      --text-mute:   #888888;
+      --red:         #E53935;
+      --orange:      #FF6F00;
+      --shadow:      0 2px 8px rgba(0,0,0,0.08);
+      --shadow-md:   0 4px 20px rgba(0,0,0,0.12);
+      --radius:      12px;
+      --radius-sm:   8px;
+      --nav-h:       64px;
+      --bottom-h:    60px;
     }
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    html{scroll-behavior:smooth}
-    body{background:var(--bg);color:var(--text);font-family:var(--font-ui);font-size:14px;line-height:1.5;min-height:100vh;overflow-x:hidden;padding-bottom:116px}
-    ::-webkit-scrollbar{width:4px;height:4px}
-    ::-webkit-scrollbar-track{background:var(--bg-2)}
-    ::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:2px}
 
-    /* HEADER */
-    .header{position:sticky;top:0;z-index:100;background:#fff;border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow-sm)}
-    .logo{display:flex;align-items:center;gap:10px;flex-shrink:0;text-decoration:none}
-    .logo-mark{width:36px;height:36px;background:linear-gradient(135deg,#00C853,#00BFA5);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;box-shadow:0 2px 8px rgba(0,200,83,0.30)}
-    .logo-text{font-weight:800;font-size:17px;color:var(--text);letter-spacing:-0.5px}
-    .logo-text span{color:var(--green)}
-    .search-wrap{flex:1;position:relative}
-    .search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text-dim);pointer-events:none;font-size:13px}
-    .search-input{width:100%;background:var(--bg-2);border:1.5px solid var(--border);border-radius:var(--radius-pill);color:var(--text);font-family:var(--font-ui);font-size:14px;padding:8px 14px 8px 34px;outline:none;transition:all 0.15s}
-    .search-input:focus{border-color:var(--green);background:#fff;box-shadow:0 0 0 3px rgba(0,200,83,0.08)}
-    .search-input::placeholder{color:var(--text-dim)}
-
-    /* FILTER TABS */
-    .filter-tabs-wrap{padding:10px 16px 0;background:#fff}
-    .filter-tabs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:10px}
-    .filter-tabs::-webkit-scrollbar{display:none}
-    .filter-tab{flex-shrink:0;padding:6px 16px;border-radius:var(--radius-pill);border:1.5px solid var(--border);background:#fff;color:var(--text-muted);font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
-    .filter-tab:hover{border-color:var(--green);color:var(--text)}
-    .filter-tab.active{background:var(--green);border-color:var(--green);color:#fff;box-shadow:0 2px 8px rgba(0,200,83,0.25)}
-
-    /* CATEGORY TABS */
-    .category-tabs-wrap{padding:0 16px;background:#fff;border-bottom:1px solid var(--border)}
-    .category-tabs{display:flex;overflow-x:auto;scrollbar-width:none}
-    .category-tabs::-webkit-scrollbar{display:none}
-    .category-tab{flex-shrink:0;padding:8px 14px;border:none;border-bottom:2px solid transparent;background:transparent;color:var(--text-muted);font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;white-space:nowrap;margin-bottom:-1px}
-    .category-tab:hover{color:var(--text)}
-    .category-tab.active{color:var(--green-dark);border-bottom-color:var(--green);font-weight:600}
-
-    /* STATS BAR */
-    .stats-bar{display:flex;align-items:center;padding:8px 16px;background:var(--bg-2);border-bottom:1px solid var(--border);gap:0;overflow-x:auto;scrollbar-width:none}
-    .stats-bar::-webkit-scrollbar{display:none}
-    .stat-item{display:flex;align-items:center;gap:6px;flex-shrink:0;padding:0 14px}
-    .stat-item:first-child{padding-left:0}
-    .stat-item+.stat-item{border-left:1px solid var(--border)}
-    .stat-icon{color:var(--green);font-size:11px}
-    .stat-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-dim)}
-    .stat-value{font-family:var(--font-data);font-size:12px;font-weight:600;color:var(--text)}
-
-    /* ENRICHMENT BANNER */
-    .enrich-banner{display:none;align-items:center;gap:8px;padding:7px 16px;background:rgba(0,200,83,0.06);border-bottom:1px solid rgba(0,200,83,0.15);font-size:12px;color:var(--green-dark);font-family:var(--font-data)}
-    .enrich-banner.visible{display:flex}
-    .enrich-dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0;animation:pulse 1.5s ease-in-out infinite}
-    @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(0.85)}}
-
-    /* TABLE HEADER */
-    .table-header{display:grid;grid-template-columns:36px 1fr 92px 62px 52px;align-items:center;padding:6px 16px;background:var(--bg-2);border-bottom:1px solid var(--border);position:sticky;top:57px;z-index:90}
-    .th{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--text-dim)}
-    .th.sortable{cursor:pointer;user-select:none}
-    .th.sortable:hover{color:var(--green-dark)}
-    .th.right{text-align:right}
-
-    /* AGENT ROWS */
-    .agent-row{display:grid;grid-template-columns:36px 1fr 92px 62px 52px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s}
-    .agent-row:hover{background:var(--bg-2)}
-    .agent-row:last-child{border-bottom:none}
-    .rank{font-family:var(--font-data);font-size:11px;color:var(--text-dim);font-weight:500}
-    .agent-cell{display:flex;align-items:center;gap:10px;min-width:0}
-    .avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--bg-3),var(--bg-4));flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-family:var(--font-data);font-size:13px;font-weight:600;color:var(--text-muted);border:1.5px solid var(--border)}
-    .avatar img{width:100%;height:100%;object-fit:cover}
-    .agent-info{min-width:0;flex:1}
-    .agent-name{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-0.2px}
-    .agent-ticker{font-family:var(--font-data);font-size:11px;color:var(--text-dim);font-weight:500}
-    .agent-category{font-size:11px;color:var(--text-muted);margin-top:1px}
-    .agent-metrics{font-family:var(--font-data);font-size:10px;color:var(--text-dim);margin-top:2px}
-    .price-col{text-align:right}
-    .price-val{font-family:var(--font-data);font-size:12px;font-weight:600;color:var(--text)}
-    .mcap-val{font-family:var(--font-data);font-size:10px;color:var(--text-dim);margin-top:1px}
-    .change-col{text-align:right}
-    .change-val{font-family:var(--font-data);font-size:12px;font-weight:600}
-    .change-val.positive{color:var(--green-dark)}
-    .change-val.negative{color:var(--red)}
-    .viq-col{text-align:right}
-    .viq-val{font-family:var(--font-data);font-size:14px;font-weight:700}
-
-    /* LOADING */
-    .loading-row{display:flex;align-items:center;justify-content:center;gap:10px;padding:48px 16px;color:var(--text-muted);font-size:14px}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .loading-spinner{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin 0.7s linear infinite;flex-shrink:0}
-
-    /* EMPTY STATE */
-    .empty-state{text-align:center;padding:60px 16px;color:var(--text-muted)}
-    .empty-state-icon{font-size:36px;margin-bottom:12px;color:var(--text-dim)}
-    .empty-state-title{font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px}
-
-    /* PAGINATION */
-    .pagination{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-top:1px solid var(--border);background:var(--bg-2)}
-    .pagination-info{font-family:var(--font-data);font-size:12px;color:var(--text-dim)}
-    .pagination-controls{display:flex;align-items:center;gap:4px}
-    .page-btn{min-width:30px;height:30px;padding:0 6px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:#fff;color:var(--text-muted);font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center}
-    .page-btn:hover:not(:disabled){border-color:var(--green);color:var(--green-dark)}
-    .page-btn.active{background:var(--green);border-color:var(--green);color:#fff}
-    .page-btn:disabled{opacity:0.35;cursor:not-allowed}
-
-    /* BOTTOM NAV */
-    .bottom-nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--border);z-index:200;box-shadow:0 -4px 16px rgba(0,0,0,0.06)}
-    .bottom-filters{display:flex;padding:6px 12px;gap:6px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}
-    .bottom-filters::-webkit-scrollbar{display:none}
-    .bottom-filter-btn{flex-shrink:0;padding:4px 10px;border:1.5px solid var(--border);border-radius:var(--radius-pill);background:transparent;color:var(--text-muted);font-size:11px;font-weight:500;cursor:pointer;transition:all 0.15s;display:inline-flex;align-items:center;gap:4px}
-    .bottom-filter-btn:hover{border-color:var(--green);color:var(--text)}
-    .bottom-filter-btn.active{background:var(--green-bg);border-color:var(--green);color:var(--green-dark)}
-    .bottom-tabs{display:grid;grid-template-columns:repeat(5,1fr);padding:4px 8px 8px}
-    .bottom-tab{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 4px;border:none;background:transparent;color:var(--text-dim);font-size:10px;font-weight:500;cursor:pointer;transition:color 0.15s;border-radius:var(--radius-sm)}
-    .bottom-tab i{font-size:18px}
-    .bottom-tab.active{color:var(--green)}
-    .bottom-tab:hover{color:var(--text)}
-
-    /* MODAL */
-    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity 0.2s;backdrop-filter:blur(2px)}
-    .modal-overlay.active{opacity:1;pointer-events:auto}
-    .modal{width:100%;max-width:720px;max-height:90vh;background:#fff;border-radius:20px 20px 0 0;overflow-y:auto;position:relative;transform:translateY(20px);transition:transform 0.25s cubic-bezier(0.34,1.56,0.64,1);box-shadow:var(--shadow-lg)}
-    .modal-overlay.active .modal{transform:translateY(0)}
-    .modal-header{padding:20px 20px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,rgba(0,200,83,0.04),rgba(0,191,165,0.04))}
-    .modal-avatar{width:56px;height:56px;border-radius:50%;background:var(--bg-3);overflow:hidden;flex-shrink:0;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--font-data);font-size:16px;font-weight:600;color:var(--text-muted)}
-    .modal-avatar img{width:100%;height:100%;object-fit:cover}
-    .modal-title-wrap{flex:1;min-width:0}
-    .modal-agent-name{font-size:20px;font-weight:700;letter-spacing:-0.4px;color:var(--text)}
-    .modal-agent-meta{display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap}
-    .modal-score-ring{position:relative;width:64px;height:64px;flex-shrink:0}
-    .modal-score-ring svg{transform:rotate(-90deg)}
-    .modal-score-value{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
-    .modal-score-num{font-family:var(--font-data);font-size:16px;font-weight:700;line-height:1}
-    .modal-score-label{font-size:8px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px}
-    .modal-close{position:absolute;top:16px;right:16px;width:32px;height:32px;background:var(--bg-2);border:1.5px solid var(--border);border-radius:50%;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all 0.15s}
-    .modal-close:hover{background:var(--red-bg);border-color:var(--red);color:var(--red)}
-    .modal-body{padding:20px;display:flex;flex-direction:column;gap:20px}
-    .report-section-title{font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
-    .report-section-title::after{content:'';flex:1;height:1px;background:var(--border)}
-    .report-narrative{color:var(--text-muted);font-size:14px;line-height:1.7}
-    .metrics-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-    @media(max-width:600px){.metrics-grid{grid-template-columns:repeat(2,1fr)}}
-    .metric-tile{background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);padding:12px;transition:border-color 0.15s}
-    .metric-tile:hover{border-color:var(--green)}
-    .metric-tile-label{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:4px;font-weight:600}
-    .metric-tile-value{font-family:var(--font-data);font-size:15px;font-weight:600;color:var(--text)}
-    .metric-tile-value.teal{color:var(--teal)}
-    .metric-tile-value.purple{color:var(--purple)}
-    .metric-tile-value.amber{color:var(--amber)}
-    .metric-tile-value.green{color:var(--green-dark)}
-    .metric-tile-value.red{color:var(--red)}
-    .score-breakdown-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
-    @media(max-width:600px){.score-breakdown-grid{grid-template-columns:1fr}}
-    .forecast-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-    .forecast-card{background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;transition:border-color 0.15s}
-    .forecast-card:hover{border-color:var(--green)}
-    .forecast-horizon{font-size:11px;color:var(--text-dim);margin-bottom:6px;font-family:var(--font-data);font-weight:600}
-    .forecast-probability{font-family:var(--font-data);font-size:26px;font-weight:700;line-height:1;margin-bottom:4px}
-    .forecast-range{font-family:var(--font-data);font-size:11px;color:var(--text-dim);margin-bottom:6px}
-    .forecast-catalyst{font-size:11px;color:var(--text-muted);line-height:1.4}
-    .status-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:100px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px}
-    .status-badge.sentient{background:rgba(8,145,178,0.10);color:var(--teal);border:1px solid rgba(8,145,178,0.25)}
-    .status-badge.prototype{background:rgba(245,158,11,0.10);color:var(--amber);border:1px solid rgba(245,158,11,0.25)}
-    .category-badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:500;color:var(--text-muted);background:var(--bg-3);border:1px solid var(--border)}
-    .doxx-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:100px;font-size:10px;font-weight:600}
-    .doxx-badge.tier-1{background:var(--green-bg);color:var(--green-dark);border:1px solid rgba(0,200,83,0.25)}
-    .doxx-badge.tier-2{background:rgba(168,85,247,0.10);color:var(--purple);border:1px solid rgba(168,85,247,0.25)}
-    .doxx-badge.tier-3{background:var(--bg-3);color:var(--text-muted);border:1px solid var(--border)}
-    .risk-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:100px;font-size:10px;font-weight:600;text-transform:uppercase}
-    .risk-badge.low{background:var(--green-bg);color:var(--green-dark);border:1px solid rgba(0,200,83,0.2)}
-    .risk-badge.medium{background:rgba(245,158,11,0.10);color:var(--amber);border:1px solid rgba(245,158,11,0.2)}
-    .risk-badge.high{background:var(--red-bg);color:var(--red);border:1px solid rgba(239,68,68,0.2)}
-    .risk-badge.extreme{background:rgba(239,68,68,0.15);color:var(--red);border:1px solid rgba(239,68,68,0.3)}
-    .dex-chart-wrap{width:100%;height:380px;border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);background:var(--bg-3)}
-    .dex-chart-wrap iframe{width:100%;height:100%;border:none;display:block}
-    .tier-header{grid-column:1 / -1;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--green-dark);padding-top:8px}
-    .tier-factor-row{display:grid;grid-template-columns:1fr auto;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)}
-    .tier-factor-row:last-child{border-bottom:none}
-    .tier-factor-left{display:flex;flex-direction:column;gap:2px}
-    .tier-factor-name{font-size:12px;font-weight:600;color:var(--text-muted)}
-    .tier-factor-why{font-size:11px;color:var(--text-dim);line-height:1.4}
-    .tier-factor-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:48px}
-    .tier-factor-score{font-family:var(--font-data);font-size:13px;font-weight:700}
-    .tier-factor-bar{width:44px;height:3px;background:var(--bg-4);border-radius:2px;overflow:hidden}
-    .tier-factor-bar-fill{height:100%;border-radius:2px}
-    .score-ring{position:relative;width:42px;height:42px;flex-shrink:0}
-    .score-ring svg{transform:rotate(-90deg)}
-    .score-ring-value{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-data);font-size:10px;font-weight:700}
-    .first-mover-badge{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;background:rgba(168,85,247,0.10);border:1px solid rgba(168,85,247,0.3);color:var(--purple);font-size:8px;font-weight:700;clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)}
-    .toast{position:fixed;bottom:130px;right:16px;background:var(--text);color:#fff;border-radius:var(--radius);padding:10px 14px;font-size:13px;z-index:2000;animation:fadeIn 0.2s ease;max-width:280px;box-shadow:var(--shadow-md)}
-    @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-
-    /* DESKTOP */
-    @media(min-width:768px){
-      body{padding-bottom:0}
-      .bottom-nav{display:none}
-      .header{padding:12px 24px}
-      .filter-tabs-wrap{padding:12px 24px 0}
-      .category-tabs-wrap{padding:0 24px}
-      .stats-bar{padding:8px 24px}
-      .enrich-banner{padding:7px 24px}
-      .table-header{padding:7px 24px;grid-template-columns:44px 1fr 120px 80px 70px;top:65px}
-      .agent-row{padding:12px 24px;grid-template-columns:44px 1fr 120px 80px 70px}
-      .pagination{padding:12px 24px}
-      .modal-overlay{align-items:center;justify-content:center}
-      .modal{border-radius:16px;margin:16px}
-      .modal-body{padding:24px}
+    html, body {
+      height: 100%;
+      font-family: 'Inter', sans-serif;
+      background: var(--white);
+      color: var(--text);
+      overflow-x: hidden;
     }
-    @media(min-width:1024px){
-      .table-header,.agent-row{grid-template-columns:44px 1fr 140px 90px 80px}
+
+    /* ── TOP NAV ── */
+    .topnav {
+      position: fixed; top: 0; left: 0; right: 0; height: var(--nav-h);
+      background: var(--white);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 20px;
+      z-index: 100;
+      box-shadow: var(--shadow);
+    }
+    .logo {
+      font-size: 20px; font-weight: 800; letter-spacing: -0.5px;
+      color: var(--text);
+    }
+    .logo span { color: var(--green); }
+    .topnav-right { display: flex; align-items: center; gap: 12px; }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .status-text { font-size: 12px; color: var(--text-sec); font-weight: 500; }
+
+    /* ── MAIN WRAPPER ── */
+    .wrapper {
+      padding-top: var(--nav-h);
+      padding-bottom: var(--bottom-h);
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    /* ── STATS BAR ── */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      padding: 16px 16px 0;
+    }
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      text-align: center;
+    }
+    .stat-card .val {
+      font-size: 18px; font-weight: 700; color: var(--text);
+      line-height: 1.2;
+    }
+    .stat-card .lbl {
+      font-size: 10px; font-weight: 500; color: var(--text-mute);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      margin-top: 3px;
+    }
+    .stat-card .val.green { color: var(--green-dark); }
+
+    /* ── LOADING BANNER ── */
+    #loading-banner {
+      margin: 12px 16px 0;
+      background: var(--green-bg);
+      border: 1px solid #A5D6A7;
+      border-radius: var(--radius-sm);
+      padding: 8px 14px;
+      font-size: 12px; font-weight: 500; color: var(--green-dark);
+      display: none;
+      align-items: center; gap: 8px;
+    }
+    #loading-banner.visible { display: flex; }
+    .spinner-sm {
+      width: 14px; height: 14px;
+      border: 2px solid #A5D6A7;
+      border-top-color: var(--green);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── FILTER TABS ── */
+    .filter-tabs {
+      display: flex; gap: 4px;
+      padding: 14px 16px 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .filter-tabs::-webkit-scrollbar { display: none; }
+    .tab-btn {
+      flex-shrink: 0;
+      padding: 7px 16px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--white);
+      font-size: 13px; font-weight: 500; color: var(--text-sec);
+      cursor: pointer; transition: all 0.15s;
+    }
+    .tab-btn:hover { border-color: var(--green); color: var(--green-dark); }
+    .tab-btn.active {
+      background: var(--green); border-color: var(--green);
+      color: #fff; font-weight: 600;
+    }
+
+    /* ── CATEGORY PILLS ── */
+    .cat-pills {
+      display: flex; gap: 6px;
+      padding: 10px 16px 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .cat-pills::-webkit-scrollbar { display: none; }
+    .cat-pill {
+      flex-shrink: 0;
+      padding: 5px 13px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      font-size: 12px; font-weight: 500; color: var(--text-sec);
+      cursor: pointer; transition: all 0.15s;
+    }
+    .cat-pill:hover { border-color: var(--green); color: var(--green-dark); }
+    .cat-pill.active {
+      background: var(--green-bg); border-color: var(--green);
+      color: var(--green-dark); font-weight: 600;
+    }
+
+    /* ── SEARCH ── */
+    .search-wrap {
+      padding: 10px 16px 0;
+    }
+    .search-inner {
+      position: relative;
+    }
+    .search-icon {
+      position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+      color: var(--text-mute); font-size: 15px; pointer-events: none;
+    }
+    #search-input {
+      width: 100%;
+      padding: 10px 12px 10px 36px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--card);
+      font-size: 14px; color: var(--text);
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    #search-input::placeholder { color: var(--text-mute); }
+    #search-input:focus { border-color: var(--green); background: var(--white); }
+
+    /* ── AGENT TABLE ── */
+    .agent-section {
+      padding: 12px 16px 0;
+    }
+    .agent-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .agent-table thead th {
+      padding: 8px 10px;
+      text-align: left;
+      font-size: 10px; font-weight: 600;
+      color: var(--text-mute);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      border-bottom: 2px solid var(--border);
+      background: var(--card);
+    }
+    .agent-table thead th:first-child { border-radius: var(--radius-sm) 0 0 0; }
+    .agent-table thead th:last-child  { border-radius: 0 var(--radius-sm) 0 0; text-align: right; }
+    .agent-table thead th.r { text-align: right; }
+    .agent-row {
+      cursor: pointer;
+      transition: background 0.12s;
+      border-bottom: 1px solid var(--border);
+    }
+    .agent-row:hover { background: var(--green-bg); }
+    .agent-row td {
+      padding: 11px 10px;
+      font-size: 13px;
+      vertical-align: middle;
+    }
+    .agent-row td.r { text-align: right; }
+    .rank-cell { color: var(--text-mute); font-size: 12px; font-weight: 600; width: 36px; }
+    .avatar-cell { width: 44px; }
+    .avatar {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: var(--green-bg);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 700; color: var(--green-dark);
+      overflow: hidden; flex-shrink: 0;
+    }
+    .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+    .name-cell .agent-name { font-weight: 600; font-size: 13px; color: var(--text); }
+    .name-cell .agent-ticker {
+      font-size: 11px; color: var(--text-mute); font-weight: 500;
+      margin-top: 1px;
+    }
+    .change-pos { color: var(--green-dark); font-weight: 600; }
+    .change-neg { color: var(--red); font-weight: 600; }
+    .viq-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 3px 8px; border-radius: 10px;
+      font-size: 11px; font-weight: 700;
+      min-width: 42px;
+    }
+    .viq-high   { background: #E8F5E9; color: #1B5E20; }
+    .viq-medium { background: #FFF8E1; color: #E65100; }
+    .viq-low    { background: #FFEBEE; color: #B71C1C; }
+
+    /* ── LOAD MORE ── */
+    .load-more-wrap {
+      padding: 14px 16px 0;
+      display: flex; justify-content: center;
+    }
+    #load-more-btn {
+      padding: 10px 28px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 13px; font-weight: 600; color: var(--text-sec);
+      cursor: pointer; transition: all 0.15s;
+    }
+    #load-more-btn:hover { border-color: var(--green); color: var(--green-dark); background: var(--green-bg); }
+    #load-more-btn:disabled { opacity: 0.45; cursor: default; }
+
+    /* ── EMPTY / ERROR ── */
+    .empty-state {
+      text-align: center; padding: 48px 16px;
+      color: var(--text-mute); font-size: 14px;
+    }
+    .empty-state .icon { font-size: 40px; margin-bottom: 10px; }
+
+    /* ── BOTTOM NAV ── */
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      height: var(--bottom-h);
+      background: var(--white);
+      border-top: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-around;
+      z-index: 100;
+    }
+    .nav-item {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 3px; cursor: pointer;
+      color: var(--text-mute); font-size: 10px; font-weight: 500;
+      transition: color 0.15s;
+    }
+    .nav-item.active { color: var(--green-dark); }
+    .nav-item svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* ── MODAL ── */
+    .modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.35);
+      z-index: 200;
+      display: none; align-items: flex-end; justify-content: center;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      width: 100%; max-width: 900px;
+      max-height: 88vh;
+      background: var(--white);
+      border-radius: var(--radius) var(--radius) 0 0;
+      overflow-y: auto;
+      padding: 0 0 24px;
+      box-shadow: var(--shadow-md);
+      animation: slideUp 0.25s ease;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(60px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+    .modal-handle {
+      width: 40px; height: 4px; border-radius: 2px;
+      background: var(--border); margin: 12px auto 16px;
+    }
+    .modal-header {
+      display: flex; align-items: flex-start; gap: 14px;
+      padding: 0 20px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-avatar {
+      width: 52px; height: 52px; border-radius: 50%;
+      background: var(--green-bg);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: 800; color: var(--green-dark);
+      overflow: hidden; flex-shrink: 0;
+    }
+    .modal-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+    .modal-title-wrap { flex: 1; }
+    .modal-name { font-size: 20px; font-weight: 700; color: var(--text); }
+    .modal-ticker { font-size: 13px; color: var(--text-mute); font-weight: 500; }
+    .modal-close {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 50%; width: 32px; height: 32px;
+      cursor: pointer; font-size: 16px; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-sec); transition: background 0.15s;
+    }
+    .modal-close:hover { background: var(--border); }
+
+    /* VIQ score big badge in modal */
+    .viq-score-big {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 18px; border-radius: var(--radius-sm);
+      font-size: 22px; font-weight: 800;
+      margin: 16px 20px 0;
+    }
+    .viq-score-big.high   { background: #E8F5E9; color: #1B5E20; }
+    .viq-score-big.medium { background: #FFF8E1; color: #E65100; }
+    .viq-score-big.low    { background: #FFEBEE; color: #B71C1C; }
+    .viq-label { font-size: 12px; font-weight: 600; opacity: 0.7; }
+
+    /* metrics grid */
+    .metrics-grid {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px; padding: 14px 20px 0;
+    }
+    .metric-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 12px;
+    }
+    .metric-card .m-val { font-size: 16px; font-weight: 700; color: var(--text); }
+    .metric-card .m-lbl { font-size: 10px; color: var(--text-mute); font-weight: 500; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.4px; }
+
+    /* bio */
+    .modal-bio {
+      padding: 14px 20px 0;
+      font-size: 13px; color: var(--text-sec); line-height: 1.65;
+    }
+    .modal-section-title {
+      font-size: 11px; font-weight: 700; color: var(--text-mute);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      padding: 14px 20px 6px;
+    }
+
+    /* social links */
+    .socials-row {
+      display: flex; gap: 8px; flex-wrap: wrap;
+      padding: 0 20px;
+    }
+    .social-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 12px; border-radius: 16px;
+      border: 1px solid var(--border); background: var(--card);
+      font-size: 12px; font-weight: 500; color: var(--text-sec);
+      text-decoration: none; transition: all 0.15s;
+    }
+    .social-link:hover { border-color: var(--green); color: var(--green-dark); background: var(--green-bg); }
+
+    /* spinner overlay for modal loading */
+    .modal-loading {
+      display: flex; align-items: center; justify-content: center;
+      padding: 48px 20px;
+    }
+    .spinner-lg {
+      width: 32px; height: 32px;
+      border: 3px solid var(--border);
+      border-top-color: var(--green);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 600px) {
+      .stats-bar { grid-template-columns: repeat(2, 1fr); }
+      .metrics-grid { grid-template-columns: 1fr 1fr; }
+      .agent-table thead th.hide-sm,
+      .agent-table tbody td.hide-sm { display: none; }
     }
   </style>
 </head>
 <body>
 
-<!-- HEADER -->
-<header class="header">
-  <div class="logo">
-    <div class="logo-mark"><i class="fa-solid fa-bolt"></i></div>
-    <span class="logo-text">Virtuals<span>IQ</span></span>
-  </div>
-  <div class="search-wrap">
-    <i class="fa-solid fa-magnifying-glass search-icon"></i>
-    <input class="search-input" type="text" placeholder="Search agents, tickers..." id="search-input" autocomplete="off" />
-  </div>
-</header>
+  <!-- TOP NAV -->
+  <nav class="topnav">
+    <div class="logo">Virtuals<span>IQ</span></div>
+    <div class="topnav-right">
+      <div class="status-dot" id="status-dot"></div>
+      <span class="status-text" id="status-text">Loading…</span>
+    </div>
+  </nav>
 
-<!-- FILTER TABS -->
-<div class="filter-tabs-wrap">
-  <div class="filter-tabs">
-    <button class="filter-tab active" data-feed="trending" data-sort="market_cap"><i class="fa-solid fa-fire-flame-curved"></i> Trending</button>
-    <button class="filter-tab" data-feed="new" data-sort="newest"><i class="fa-solid fa-star"></i> New</button>
-    <button class="filter-tab" data-feed="top-viq" data-sort="composite_score"><i class="fa-solid fa-trophy"></i> Top VIQ</button>
-    <button class="filter-tab" data-feed="smart-money" data-sort="market_cap"><i class="fa-solid fa-brain"></i> Smart Money</button>
-  </div>
-</div>
+  <div class="wrapper">
 
-<!-- CATEGORY TABS -->
-<div class="category-tabs-wrap">
-  <div class="category-tabs">
-    <button class="category-tab active" data-category="">All</button>
-    <button class="category-tab" data-category="DeFi">DeFi</button>
-    <button class="category-tab" data-category="Gaming">Gaming</button>
-    <button class="category-tab" data-category="Social">Social</button>
-    <button class="category-tab" data-category="Trading">Trading</button>
-    <button class="category-tab" data-category="Infrastructure">Infra</button>
-    <button class="category-tab" data-category="Information">Info</button>
-  </div>
-</div>
-
-<!-- STATS BAR -->
-<div class="stats-bar">
-  <div class="stat-item">
-    <i class="fa-solid fa-chart-line stat-icon"></i>
-    <span class="stat-label">24H VOL</span>
-    <span class="stat-value" id="stat-vol">---</span>
-  </div>
-  <div class="stat-item">
-    <i class="fa-solid fa-robot stat-icon"></i>
-    <span class="stat-label">AGENTS</span>
-    <span class="stat-value" id="stat-total">—</span>
-  </div>
-  <div class="stat-item">
-    <i class="fa-solid fa-gauge-high stat-icon"></i>
-    <span class="stat-label">AVG VIQ</span>
-    <span class="stat-value" id="stat-avg-score">—</span>
-  </div>
-  <div class="stat-item">
-    <i class="fa-solid fa-circle-dot stat-icon"></i>
-    <span class="stat-label">SENTIENT</span>
-    <span class="stat-value" id="stat-sentient">—</span>
-  </div>
-</div>
-
-<!-- ENRICHMENT BANNER -->
-<div class="enrich-banner" id="enrich-banner">
-  <div class="enrich-dot"></div>
-  <span id="enrich-msg">Loading agents...</span>
-</div>
-
-<!-- TABLE HEADER -->
-<div class="table-header">
-  <div class="th">#</div>
-  <div class="th">AGENT</div>
-  <div class="th right sortable" data-sort="market_cap">PRICE/MCAP</div>
-  <div class="th right sortable" data-sort="price_change_24h">24H %</div>
-  <div class="th right sortable" data-sort="composite_score">VIQ</div>
-</div>
-
-<!-- AGENT LIST -->
-<div id="agent-list">
-  <div class="loading-row">
-    <div class="loading-spinner"></div>
-    Loading agents from Virtuals Protocol...
-  </div>
-</div>
-
-<!-- PAGINATION -->
-<div class="pagination" id="pagination-bar" style="display:none">
-  <div class="pagination-info" id="pagination-info"></div>
-  <div class="pagination-controls" id="pagination-controls"></div>
-</div>
-
-<!-- MODAL -->
-<div class="modal-overlay" id="modal-overlay">
-  <div class="modal" id="modal">
-    <button class="modal-close" id="modal-close"><i class="fa-solid fa-xmark"></i></button>
-    <div class="modal-header" id="modal-header">
-      <div class="modal-avatar" id="modal-avatar"></div>
-      <div class="modal-title-wrap">
-        <div class="modal-agent-name" id="modal-agent-name">Loading...</div>
-        <div class="modal-agent-meta" id="modal-agent-meta"></div>
+    <!-- STATS BAR -->
+    <div class="stats-bar">
+      <div class="stat-card">
+        <div class="val" id="stat-agents">—</div>
+        <div class="lbl">Total Agents</div>
       </div>
-      <div class="modal-score-ring" id="modal-score-ring">
-        <svg width="64" height="64" viewBox="0 0 64 64">
-          <circle cx="32" cy="32" r="26" fill="none" stroke="var(--bg-4)" stroke-width="5"/>
-          <circle id="modal-ring-arc" cx="32" cy="32" r="26" fill="none" stroke="var(--green)" stroke-width="5"
-            stroke-dasharray="163.4" stroke-dashoffset="163.4" stroke-linecap="round"/>
-        </svg>
-        <div class="modal-score-value">
-          <div class="modal-score-num" id="modal-score-num">—</div>
-          <div class="modal-score-label">VIQ</div>
-        </div>
+      <div class="stat-card">
+        <div class="val" id="stat-mcap">—</div>
+        <div class="lbl">Total MCAP</div>
+      </div>
+      <div class="stat-card">
+        <div class="val" id="stat-vol">—</div>
+        <div class="lbl">24h Volume</div>
+      </div>
+      <div class="stat-card">
+        <div class="val green" id="stat-trending">—</div>
+        <div class="lbl">Trending</div>
       </div>
     </div>
-    <div class="modal-body" id="modal-body">
-      <div style="text-align:center;padding:40px">
-        <div class="loading-spinner" style="margin:0 auto 12px"></div>
-        <div style="color:var(--text-dim);font-size:13px">Loading intelligence report...</div>
+
+    <!-- LOADING BANNER -->
+    <div id="loading-banner">
+      <div class="spinner-sm"></div>
+      <span id="loading-text">Loading agents…</span>
+    </div>
+
+    <!-- FILTER TABS -->
+    <div class="filter-tabs">
+      <button class="tab-btn active" data-feed="hot">🔥 Trending</button>
+      <button class="tab-btn" data-feed="new">✨ New</button>
+      <button class="tab-btn" data-feed="top-scored">🏆 Top VIQ</button>
+      <button class="tab-btn" data-feed="smart-money">💎 Smart Money</button>
+    </div>
+
+    <!-- CATEGORY PILLS -->
+    <div class="cat-pills">
+      <button class="cat-pill active" data-cat="">All</button>
+      <button class="cat-pill" data-cat="defi">DeFi</button>
+      <button class="cat-pill" data-cat="gaming">Gaming</button>
+      <button class="cat-pill" data-cat="social">Social</button>
+      <button class="cat-pill" data-cat="ai">AI</button>
+      <button class="cat-pill" data-cat="infrastructure">Infrastructure</button>
+    </div>
+
+    <!-- SEARCH -->
+    <div class="search-wrap">
+      <div class="search-inner">
+        <span class="search-icon">🔍</span>
+        <input type="search" id="search-input" placeholder="Search agents by name or ticker…" autocomplete="off" />
+      </div>
+    </div>
+
+    <!-- AGENT TABLE -->
+    <div class="agent-section">
+      <table class="agent-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th></th>
+            <th>Agent</th>
+            <th class="r hide-sm">VOL 24h</th>
+            <th class="r">MCAP</th>
+            <th class="r">Price %</th>
+            <th class="r">VIQ Score</th>
+          </tr>
+        </thead>
+        <tbody id="agent-tbody">
+          <tr><td colspan="7"><div class="empty-state"><div class="icon">⏳</div>Fetching agents…</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- LOAD MORE -->
+    <div class="load-more-wrap">
+      <button id="load-more-btn" style="display:none">Load More</button>
+    </div>
+
+  </div><!-- /wrapper -->
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <div class="nav-item active" id="nav-home">
+      <svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg>
+      Home
+    </div>
+    <div class="nav-item" id="nav-trending">
+      <svg viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+      Trending
+    </div>
+    <div class="nav-item" id="nav-watchlist">
+      <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+      Watchlist
+    </div>
+    <div class="nav-item" id="nav-portfolio">
+      <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
+      Portfolio
+    </div>
+  </nav>
+
+  <!-- DETAIL MODAL -->
+  <div class="modal-backdrop" id="modal-backdrop">
+    <div class="modal" id="modal" role="dialog" aria-modal="true">
+      <div class="modal-handle"></div>
+      <div id="modal-content">
+        <div class="modal-loading"><div class="spinner-lg"></div></div>
       </div>
     </div>
   </div>
-</div>
-
-<!-- BOTTOM NAV -->
-<nav class="bottom-nav">
-  <div class="bottom-filters">
-    <button class="bottom-filter-btn active" id="btn-24h">24H</button>
-    <button class="bottom-filter-btn" id="btn-chain"><i class="fa-solid fa-link"></i> Base Chain</button>
-    <button class="bottom-filter-btn" id="btn-sort"><i class="fa-solid fa-arrow-up-wide-short"></i> Sort: MCap</button>
-    <button class="bottom-filter-btn" id="btn-status">All Status</button>
-    <button class="bottom-filter-btn" id="btn-doxx">All Doxx</button>
-  </div>
-  <div class="bottom-tabs">
-    <button class="bottom-tab active" id="tab-dashboard">
-      <i class="fa-solid fa-table-cells-large"></i>Dashboard
-    </button>
-    <button class="bottom-tab" id="tab-search" onclick="document.getElementById('search-input').focus()">
-      <i class="fa-solid fa-magnifying-glass"></i>Search
-    </button>
-    <button class="bottom-tab" id="tab-watchlist">
-      <i class="fa-solid fa-bookmark"></i>Watchlist
-    </button>
-    <button class="bottom-tab" id="tab-alerts">
-      <i class="fa-solid fa-bell"></i>Alerts
-    </button>
-    <button class="bottom-tab" id="tab-settings">
-      <i class="fa-solid fa-gear"></i>Settings
-    </button>
-  </div>
-</nav>
-
-<select id="filter-status" style="display:none">
-  <option value="">All Status</option>
-  <option value="Sentient">Sentient</option>
-  <option value="Prototype">Prototype</option>
-</select>
-<select id="filter-doxx" style="display:none">
-  <option value="">All Doxx</option>
-  <option value="1">Full Doxx</option>
-  <option value="2">Social</option>
-  <option value="3">Anon</option>
-</select>
 
 {% raw %}
 <script>
-const state = {
-  page: 1, pageSize: 25, sort: 'market_cap', category: '', status: '',
-  doxxTier: '', search: '', total: 0, totalPages: 0,
-  searchTimeout: null, currentAgent: null, jobPollInterval: null,
-};
+  // ── STATE ──────────────────────────────────────────────────────────────────
+  let currentFeed     = 'hot';
+  let currentCategory = '';
+  let currentSearch   = '';
+  let currentPage     = 1;
+  let totalPages      = 1;
+  let isLoading       = false;
+  let searchTimer     = null;
+  const PAGE_SIZE     = 25;
 
-function fmtMcap(v) {
-  if (!v || isNaN(v)) return '—';
-  if (v >= 1e9) return '$' + (v/1e9).toFixed(2) + 'B';
-  if (v >= 1e6) return '$' + (v/1e6).toFixed(2) + 'M';
-  if (v >= 1e3) return '$' + (v/1e3).toFixed(1) + 'K';
-  return '$' + v.toFixed(2);
-}
-function fmtChange(v) {
-  if (v === null || v === undefined || isNaN(v)) return '—';
-  const sign = v >= 0 ? '+' : '';
-  return sign + parseFloat(v).toFixed(2) + '%';
-}
-function fmtNumber(v) { if (!v) return '—'; return parseInt(v).toLocaleString(); }
-function fmtCompact(v) {
-  if (!v || isNaN(v)) return '—';
-  if (v >= 1e6) return (v/1e6).toFixed(1) + 'M';
-  if (v >= 1e3) return (v/1e3).toFixed(0) + 'K';
-  return String(v);
-}
-function scoreColor(score) {
-  if (score >= 75) return '#00A843';
-  if (score >= 50) return '#A855F7';
-  if (score >= 30) return '#F59E0B';
-  return '#EF4444';
-}
-function initials(name) {
-  if (!name) return '?';
-  return name.split(' ').slice(0,2).map(w => w[0]).join('').toUpperCase();
-}
-function scoreRingHTML(score, size=42, sw=4) {
-  const r = (size/2) - sw;
-  const circ = 2 * Math.PI * r;
-  const fill = ((score || 0) / 100) * circ;
-  const color = scoreColor(score);
-  return `<div class="score-ring">
-    <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-      <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="var(--bg-4)" stroke-width="${sw}"/>
-      <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${color}" stroke-width="${sw}"
-        stroke-dasharray="${circ}" stroke-dashoffset="${circ - fill}" stroke-linecap="round"/>
-    </svg>
-    <div class="score-ring-value" style="color:${color}">${Math.round(score||0)}</div>
-  </div>`;
-}
-
-async function loadStats() {
-  try {
-    const res = await fetch('/api/stats');
-    const data = await res.json();
-    document.getElementById('stat-total').textContent = (data.total_agents||0).toLocaleString();
-    document.getElementById('stat-avg-score').textContent = Math.round(data.avg_score||0);
-    document.getElementById('stat-sentient').textContent = (data.sentient_count||0).toLocaleString();
-    if (data.vol_24h_total) document.getElementById('stat-vol').textContent = fmtMcap(data.vol_24h_total);
-  } catch(e) {}
-}
-
-async function loadAgents() {
-  const list = document.getElementById('agent-list');
-  list.innerHTML = '<div class="loading-row"><div class="loading-spinner"></div>Loading agents...</div>';
-  const params = new URLSearchParams({ page: state.page, page_size: state.pageSize, sort: state.sort });
-  if (state.category) params.set('category', state.category);
-  if (state.status)   params.set('status', state.status);
-  if (state.doxxTier) params.set('doxx_tier', state.doxxTier);
-  if (state.search)   params.set('search', state.search);
-  try {
-    const res = await fetch(`/api/agents?${params}`);
-    const data = await res.json();
-    state.total = data.total || 0;
-    state.totalPages = data.total_pages || 1;
-    if (!data.agents || data.agents.length === 0) {
-      list.innerHTML = `<div class="empty-state">
-        <div class="empty-state-icon"><i class="fa-solid fa-magnifying-glass"></i></div>
-        <div class="empty-state-title">No agents found</div>
-        <div>Try adjusting your filters</div>
-      </div>`;
-      renderPagination(); return;
-    }
-    const offset = (state.page - 1) * state.pageSize;
-    list.innerHTML = data.agents.map((a, i) => {
-      const rank = offset + i + 1;
-      const change = parseFloat(a.price_change_24h || 0);
-      const changeClass = change >= 0 ? 'positive' : 'negative';
-      const scoreNum = Math.round(a.composite_score || 50);
-      const scoreClr = scoreColor(scoreNum);
-      const categoryLabel = a.agent_type || '';
-      const statusLabel = a.status || 'Prototype';
-      const vol = a.volume_24h   ? 'VOL '  + fmtMcap(a.volume_24h)     : '';
-      const mc  = a.market_cap   ? 'MCAP ' + fmtMcap(a.market_cap)     : '';
-      const hl  = a.holder_count ? 'HL '   + fmtCompact(a.holder_count) : '';
-      const metricLine = [vol, mc, hl].filter(Boolean).join('  ');
-      const priceStr = a.price ? '$' + parseFloat(a.price).toPrecision(4) : '—';
-      return `<div class="agent-row" onclick="openModal('${a.virtuals_id}')">
-        <div class="rank">${rank}</div>
-        <div class="agent-cell">
-          <div class="avatar">${a.image_url
-            ? `<img src="${a.image_url}" alt="${a.name}" onerror="this.parentElement.textContent='${initials(a.name)}'"/>`
-            : initials(a.name)}</div>
-          <div class="agent-info">
-            <div class="agent-name">${a.name}</div>
-            <div class="agent-ticker">${a.ticker || ''}</div>
-            ${categoryLabel || statusLabel ? `<div class="agent-category">${categoryLabel}${categoryLabel && statusLabel ? ' · ' : ''}${statusLabel}</div>` : ''}
-            ${metricLine ? `<div class="agent-metrics">${metricLine}</div>` : ''}
-          </div>
-        </div>
-        <div class="price-col">
-          <div class="price-val">${priceStr}</div>
-          <div class="mcap-val">${fmtMcap(a.market_cap)}</div>
-        </div>
-        <div class="change-col"><div class="change-val ${changeClass}">${fmtChange(a.price_change_24h)}</div></div>
-        <div class="viq-col"><div class="viq-val" style="color:${scoreClr}">${scoreNum}</div></div>
-      </div>`;
-    }).join('');
-    renderPagination();
-  } catch(e) {
-    list.innerHTML = `<div class="loading-row" style="color:var(--red)">Error loading agents. Please refresh.</div>`;
-    console.error(e);
+  // ── FORMAT HELPERS ─────────────────────────────────────────────────────────
+  function fmtMcap(v) {
+    if (v == null || isNaN(v)) return '—';
+    if (v >= 1e9) return `$${(v/1e9).toFixed(2)}B`;
+    if (v >= 1e6) return `$${(v/1e6).toFixed(2)}M`;
+    if (v >= 1e3) return `$${(v/1e3).toFixed(1)}K`;
+    return `$${v.toFixed(2)}`;
   }
-}
-
-function renderPagination() {
-  const bar = document.getElementById('pagination-bar');
-  const info = document.getElementById('pagination-info');
-  const controls = document.getElementById('pagination-controls');
-  if (state.totalPages <= 1) { bar.style.display = 'none'; return; }
-  bar.style.display = 'flex';
-  const start = (state.page-1)*state.pageSize + 1;
-  const end = Math.min(state.page*state.pageSize, state.total);
-  info.textContent = `${start}–${end} of ${state.total.toLocaleString()}`;
-  const pages = [];
-  const p = state.page, tp = state.totalPages;
-  pages.push(1);
-  if (p > 3) pages.push('…');
-  for (let i = Math.max(2,p-1); i <= Math.min(tp-1,p+1); i++) pages.push(i);
-  if (p < tp-2) pages.push('…');
-  if (tp > 1) pages.push(tp);
-  controls.innerHTML = `
-    <button class="page-btn" onclick="gotoPage(${p-1})" ${p<=1?'disabled':''}>‹</button>
-    ${pages.map(x => x === '…'
-      ? `<span style="padding:0 4px;color:var(--text-dim)">…</span>`
-      : `<button class="page-btn ${x===p?'active':''}" onclick="gotoPage(${x})">${x}</button>`
-    ).join('')}
-    <button class="page-btn" onclick="gotoPage(${p+1})" ${p>=tp?'disabled':''}>›</button>`;
-}
-
-function gotoPage(p) {
-  if (p < 1 || p > state.totalPages) return;
-  state.page = p;
-  loadAgents();
-  window.scrollTo({top: 0, behavior: 'smooth'});
-}
-
-async function openModal(virtualsId) {
-  const overlay = document.getElementById('modal-overlay');
-  overlay.classList.add('active');
-  document.body.style.overflow = 'hidden';
-  document.getElementById('modal-agent-name').textContent = 'Loading...';
-  document.getElementById('modal-agent-meta').innerHTML = '';
-  document.getElementById('modal-avatar').innerHTML = '';
-  document.getElementById('modal-score-num').textContent = '—';
-  document.getElementById('modal-ring-arc').style.strokeDashoffset = '163.4';
-  document.getElementById('modal-body').innerHTML = `
-    <div style="text-align:center;padding:60px">
-      <div class="loading-spinner" style="margin:0 auto 16px"></div>
-      <div style="color:var(--text-dim)">Loading intelligence report...</div>
-    </div>`;
-  try {
-    const res = await fetch(`/api/agent/${virtualsId}`);
-    if (!res.ok) throw new Error('Agent not found');
-    renderModal(await res.json());
-  } catch(e) {
-    document.getElementById('modal-body').innerHTML =
-      `<div style="text-align:center;padding:48px;color:var(--red)">Failed to load agent data.</div>`;
+  function fmtVol(v)    { return fmtMcap(v); }
+  function fmtChange(v) {
+    if (v == null || isNaN(v)) return '<span style="color:var(--text-mute)">—</span>';
+    const s = v.toFixed(2);
+    return v >= 0
+      ? `<span class="change-pos">+${s}%</span>`
+      : `<span class="change-neg">${s}%</span>`;
   }
-}
-
-function renderModal(agent) {
-  state.currentAgent = agent;
-  const avatarEl = document.getElementById('modal-avatar');
-  if (agent.image_url) {
-    avatarEl.innerHTML = `<img src="${agent.image_url}" alt="${agent.name}" onerror="this.parentElement.textContent='${initials(agent.name)}'"/>`;
-  } else {
-    avatarEl.textContent = initials(agent.name);
+  function fmtScore(v) {
+    if (v == null || isNaN(v)) return { cls: 'viq-low', txt: '—' };
+    const n = Number(v);
+    if (n >= 70) return { cls: 'viq-high',   txt: n.toFixed(0) };
+    if (n >= 40) return { cls: 'viq-medium', txt: n.toFixed(0) };
+    return          { cls: 'viq-low',    txt: n.toFixed(0) };
   }
-  document.getElementById('modal-agent-name').textContent = agent.name;
-  const statusClass = agent.status === 'Sentient' ? 'sentient' : 'prototype';
-  const doxxClass = `tier-${agent.doxx_tier || 3}`;
-  const doxxLabel = {1:'Full Doxx', 2:'Social Presence', 3:'Anonymous'}[agent.doxx_tier] || 'Anonymous';
-  const risk = (agent.analysis_json?.risk?.overall_risk || 'medium').toLowerCase();
-  document.getElementById('modal-agent-meta').innerHTML = `
-    <span class="status-badge ${statusClass}">${agent.status}</span>
-    <span class="category-badge">${agent.agent_type || '—'}</span>
-    <span class="doxx-badge ${doxxClass}">${doxxLabel}</span>
-    ${agent.first_mover ? '<div class="first-mover-badge" title="First Mover Advantage">1ST</div>' : ''}
-    <span class="risk-badge ${risk}">${risk} risk</span>`;
-  const score = Math.round(agent.composite_score || 50);
-  const tier = agent.tier_classification || 'Moderate';
-  const color = scoreColor(score);
-  const circ = 163.4;
-  const offset = circ - (score/100)*circ;
-  document.getElementById('modal-score-num').textContent = score;
-  document.getElementById('modal-score-num').style.color = color;
-  const arc = document.getElementById('modal-ring-arc');
-  arc.style.stroke = color;
-  arc.style.strokeDashoffset = offset;
-  const analysis = agent.analysis_json || {};
-  const scores = agent.scores_json || {};
-  const prediction = agent.prediction_json || {};
-  const hasAnalysis = Object.keys(analysis).length > 0;
-  const overview = analysis.overview || {};
-  const riskData = analysis.risk || {};
-  const body = document.getElementById('modal-body');
-  body.innerHTML = `
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <div>
-        <span style="font-family:var(--font-data);font-size:24px;font-weight:700;color:${color}">${score}</span>
-        <span style="font-size:13px;color:${color};margin-left:6px;font-weight:600">${tier}</span>
-      </div>
-    </div>
-    ${hasAnalysis ? `
-    <div>
-      <div class="report-section-title">Intelligence Overview</div>
-      <p class="report-narrative">${overview.summary || 'No overview available.'}</p>
-      ${overview.value_proposition ? `<p class="report-narrative" style="margin-top:8px;color:var(--teal);font-style:italic">${overview.value_proposition}</p>` : ''}
-      ${overview.stage ? `<p style="margin-top:6px;font-size:11px;font-family:var(--font-data);color:var(--text-dim)">Stage: <span style="color:var(--amber)">${overview.stage.toUpperCase()}</span></p>` : ''}
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      ${riskData.bull_case ? `<div style="padding:10px;background:rgba(0,200,83,0.06);border:1px solid rgba(0,200,83,0.2);border-radius:var(--radius-sm)"><div style="font-size:10px;color:var(--green-dark);font-weight:700;letter-spacing:0.5px;margin-bottom:4px">BULL CASE</div><div style="font-size:12px;color:var(--text-muted)">${riskData.bull_case}</div></div>` : ''}
-      ${riskData.bear_case ? `<div style="padding:10px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-sm)"><div style="font-size:10px;color:var(--red);font-weight:700;letter-spacing:0.5px;margin-bottom:4px">BEAR CASE</div><div style="font-size:12px;color:var(--text-muted)">${riskData.bear_case}</div></div>` : ''}
-    </div>
-    ${riskData.key_risks && riskData.key_risks.length ? `
-    <div>
-      <div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Key Risks</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px">
-        ${riskData.key_risks.map(r => `<span style="padding:3px 8px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:4px;font-size:11px;color:var(--text-muted)">⚠ ${r}</span>`).join('')}
-      </div>
-    </div>` : ''}
-    ` : `
-    <div>
-      <div class="report-section-title">Overview</div>
-      <p class="report-narrative">${agent.biography || 'No biography available for this agent.'}</p>
-      <p style="margin-top:12px;font-size:12px;color:var(--text-dim)">Full AI analysis not yet generated.</p>
-    </div>
-    `}
-    <div>
-      <div class="report-section-title">Key Metrics</div>
-      <div class="metrics-grid">
-        <div class="metric-tile"><div class="metric-tile-label">Market Cap</div><div class="metric-tile-value teal">${fmtMcap(agent.market_cap)}</div></div>
-        <div class="metric-tile"><div class="metric-tile-label">24h Volume</div><div class="metric-tile-value purple">${fmtMcap(agent.volume_24h)}</div></div>
-        <div class="metric-tile"><div class="metric-tile-label">Price Change 24h</div><div class="metric-tile-value ${parseFloat(agent.price_change_24h||0)>=0?'green':'red'}">${fmtChange(agent.price_change_24h)}</div></div>
-        <div class="metric-tile"><div class="metric-tile-label">Holders</div><div class="metric-tile-value">${fmtNumber(agent.holder_count)}</div></div>
-        <div class="metric-tile"><div class="metric-tile-label">Liquidity</div><div class="metric-tile-value">${fmtMcap(agent.liquidity_usd)}</div></div>
-        <div class="metric-tile"><div class="metric-tile-label">Buy/Sell Ratio</div><div class="metric-tile-value ${parseFloat(agent.buy_sell_ratio||1)>=1?'green':'red'}">${parseFloat(agent.buy_sell_ratio||1).toFixed(2)}x</div></div>
-        <div class="metric-tile"><div class="metric-tile-label">Twitter Followers</div><div class="metric-tile-value">${fmtNumber(agent.twitter_followers)}</div></div>
-        <div class="metric-tile"><div class="metric-tile-label">GitHub Stars</div><div class="metric-tile-value">${fmtNumber(agent.github_stars)}</div></div>
-      </div>
-    </div>
-    ${agent.contract_address ? `
-    <div>
-      <div class="report-section-title">Price Chart</div>
-      <div class="dex-chart-wrap">
-        <iframe src="https://dexscreener.com/base/${agent.contract_address}?embed=1&theme=light&trades=0&info=0" loading="lazy" allowfullscreen></iframe>
-      </div>
-    </div>` : ''}
-    <div>
-      <div class="report-section-title">VIQ Intelligence Report</div>
-      <div class="score-breakdown-grid">${renderTierBreakdown(scores, analysis, agent)}</div>
-    </div>
-    <div>
-      <div class="report-section-title">AI Forecast</div>
-      <div class="forecast-grid">
-        ${renderForecast('7d', prediction['7d'])}
-        ${renderForecast('30d', prediction['30d'])}
-        ${renderForecast('90d', prediction['90d'])}
-      </div>
-    </div>
-    ${agent.linked_twitter || agent.linked_website || agent.linked_telegram ? `
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      ${agent.linked_twitter ? `<a href="${agent.linked_twitter}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none"><i class="fa-brands fa-x-twitter"></i> Twitter</a>` : ''}
-      ${agent.linked_website ? `<a href="${agent.linked_website}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none"><i class="fa-solid fa-globe"></i> Website</a>` : ''}
-      ${agent.linked_telegram ? `<a href="${agent.linked_telegram}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none"><i class="fa-brands fa-telegram"></i> Telegram</a>` : ''}
-    </div>` : ''}
-  `;
-}
+  function scoreClass(v) {
+    if (v == null || isNaN(v)) return 'low';
+    if (v >= 70) return 'high';
+    if (v >= 40) return 'medium';
+    return 'low';
+  }
+  function initials(name) {
+    if (!name) return '?';
+    return name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+  }
+  function avatarEl(agent, size) {
+    const cls  = size === 'lg' ? 'modal-avatar' : 'avatar';
+    const img  = agent.image_url || agent.image || '';
+    const init = initials(agent.name || agent.agent_name || '');
+    if (img) return `<div class="${cls}"><img src="${img}" alt="${init}" onerror="this.parentNode.innerHTML='${init}'"></div>`;
+    return `<div class="${cls}">${init}</div>`;
+  }
 
-function _factorWhy(key, scores, analysis, agent) {
-  const fm = analysis.first_mover || {};
-  const team = analysis.team || {};
-  const product = analysis.product || {};
-  const market = analysis.market || {};
-  const community = analysis.community || {};
-  const v = scores[key] !== undefined ? Math.round(scores[key]) : 50;
-  const map = {
-    F1_category_uniqueness: () => fm.category_unique === true ? `Novel category — no direct on-chain comparables identified` : fm.category_unique === false ? `Operates in a crowded vertical with established on-chain rivals` : `Uniqueness score ${v}/100`,
-    F2_approach_novelty: () => fm.approach_novel === true ? `Approach is architecturally distinct from existing protocol designs` : fm.approach_novel === false ? `Methodology closely mirrors existing live agents` : `Novelty score ${v}/100`,
-    F3_cross_chain_originality: () => fm.cross_chain_original === true ? `No equivalent exists across Base, Ethereum, or Solana ecosystems` : fm.cross_chain_original === false ? `Cross-chain equivalents already live on competing networks` : `Cross-chain originality ${v}/100`,
-    F4_timing_advantage: () => fm.days_ahead_of_competitor ? `~${fm.days_ahead_of_competitor}d ahead of nearest competitor — timing moat is ${v >= 65 ? 'strong' : v >= 45 ? 'moderate' : 'thin'}` : `Timing advantage score ${v}/100`,
-    F5_defensibility: () => fm.analysis ? `${fm.analysis.slice(0,120)}${fm.analysis.length > 120 ? '…' : ''}` : `Defensibility / moat score ${v}/100`,
-    F6_doxx_tier: () => { const tier = team.doxx_tier || agent.doxx_tier || 3; const desc = team.doxx_description || ({1:'Full doxx — identity publicly verified',2:'Social presence — pseudonymous with active socials',3:'Anonymous — no verifiable identity'}[tier] || 'Unknown'); return `${desc}${team.red_flags && team.red_flags.length ? ` ⚠ ${team.red_flags[0]}` : ''}`; },
-    F7_track_record: () => team.team_summary ? `${team.team_summary.slice(0,130)}${team.team_summary.length > 130 ? '…' : ''}` : `Track record score ${v}/100`,
-    F8_code_activity: () => { const commits = agent.github_commits_30d; const stars = agent.github_stars; if (commits || stars) return `${commits ? commits + ' commits in last 30d' : 'Commit data unavailable'}${stars ? ' · ' + stars + ' GitHub stars' : ''}`; return `Code activity score ${v}/100`; },
-    F9_shipping_cadence: () => product.status ? `Product status: ${product.status}${product.description ? ' — ' + product.description.slice(0,100) : ''}` : `Shipping cadence score ${v}/100`,
-    F10_product_status: () => product.description ? product.description.slice(0,140) : `Product status score ${v}/100`,
-    F11_partnerships: () => product.technical_moat ? `${product.technical_moat.slice(0,130)}${product.technical_moat.length > 130 ? '…' : ''}${product.red_flags && product.red_flags.length ? ' ⚠ ' + product.red_flags[0] : ''}` : `Partnership score ${v}/100`,
-    F12_wallet_behavior: () => team.wallet_behavior_score !== undefined ? `Wallet behavior score ${Math.round(team.wallet_behavior_score)}/100${v < 40 ? ' — unusual wallet activity detected' : v >= 70 ? ' — healthy distribution, no suspicious sells' : ''}` : `Wallet behavior score ${v}/100`,
-    F13_tam: () => market.tam_description ? market.tam_description.slice(0,140) : `TAM score ${v}/100`,
-    F14_real_world_comparables: () => market.real_world_comparable ? `Comparable to ${market.real_world_comparable} — comparables score ${Math.round(market.comparables_score || v)}/100` : `Real-world comparables score ${v}/100`,
-    F15_revenue_model: () => `Revenue model score ${Math.round(market.revenue_model_score || v)}/100${market.saturation_description ? ' — ' + market.saturation_description.slice(0,80) : ''}`,
-    F16_current_revenue: () => `Current revenue score ${Math.round(market.current_revenue_score || v)}/100${v < 35 ? ' — no confirmed revenue stream' : v >= 65 ? ' — active revenue generation confirmed' : ' — early-stage revenue signals'}`,
-    F17_mcap_to_tam: () => market.mcap_tam_ratio !== undefined ? `MCap/TAM ratio ${market.mcap_tam_ratio.toFixed(4)} — ${market.mcap_tam_ratio < 0.001 ? 'highly undervalued relative to addressable market' : market.mcap_tam_ratio > 0.1 ? 'market cap aggressive vs TAM' : 'reasonable penetration rate'}` : `MCap/TAM score ${v}/100`,
-    F18_saturation: () => market.saturation_description ? market.saturation_description.slice(0,130) : `Market saturation score ${v}/100`,
-    F19_holder_distribution: () => { const holders = agent.holder_count; return holders ? `${fmtNumber(holders)} holders — distribution score ${v}/100${v >= 65 ? ', healthy spread' : v < 40 ? ', concentrated ownership risk' : ''}` : `Holder distribution score ${v}/100`; },
-    F20_twitter_engagement: () => { const followers = agent.twitter_followers; return followers ? `${fmtNumber(followers)} Twitter followers — engagement score ${v}/100` : `Twitter engagement score ${v}/100 — no linked account`; },
-    F21_follower_growth: () => community.follower_growth_score !== undefined ? `Follower growth score ${Math.round(community.follower_growth_score)}/100${v >= 65 ? ' — accelerating growth trend' : v < 40 ? ' — stagnant or declining' : ' — steady growth'}` : `Follower growth score ${v}/100`,
-    F22_community_depth: () => community.community_analysis ? community.community_analysis.slice(0,140) : `Community depth score ${v}/100`,
-    F23_organic_signals: () => community.organic_score !== undefined ? `Organic signal score ${Math.round(community.organic_score)}/100${v >= 65 ? ' — engagement appears genuine' : v < 40 ? ' — bot/paid signals detected' : ' — mixed organic/paid signals'}` : `Organic vs paid score ${v}/100`,
-    F24_smart_money: () => community.smart_money_score !== undefined ? `Smart money score ${Math.round(community.smart_money_score)}/100${v >= 65 ? ' — known protocol wallets accumulating' : v < 40 ? ' — no smart money participation detected' : ' — some notable wallet activity'}` : `Smart money score ${v}/100`,
-  };
-  const fn = map[key];
-  return fn ? fn() : `Score ${v}/100`;
-}
-
-function renderTierBreakdown(scores, analysis, agent) {
-  const tiers = [
-    { label: 'TIER 1 — FIRST MOVER (30%)', keys: [['F1_category_uniqueness','Category Uniqueness'],['F2_approach_novelty','Approach Novelty'],['F3_cross_chain_originality','Cross-Chain Original'],['F4_timing_advantage','Timing Advantage'],['F5_defensibility','Defensibility / Moat']] },
-    { label: 'TIER 2 — TEAM & EXECUTION (28%)', keys: [['F6_doxx_tier','Team Visibility'],['F7_track_record','Track Record'],['F8_code_activity','Code Activity'],['F9_shipping_cadence','Shipping Cadence'],['F10_product_status','Product Status'],['F11_partnerships','Partnerships'],['F12_wallet_behavior','Wallet Behavior']] },
-    { label: 'TIER 3 — VALUE POOL / TAM (24%)', keys: [['F13_tam','Total Addressable Market'],['F14_real_world_comparables','Real-World Comparables'],['F15_revenue_model','Revenue Model Clarity'],['F16_current_revenue','Current Revenue'],['F17_mcap_to_tam','MCap / TAM Ratio'],['F18_saturation','Market Saturation']] },
-    { label: 'TIER 4 — COMMUNITY & SOCIAL (18%)', keys: [['F19_holder_distribution','Holder Distribution'],['F20_twitter_engagement','Twitter Engagement'],['F21_follower_growth','Follower Growth'],['F22_community_depth','Community Depth'],['F23_organic_signals','Organic vs Paid'],['F24_smart_money','Smart Money']] },
-  ];
-  return tiers.map(tier => `
-    <div class="tier-header">${tier.label}</div>
-    ${tier.keys.map(([key, label]) => {
-      const v = scores[key] !== undefined ? Math.round(scores[key]) : 50;
-      const color = scoreColor(v);
-      const why = _factorWhy(key, scores, analysis, agent);
-      return `<div class="tier-factor-row">
-        <div class="tier-factor-left">
-          <div class="tier-factor-name">${label}</div>
-          <div class="tier-factor-why">${why}</div>
-        </div>
-        <div class="tier-factor-right">
-          <div class="tier-factor-score" style="color:${color}">${v}</div>
-          <div class="tier-factor-bar"><div class="tier-factor-bar-fill" style="width:${v}%;background:${color}"></div></div>
-        </div>
-      </div>`;
-    }).join('')}
-  `).join('');
-}
-
-function renderForecast(horizon, data) {
-  if (!data) return `<div class="forecast-card"><div class="forecast-horizon">${horizon.toUpperCase()} Horizon</div><div class="forecast-probability" style="color:var(--text-dim)">—</div><div class="forecast-catalyst" style="color:var(--text-dim)">No forecast available</div></div>`;
-  const prob = data.probability_up || 50;
-  const color = prob >= 60 ? '#00A843' : prob >= 45 ? '#F59E0B' : '#EF4444';
-  const rangeLow = data.range_low || 0, rangeHigh = data.range_high || 0;
-  return `<div class="forecast-card">
-    <div class="forecast-horizon">${horizon.toUpperCase()} Horizon</div>
-    <div class="forecast-probability" style="color:${color}">${prob}%</div>
-    <div style="font-size:10px;color:var(--text-dim);margin-bottom:4px">probability bullish</div>
-    <div class="forecast-range">${rangeLow >= 0 ? '+' : ''}${rangeLow}% / ${rangeHigh >= 0 ? '+' : ''}${rangeHigh}%</div>
-    <div class="forecast-catalyst">${data.catalyst || ''}</div>
-  </div>`;
-}
-
-function closeModal() {
-  document.getElementById('modal-overlay').classList.remove('active');
-  document.body.style.overflow = '';
-  if (state.jobPollInterval) clearInterval(state.jobPollInterval);
-}
-document.getElementById('modal-close').addEventListener('click', closeModal);
-document.getElementById('modal-overlay').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
-document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeModal(); });
-
-let toastTimeout;
-function showToast(msg, isError=false) {
-  let el = document.querySelector('.toast');
-  if (el) el.remove();
-  el = document.createElement('div');
-  el.className = 'toast';
-  if (isError) el.style.background = '#EF4444';
-  el.textContent = msg;
-  document.body.appendChild(el);
-  clearTimeout(toastTimeout);
-  toastTimeout = setTimeout(() => el.remove(), 5000);
-}
-
-document.querySelectorAll('.filter-tab').forEach(btn => {
-  btn.addEventListener('click', function() {
-    document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
-    this.classList.add('active');
-    state.sort = this.dataset.sort;
-    state.page = 1;
-    loadAgents();
-  });
-});
-
-document.querySelectorAll('.category-tab').forEach(btn => {
-  btn.addEventListener('click', function() {
-    document.querySelectorAll('.category-tab').forEach(b => b.classList.remove('active'));
-    this.classList.add('active');
-    state.category = this.dataset.category;
-    state.page = 1;
-    loadAgents();
-  });
-});
-
-document.querySelectorAll('.th.sortable').forEach(th => {
-  th.addEventListener('click', function() {
-    state.sort = this.dataset.sort;
-    state.page = 1;
-    loadAgents();
-  });
-});
-
-document.getElementById('search-input').addEventListener('input', function() {
-  clearTimeout(state.searchTimeout);
-  state.searchTimeout = setTimeout(() => {
-    state.search = this.value.trim();
-    state.page = 1;
-    loadAgents();
-  }, 350);
-});
-
-document.getElementById('btn-status').addEventListener('click', function() {
-  const sel = document.getElementById('filter-status');
-  const options = Array.from(sel.options);
-  const currentIdx = options.findIndex(o => o.value === state.status);
-  const nextIdx = (currentIdx + 1) % options.length;
-  state.status = options[nextIdx].value;
-  this.textContent = options[nextIdx].text;
-  this.classList.toggle('active', state.status !== '');
-  state.page = 1;
-  loadAgents();
-});
-
-document.getElementById('btn-doxx').addEventListener('click', function() {
-  const sel = document.getElementById('filter-doxx');
-  const options = Array.from(sel.options);
-  const currentIdx = options.findIndex(o => o.value === state.doxxTier);
-  const nextIdx = (currentIdx + 1) % options.length;
-  state.doxxTier = options[nextIdx].value;
-  this.textContent = options[nextIdx].text;
-  this.classList.toggle('active', state.doxxTier !== '');
-  state.page = 1;
-  loadAgents();
-});
-
-document.getElementById('btn-sort').addEventListener('click', function() {
-  const sorts = [
-    {value:'market_cap',label:'Sort: MCap'},
-    {value:'composite_score',label:'Sort: VIQ'},
-    {value:'price_change_24h',label:'Sort: 24h %'},
-    {value:'newest',label:'Sort: New'},
-    {value:'holders',label:'Sort: Holders'},
-  ];
-  const currentIdx = sorts.findIndex(s => s.value === state.sort);
-  const nextIdx = (currentIdx + 1) % sorts.length;
-  state.sort = sorts[nextIdx].value;
-  this.innerHTML = `<i class="fa-solid fa-arrow-up-wide-short"></i> ${sorts[nextIdx].label}`;
-  state.page = 1;
-  loadAgents();
-});
-
-let _enrichPollInterval = null, _lastAgentCount = 0;
-
-async function checkEnrichmentStatus() {
-  try {
-    const res = await fetch('/api/status');
-    if (!res.ok) return true;
-    const data = await res.json();
-    const banner = document.getElementById('enrich-banner');
-    const msg = document.getElementById('enrich-msg');
-    const done = data.status === 'complete' || data.status === 'idle';
-    if (!done) {
-      const labels = { preloading:'Loading agents from Virtuals Protocol', enriching:'Enriching market data via DexScreener', scoring:'Calculating VIQ scores' };
-      const label = labels[data.status] || 'Updating data';
-      const count = data.total_agents_in_db || 0;
-      msg.textContent = `${label}... ${count.toLocaleString()} agents loaded`;
-      banner.classList.add('visible');
-      if (count !== _lastAgentCount) {
-        _lastAgentCount = count;
-        loadStats();
-        if (state.page === 1) loadAgents();
+  // ── STATUS POLLING ─────────────────────────────────────────────────────────
+  async function checkStatus() {
+    try {
+      const r = await fetch('/api/status');
+      if (!r.ok) return;
+      const d = await r.json();
+      const phase = d.phase || d.state || 'ready';
+      const dot   = document.getElementById('status-dot');
+      const txt   = document.getElementById('status-text');
+      if (phase === 'complete' || phase === 'ready') {
+        dot.style.background = 'var(--green)';
+        txt.textContent = 'Live';
+      } else {
+        dot.style.background = 'var(--orange)';
+        txt.textContent = phase.replace('_', ' ');
+        setTimeout(checkStatus, 5000);
       }
-    } else {
-      banner.classList.remove('visible');
+    } catch (_) {}
+  }
+
+  // ── STATS ──────────────────────────────────────────────────────────────────
+  async function loadStats() {
+    try {
+      const r = await fetch('/api/stats');
+      if (!r.ok) return;
+      const d = await r.json();
+      document.getElementById('stat-agents').textContent   = (d.total_agents   ?? d.total ?? '—').toLocaleString();
+      document.getElementById('stat-mcap').textContent     = fmtMcap(d.total_market_cap ?? d.total_mcap);
+      document.getElementById('stat-vol').textContent      = fmtVol(d.total_volume_24h  ?? d.volume_24h);
+      document.getElementById('stat-trending').textContent = (d.trending_count ?? d.sentient_count ?? '—').toLocaleString();
+    } catch (_) {}
+  }
+
+  // ── LOAD BANNER ────────────────────────────────────────────────────────────
+  function setBanner(visible, text) {
+    const el = document.getElementById('loading-banner');
+    const tx = document.getElementById('loading-text');
+    el.classList.toggle('visible', visible);
+    if (text) tx.textContent = text;
+  }
+
+  // ── LOAD AGENTS ───────────────────────────────────────────────────────────
+  async function loadAgents(reset = true) {
+    if (isLoading) return;
+    isLoading = true;
+
+    if (reset) {
+      currentPage = 1;
+      document.getElementById('agent-tbody').innerHTML =
+        `<tr><td colspan="7"><div class="modal-loading"><div class="spinner-lg"></div></div></td></tr>`;
+      document.getElementById('load-more-btn').style.display = 'none';
     }
-    return done;
-  } catch(e) { return true; }
-}
 
-async function startEnrichmentPolling() {
-  const done = await checkEnrichmentStatus();
-  if (done) return;
-  _enrichPollInterval = setInterval(async () => {
-    const done = await checkEnrichmentStatus();
-    if (done) { clearInterval(_enrichPollInterval); _enrichPollInterval = null; loadStats(); }
-  }, 5000);
-}
+    setBanner(true, `Loading agents… page ${currentPage}`);
 
-(async function init() {
-  await loadStats();
-  await loadAgents();
-  startEnrichmentPolling();
-  setInterval(loadStats, 5 * 60 * 1000);
-})();
+    try {
+      let data, agents = [], total = 0;
+
+      // Trending feeds go through /api/trending/{feed}
+      if (currentFeed !== 'all' && !currentSearch && !currentCategory) {
+        const feed = currentFeed;
+        const r = await fetch(`/api/trending/${feed}?limit=${PAGE_SIZE}`);
+        if (r.ok) {
+          data   = await r.json();
+          agents = data.agents || data.results || data || [];
+          total  = agents.length;
+        }
+      }
+
+      // Fallback / search / category → /api/agents
+      if (!agents.length || currentSearch || currentCategory) {
+        const params = new URLSearchParams({
+          page:      currentPage,
+          page_size: PAGE_SIZE,
+        });
+        if (currentCategory) params.set('category', currentCategory);
+        if (currentSearch)   params.set('search',   currentSearch);
+
+        // Map tab to sort
+        const sortMap = { hot: 'market_cap', new: 'newest', 'top-scored': 'composite_score', 'smart-money': 'holders', 'first-movers': 'market_cap' };
+        const sort = sortMap[currentFeed] || 'market_cap';
+        params.set('sort', sort);
+
+        const r = await fetch(`/api/agents?${params}`);
+        if (!r.ok) throw new Error('API error');
+        data   = await r.json();
+        agents = data.agents || data.results || [];
+        total  = data.total  || agents.length;
+        totalPages = Math.ceil(total / PAGE_SIZE);
+      }
+
+      setBanner(false);
+      renderAgents(agents, reset);
+
+      const btn = document.getElementById('load-more-btn');
+      btn.style.display = (currentPage < totalPages) ? 'block' : 'none';
+    } catch (e) {
+      setBanner(false);
+      if (reset) {
+        document.getElementById('agent-tbody').innerHTML =
+          `<tr><td colspan="7"><div class="empty-state"><div class="icon">⚠️</div>Failed to load agents. Try again shortly.</div></td></tr>`;
+      }
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  function renderAgents(agents, reset) {
+    const tbody = document.getElementById('agent-tbody');
+    if (reset) tbody.innerHTML = '';
+
+    if (!agents.length && reset) {
+      tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="icon">🔍</div>No agents found.</div></td></tr>`;
+      return;
+    }
+
+    const offset = reset ? 0 : tbody.querySelectorAll('tr').length;
+
+    agents.forEach((a, i) => {
+      const rank  = offset + i + 1;
+      const id    = a.virtuals_id || a.id || a._id || '';
+      const name  = a.name || a.agent_name || 'Unknown';
+      const ticker= a.ticker || a.symbol || '';
+      const mcap  = a.market_cap ?? a.mcap ?? null;
+      const vol   = a.volume_24h ?? a.vol24h ?? null;
+      const chg   = a.price_change_24h ?? a.change_24h ?? null;
+      const score = a.composite_score ?? a.viq_score ?? a.score ?? null;
+      const sc    = fmtScore(score);
+
+      const tr = document.createElement('tr');
+      tr.className = 'agent-row';
+      tr.dataset.id = id;
+      tr.innerHTML = `
+        <td class="rank-cell">${rank}</td>
+        <td class="avatar-cell">${avatarEl(a, 'sm')}</td>
+        <td class="name-cell">
+          <div class="agent-name">${name}</div>
+          <div class="agent-ticker">${ticker ? '$'+ticker : ''}</div>
+        </td>
+        <td class="r hide-sm">${fmtVol(vol)}</td>
+        <td class="r">${fmtMcap(mcap)}</td>
+        <td class="r">${fmtChange(chg)}</td>
+        <td class="r"><span class="viq-badge ${sc.cls}">${sc.txt}</span></td>
+      `;
+      tr.addEventListener('click', () => openModal(id, a));
+      tbody.appendChild(tr);
+    });
+  }
+
+  // ── MODAL ──────────────────────────────────────────────────────────────────
+  async function openModal(id, preview) {
+    const backdrop = document.getElementById('modal-backdrop');
+    const content  = document.getElementById('modal-content');
+    backdrop.classList.add('open');
+    document.body.style.overflow = 'hidden';
+
+    // Show skeleton with preview data
+    if (preview) renderModal(preview, true);
+    else content.innerHTML = `<div class="modal-loading"><div class="spinner-lg"></div></div>`;
+
+    if (!id) return;
+    try {
+      const r = await fetch(`/api/agent/${id}`);
+      if (!r.ok) return;
+      const d = await r.json();
+      renderModal(d.agent || d, false);
+    } catch (_) {}
+  }
+
+  function renderModal(a, isPreview) {
+    const content = document.getElementById('modal-content');
+    const name   = a.name || a.agent_name || 'Unknown';
+    const ticker = a.ticker || a.symbol || '';
+    const mcap   = a.market_cap ?? a.mcap ?? null;
+    const vol    = a.volume_24h ?? a.vol24h ?? null;
+    const price  = a.price ?? a.current_price ?? null;
+    const chg    = a.price_change_24h ?? a.change_24h ?? null;
+    const holders= a.holders ?? null;
+    const score  = a.composite_score ?? a.viq_score ?? a.score ?? null;
+    const bio    = a.description || a.bio || a.biography || '';
+    const scNum  = score != null ? Number(score) : null;
+    const scClass= scoreClass(scNum);
+    const scTxt  = scNum != null ? scNum.toFixed(0) : '—';
+
+    // Social links
+    const socials = [];
+    if (a.twitter || a.twitter_url)   socials.push({ label: '𝕏 Twitter',  href: a.twitter   || a.twitter_url });
+    if (a.telegram || a.telegram_url) socials.push({ label: '✈ Telegram', href: a.telegram  || a.telegram_url });
+    if (a.discord || a.discord_url)   socials.push({ label: '💬 Discord',  href: a.discord   || a.discord_url });
+    if (a.website || a.website_url)   socials.push({ label: '🌐 Website',  href: a.website   || a.website_url });
+    if (a.github || a.github_url)     socials.push({ label: '🐙 GitHub',   href: a.github    || a.github_url });
+
+    const socialsHtml = socials.length
+      ? socials.map(s => `<a class="social-link" href="${s.href}" target="_blank" rel="noopener">${s.label}</a>`).join('')
+      : '<span style="color:var(--text-mute);font-size:13px">No social links</span>';
+
+    const priceStr = price != null ? `$${Number(price).toFixed(6)}` : '—';
+    const holdersStr = holders != null ? Number(holders).toLocaleString() : '—';
+
+    content.innerHTML = `
+      <div class="modal-header">
+        ${avatarEl(a, 'lg')}
+        <div class="modal-title-wrap">
+          <div class="modal-name">${name}</div>
+          <div class="modal-ticker">${ticker ? '$'+ticker : '—'}</div>
+        </div>
+        <button class="modal-close" id="modal-close-btn" aria-label="Close">✕</button>
+      </div>
+
+      <div class="viq-score-big ${scClass}">
+        <span>${scTxt}</span>
+        <span class="viq-label">VIQ Score${isPreview ? ' (preview)' : ''}</span>
+      </div>
+
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="m-val">${fmtMcap(mcap)}</div>
+          <div class="m-lbl">Market Cap</div>
+        </div>
+        <div class="metric-card">
+          <div class="m-val">${fmtVol(vol)}</div>
+          <div class="m-lbl">24h Volume</div>
+        </div>
+        <div class="metric-card">
+          <div class="m-val">${priceStr}</div>
+          <div class="m-lbl">Price</div>
+        </div>
+        <div class="metric-card">
+          <div class="m-val">${fmtChange(chg)}</div>
+          <div class="m-lbl">24h Change</div>
+        </div>
+        <div class="metric-card">
+          <div class="m-val">${holdersStr}</div>
+          <div class="m-lbl">Holders</div>
+        </div>
+        <div class="metric-card">
+          <div class="m-val">${a.status || a.stage || '—'}</div>
+          <div class="m-lbl">Status</div>
+        </div>
+      </div>
+
+      ${bio ? `<div class="modal-section-title">About</div><div class="modal-bio">${bio}</div>` : ''}
+
+      <div class="modal-section-title">Socials</div>
+      <div class="socials-row">${socialsHtml}</div>
+    `;
+
+    document.getElementById('modal-close-btn').addEventListener('click', closeModal);
+  }
+
+  function closeModal() {
+    document.getElementById('modal-backdrop').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  // ── EVENT WIRING ───────────────────────────────────────────────────────────
+  document.getElementById('modal-backdrop').addEventListener('click', e => {
+    if (e.target === document.getElementById('modal-backdrop')) closeModal();
+  });
+
+  // Tab buttons
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentFeed = btn.dataset.feed;
+      loadAgents(true);
+    });
+  });
+
+  // Category pills
+  document.querySelectorAll('.cat-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      currentCategory = pill.dataset.cat;
+      loadAgents(true);
+    });
+  });
+
+  // Search with 400ms debounce
+  document.getElementById('search-input').addEventListener('input', e => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      currentSearch = e.target.value.trim();
+      loadAgents(true);
+    }, 400);
+  });
+
+  // Load more
+  document.getElementById('load-more-btn').addEventListener('click', () => {
+    currentPage++;
+    loadAgents(false);
+  });
+
+  // Bottom nav (cosmetic — pages not implemented, just style toggle)
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', () => {
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      item.classList.add('active');
+    });
+  });
+
+  // ── INIT ───────────────────────────────────────────────────────────────────
+  loadStats();
+  checkStatus();
+  loadAgents(true);
 </script>
 {% endraw %}
 </body>
