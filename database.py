@@ -480,12 +480,38 @@ async def get_category_summary(category: str) -> dict:
         """, (category,)) as cur:
             stats = dict(await cur.fetchone())
 
+    # Build a data-driven AI summary for the category page
+    total = stats.get("total", 0)
+    avg_score = stats.get("avg_score")
+    total_mcap = stats.get("total_mcap", 0)
+    top_name = top_by_viq[0]["name"] if top_by_viq else None
+    top_score = top_by_viq[0].get("composite_score") if top_by_viq else None
+    mover_name = biggest_movers[0]["name"] if biggest_movers else None
+    mover_chg = biggest_movers[0].get("price_change_24h") if biggest_movers else None
+
+    summary_parts = []
+    if total:
+        summary_parts.append(f"The {category} category contains {total} agents")
+        if total_mcap:
+            summary_parts[-1] += f" with a combined market cap of ${total_mcap:,.0f}"
+        summary_parts[-1] += "."
+    if avg_score:
+        summary_parts.append(f"The average VIQ score is {avg_score:.1f}.")
+    if top_name and top_score:
+        summary_parts.append(f"{top_name} leads with a VIQ score of {top_score:.0f}.")
+    if mover_name and mover_chg and abs(mover_chg) > 1:
+        direction = "up" if mover_chg > 0 else "down"
+        summary_parts.append(f"{mover_name} is the biggest mover, {direction} {abs(mover_chg):.1f}% in 24h.")
+
+    ai_summary = " ".join(summary_parts) if summary_parts else None
+
     return {
         "category": category,
         "stats": stats,
         "top_by_viq": top_by_viq,
         "biggest_movers": biggest_movers,
         "new_launches": new_launches,
+        "ai_summary": ai_summary,
     }
 
 
