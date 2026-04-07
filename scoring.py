@@ -493,6 +493,111 @@ def _build_score_narrative(agent_data: dict, ai_analysis: dict, scores: dict,
     return ". ".join(parts) + "." if parts else ""
 
 
+def _factor_explanation(name: str, score: float, agent_data: dict, ai_analysis: dict) -> str:
+    """Generate a short explanation for why a factor got its score."""
+    fm = ai_analysis.get("first_mover", {})
+    team = ai_analysis.get("team", {})
+    product = ai_analysis.get("product", {})
+    market = ai_analysis.get("market", {})
+    community = ai_analysis.get("community", {})
+    v = round(score)
+
+    explanations = {
+        "F1_category_uniqueness": (
+            "Novel category — no direct competitors identified" if fm.get("category_unique") is True
+            else "Crowded category with established rivals" if fm.get("category_unique") is False
+            else f"Category uniqueness: {v}/100"
+        ),
+        "F2_approach_novelty": (
+            "Architecturally distinct approach" if fm.get("approach_novel") is True
+            else "Methodology mirrors existing agents" if fm.get("approach_novel") is False
+            else f"Approach novelty: {v}/100"
+        ),
+        "F3_cross_chain_originality": (
+            "No cross-chain equivalent exists" if fm.get("cross_chain_original") is True
+            else "Cross-chain equivalents already live" if fm.get("cross_chain_original") is False
+            else f"Cross-chain originality: {v}/100"
+        ),
+        "F4_timing_advantage": (
+            f"~{fm['days_ahead_of_competitor']}d ahead of nearest competitor"
+            if fm.get("days_ahead_of_competitor")
+            else f"Timing advantage: {v}/100"
+        ),
+        "F5_defensibility": (
+            fm.get("analysis", "")[:120] if fm.get("analysis")
+            else f"Defensibility score: {v}/100"
+        ),
+        "F6_doxx_tier": (
+            team.get("doxx_description", "")
+            or {1: "Fully doxxed team", 2: "Pseudonymous with social presence", 3: "Anonymous team"}.get(
+                int(agent_data.get("doxx_tier") or team.get("doxx_tier") or 3), "Unknown"
+            )
+        ),
+        "F7_track_record": (
+            (team.get("team_summary", "") or "")[:130] or f"Track record: {v}/100"
+        ),
+        "F8_code_activity": (
+            f"{agent_data.get('github_commits_30d', 0)} commits/30d, {agent_data.get('github_stars', 0)} stars"
+            if agent_data.get("github_commits_30d") or agent_data.get("github_stars")
+            else "No GitHub activity detected"
+        ),
+        "F9_shipping_cadence": (
+            f"Product: {product.get('status', 'unknown')}" if product.get("status")
+            else f"Shipping cadence: {v}/100"
+        ),
+        "F10_product_status": (
+            (product.get("description", "") or "")[:120] or f"Product status: {v}/100"
+        ),
+        "F11_partnerships": (
+            (product.get("technical_moat", "") or "")[:120] or f"Partnerships: {v}/100"
+        ),
+        "F12_wallet_behavior": (
+            f"Wallet behavior: {v}/100" + (" — unusual activity" if v < 40 else " — healthy" if v >= 70 else "")
+        ),
+        "F13_tam": (
+            (market.get("tam_description", "") or "")[:130] or f"TAM score: {v}/100"
+        ),
+        "F14_real_world_comparables": (
+            f"Comparable to {market['real_world_comparable']}" if market.get("real_world_comparable")
+            else f"Comparables: {v}/100"
+        ),
+        "F15_revenue_model": f"Revenue model clarity: {v}/100",
+        "F16_current_revenue": (
+            f"Revenue evidence: {v}/100" + (" — no confirmed revenue" if v < 35 else " — active revenue" if v >= 65 else "")
+        ),
+        "F17_mcap_to_tam": (
+            f"MCap/TAM ratio: {market['mcap_tam_ratio']:.4f}" if market.get("mcap_tam_ratio") is not None
+            else f"MCap/TAM: {v}/100"
+        ),
+        "F18_saturation": (
+            (market.get("saturation_description", "") or "")[:120] or f"Saturation: {v}/100"
+        ),
+        "F19_holder_distribution": (
+            f"{agent_data.get('holder_count', 0):,} holders — distribution score {v}/100"
+            if agent_data.get("holder_count")
+            else f"Holder distribution: {v}/100"
+        ),
+        "F20_twitter_engagement": (
+            f"{agent_data.get('twitter_followers', 0):,} followers — engagement {v}/100"
+            if agent_data.get("twitter_followers")
+            else f"Twitter engagement: {v}/100"
+        ),
+        "F21_follower_growth": (
+            f"Follower growth: {v}/100" + (" — accelerating" if v >= 65 else " — stagnant" if v < 40 else " — steady")
+        ),
+        "F22_community_depth": (
+            (community.get("community_analysis", "") or "")[:120] or f"Community depth: {v}/100"
+        ),
+        "F23_organic_signals": (
+            f"Organic signals: {v}/100" + (" — genuine engagement" if v >= 65 else " — bot signals" if v < 40 else "")
+        ),
+        "F24_smart_money": (
+            f"Smart money: {v}/100" + (" — notable wallets accumulating" if v >= 65 else "")
+        ),
+    }
+    return explanations.get(name, f"Score: {v}/100")
+
+
 def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
     """
     Run all 24 factors and return composite score with breakdown.
@@ -502,13 +607,14 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
         {
             "composite_score": float,
             "tier_classification": str,
-            "scores": {factor_name: float, ...},
+            "scores": {factor_name: {"value": float, "explanation": str}, ...},
             "tier_scores": {tier_name: float, ...},
             "first_mover": bool,
             "score_narrative": str,
         }
     """
     scores = {}
+    scores_flat = {}  # flat numeric scores for backward compat
     weighted_sum = 0.0
 
     for fn, weight, name, _tier in FACTORS:
@@ -517,7 +623,9 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
         except Exception:
             raw = NEUTRAL
         score = _clamp(raw)
+        explanation = _factor_explanation(name, score, agent_data, ai_analysis)
         scores[name] = round(score, 1)
+        scores_flat[name] = round(score, 1)
         weighted_sum += score * weight
 
     composite = _clamp(round(weighted_sum, 1))
