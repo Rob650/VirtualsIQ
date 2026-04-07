@@ -394,8 +394,8 @@ async def lifespan(app: FastAPI):
             logger.info(f"Auto-scored {score_count} agents (on-chain only, AI analysis queued)")
 
             enrichment_state["completed_at"] = datetime.utcnow().isoformat()
-            # Kick off full AI analysis in background — doesn't block server startup
-            asyncio.create_task(_auto_analyze_all())
+            # Auto-analysis on startup is DISABLED — use POST /api/admin/refresh-analysis to trigger manually
+            # asyncio.create_task(_auto_analyze_all())
         except Exception as e:
             logger.error(f"Startup preload failed: {e}")
             enrichment_state["status"] = "complete"
