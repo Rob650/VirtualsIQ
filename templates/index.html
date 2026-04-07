@@ -934,6 +934,7 @@
   <div class="enrich-dot"></div>
   <span id="enrich-msg">Loading agents...</span>
 </div>
+<div id="last-updated-label" style="display:none;font-size:11px;color:var(--text-dim);font-family:var(--font-data);padding:4px 16px 0;letter-spacing:0.3px"></div>
 
 <!-- TABLE HEADER -->
 <div class="table-header">
@@ -1206,7 +1207,7 @@ async function loadAgents() {
 
     renderPagination();
   } catch(e) {
-    list.innerHTML = `<div class="loading-row" style="color:var(--red)">Error loading agents. Please refresh.</div>`;
+    list.innerHTML = `<div class="loading-row" style="color:var(--red)">Error loading agents. <button onclick="loadAgents()" style="margin-left:10px;padding:4px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;cursor:pointer">Retry</button></div>`;
     console.error(e);
   }
 }
@@ -1292,10 +1293,11 @@ function renderModal(agent) {
   const doxxLabel = {1:'Full Doxx', 2:'Social Presence', 3:'Anonymous'}[agent.doxx_tier] || 'Anonymous';
   const risk = (agent.analysis_json?.risk?.overall_risk || 'medium').toLowerCase();
 
+  const _doxxSubScore = (agent.scores_json?.scores?.F6_doxx_tier !== undefined) ? Math.round(agent.scores_json.scores.F6_doxx_tier) : null;
   document.getElementById('modal-agent-meta').innerHTML = `
     <span class="status-badge ${statusClass}">${agent.status}</span>
     <span class="category-badge">${agent.agent_type || '—'}</span>
-    <span class="doxx-badge ${doxxClass}">${doxxLabel}</span>
+    <span class="doxx-badge ${doxxClass}">${doxxLabel}${_doxxSubScore !== null ? `<span style="margin-left:5px;font-family:var(--font-data);font-size:10px;opacity:0.8">${_doxxSubScore}</span>` : ''}</span>
     ${agent.first_mover ? '<div class="first-mover-badge" title="First Mover Advantage">1ST</div>' : ''}
     <span class="risk-badge ${risk}">${risk} risk</span>`;
 
@@ -1317,6 +1319,47 @@ function renderModal(agent) {
   const hasAnalysis = Object.keys(analysis).length > 0;
   const overview = analysis.overview || {};
   const riskData = analysis.risk || {};
+  const teamData = analysis.team || {};
+  const productData = analysis.product || {};
+  const fmData = analysis.first_mover || {};
+
+  // Phase 3: derive one_liner, top_helped, top_hurt from scores_json
+  const factorScores = scores.scores || {};
+  const tierScores = scores.tier_scores || {};
+  const FACTOR_LABELS = {
+    F1_category_uniqueness:'Category Uniqueness', F2_approach_novelty:'Approach Novelty',
+    F3_cross_chain_originality:'Cross-Chain Original', F4_timing_advantage:'Timing Advantage',
+    F5_defensibility:'Defensibility / Moat', F6_doxx_tier:'Team Visibility',
+    F7_track_record:'Track Record', F8_code_activity:'Code Activity',
+    F9_shipping_cadence:'Shipping Cadence', F10_product_status:'Product Status',
+    F11_partnerships:'Partnerships', F12_wallet_behavior:'Wallet Behavior',
+    F13_tam:'Total Addressable Market', F14_real_world_comparables:'Real-World Comparables',
+    F15_revenue_model:'Revenue Model', F16_current_revenue:'Current Revenue',
+    F17_mcap_to_tam:'MCap / TAM Ratio', F18_saturation:'Market Saturation',
+    F19_holder_distribution:'Holder Distribution', F20_twitter_engagement:'Twitter Engagement',
+    F21_follower_growth:'Follower Growth', F22_community_depth:'Community Depth',
+    F23_organic_signals:'Organic vs Paid', F24_smart_money:'Smart Money',
+  };
+  const TIER_NAMES = {first_mover:'First Mover', team:'Team & Execution', value:'Value Pool', community:'Community'};
+  const sortedFactors = Object.entries(factorScores).sort((a,b) => b[1] - a[1]);
+  const topHelped = sortedFactors.slice(0, 3).map(([k,v]) => ({label: FACTOR_LABELS[k] || k, score: Math.round(v)}));
+  const topHurt   = sortedFactors.slice(-3).reverse().map(([k,v]) => ({label: FACTOR_LABELS[k] || k, score: Math.round(v)}));
+  const doxxSubScore = factorScores.F6_doxx_tier !== undefined ? Math.round(factorScores.F6_doxx_tier) : null;
+  let oneLiner = '';
+  if (Object.keys(tierScores).length) {
+    const tierEntries = Object.entries(tierScores).sort((a,b) => b[1] - a[1]);
+    const best = tierEntries[0], worst = tierEntries[tierEntries.length-1];
+    if (best && worst && best[0] !== worst[0]) {
+      oneLiner = `Strong on ${TIER_NAMES[best[0]] || best[0]}, weak on ${TIER_NAMES[worst[0]] || worst[0]}`;
+    }
+  }
+
+  // Last analyzed timestamp
+  const lastAnalyzed = agent.updated_at ? (() => {
+    const diffMs = Date.now() - new Date(agent.updated_at + 'Z').getTime();
+    const diffMin = Math.round(diffMs / 60000);
+    return diffMin < 1 ? 'just now' : diffMin < 60 ? `${diffMin}m ago` : diffMin < 1440 ? `${Math.round(diffMin/60)}h ago` : `${Math.round(diffMin/1440)}d ago`;
+  })() : null;
 
   const body = document.getElementById('modal-body');
   body.innerHTML = `
@@ -1325,26 +1368,32 @@ function renderModal(agent) {
         <span style="font-family:var(--font-data);font-size:24px;font-weight:700;color:${color}">${score}</span>
         <span style="font-size:13px;color:${color};margin-left:6px;font-weight:600">${tier}</span>
       </div>
+      ${oneLiner ? `<div style="flex:1;font-size:12px;color:var(--text-muted);font-style:italic;min-width:140px">${oneLiner}</div>` : ''}
     </div>
+
+    ${topHelped.length || topHurt.length ? `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      ${topHelped.length ? `<div style="padding:10px;background:rgba(22,131,137,0.06);border:1px solid rgba(22,131,137,0.2);border-radius:var(--radius-sm)">
+        <div style="font-size:10px;color:var(--green-dark);font-weight:700;letter-spacing:0.5px;margin-bottom:6px">STRENGTHS</div>
+        ${topHelped.map(f => `<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-bottom:3px"><span>${f.label}</span><span style="color:var(--green);font-family:var(--font-data)">${f.score}</span></div>`).join('')}
+      </div>` : ''}
+      ${topHurt.length ? `<div style="padding:10px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-sm)">
+        <div style="font-size:10px;color:var(--red);font-weight:700;letter-spacing:0.5px;margin-bottom:6px">RISKS</div>
+        ${topHurt.map(f => `<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-bottom:3px"><span>${f.label}</span><span style="color:var(--red);font-family:var(--font-data)">${f.score}</span></div>`).join('')}
+      </div>` : ''}
+    </div>` : ''}
 
     ${hasAnalysis ? `
     <div>
-      <div class="report-section-title">Intelligence Overview</div>
-      <p class="report-narrative">${overview.summary || 'No overview available.'}</p>
-      ${overview.value_proposition ? `<p class="report-narrative" style="margin-top:8px;color:var(--teal);font-style:italic">${overview.value_proposition}</p>` : ''}
-      ${overview.stage ? `<p style="margin-top:6px;font-size:11px;font-family:var(--font-data);color:var(--text-dim)">Stage: <span style="color:var(--amber)">${overview.stage.toUpperCase()}</span></p>` : ''}
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      ${riskData.bull_case ? `<div style="padding:10px;background:rgba(22,131,137,0.06);border:1px solid rgba(22,131,137,0.2);border-radius:var(--radius-sm)"><div style="font-size:10px;color:var(--green-dark);font-weight:700;letter-spacing:0.5px;margin-bottom:4px">BULL CASE</div><div style="font-size:12px;color:var(--text-muted)">${riskData.bull_case}</div></div>` : ''}
-      ${riskData.bear_case ? `<div style="padding:10px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-sm)"><div style="font-size:10px;color:var(--red);font-weight:700;letter-spacing:0.5px;margin-bottom:4px">BEAR CASE</div><div style="font-size:12px;color:var(--text-muted)">${riskData.bear_case}</div></div>` : ''}
-    </div>
-    ${riskData.key_risks && riskData.key_risks.length ? `
-    <div>
-      <div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Key Risks</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px">
-        ${riskData.key_risks.map(r => `<span style="padding:3px 8px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:4px;font-size:11px;color:var(--text-muted)">⚠ ${r}</span>`).join('')}
+      <div class="report-section-title">AI Analyst Overview
+        ${lastAnalyzed ? `<span style="font-size:10px;color:var(--text-dim);font-weight:400;margin-left:8px;font-family:var(--font-data)">Last analyzed: ${lastAnalyzed}</span>` : ''}
       </div>
-    </div>` : ''}
+      ${overview.summary ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--teal);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">What it does</div><p class="report-narrative">${overview.summary}</p></div>` : ''}
+      ${teamData.team_summary ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--text-dim);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">Who is behind it</div><p class="report-narrative">${teamData.team_summary}</p></div>` : ''}
+      ${analysis.intelligence_notes ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--text-dim);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">What is notable</div><p class="report-narrative">${analysis.intelligence_notes}</p></div>` : ''}
+      ${(riskData.bear_case || (riskData.key_risks && riskData.key_risks.length)) ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--red);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">What is concerning</div><p class="report-narrative">${riskData.bear_case || riskData.key_risks.join('. ')}</p></div>` : ''}
+      ${(productData.description || fmData.analysis) ? `<div style="margin-bottom:4px"><div style="font-size:10px;color:var(--text-dim);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">Recent activity</div><p class="report-narrative">${productData.description || fmData.analysis}</p></div>` : ''}
+    </div>
     ` : `
     <div>
       <div class="report-section-title">Overview</div>
@@ -1716,6 +1765,7 @@ async function checkEnrichmentStatus() {
       const count = data.total_agents_in_db || 0;
       msg.textContent = `${label}... ${count.toLocaleString()} agents loaded`;
       banner.classList.add('visible');
+      document.getElementById('last-updated-label').style.display = 'none';
 
       if (count !== _lastAgentCount) {
         _lastAgentCount = count;
@@ -1724,6 +1774,15 @@ async function checkEnrichmentStatus() {
       }
     } else {
       banner.classList.remove('visible');
+      const updatedEl = document.getElementById('last-updated-label');
+      const ts = data.completed_at || data.started_at;
+      if (ts) {
+        const diffMs = Date.now() - new Date(ts + 'Z').getTime();
+        const diffMin = Math.round(diffMs / 60000);
+        const label = diffMin < 1 ? 'just now' : diffMin < 60 ? `${diffMin}m ago` : `${Math.round(diffMin/60)}h ago`;
+        updatedEl.textContent = `Updated ${label}`;
+        updatedEl.style.display = 'block';
+      }
     }
     return done;
   } catch(e) {
