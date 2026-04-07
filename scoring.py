@@ -144,6 +144,97 @@ def _f5_defensibility(agent: dict, ai: dict) -> float:
 # Tier 2 — Traction / Team & Execution (28%)
 # ---------------------------------------------------------------------------
 
+def score_doxx_tier2(agent: dict) -> dict:
+    """
+    Dynamic Tier 2 (Social) doxx scoring.
+    Returns a detailed sub-score object 0-100 with component breakdown.
+    Evaluates:
+      - Twitter/X account age (older = better)
+      - Follower quality (ratio of real vs bot followers)
+      - Engagement authenticity (real replies vs spam)
+      - Whether the account existed BEFORE the project launched
+    """
+    twitter_age = _safe(agent.get("twitter_account_age"), 0)
+    followers = _safe(agent.get("twitter_followers"), 0)
+    engagement = _safe(agent.get("twitter_engagement_rate"), 0)
+    creation_date = agent.get("creation_date")
+
+    components = {}
+
+    # 1. Account age sub-score (0-25)
+    if twitter_age > 730:      # 2+ years
+        age_score = 25.0
+    elif twitter_age > 365:    # 1+ year
+        age_score = 20.0
+    elif twitter_age > 180:    # 6+ months
+        age_score = 14.0
+    elif twitter_age > 30:
+        age_score = 8.0
+    else:
+        age_score = 2.0
+    components["account_age"] = round(age_score, 1)
+
+    # 2. Follower quality sub-score (0-25)
+    if followers > 50000:
+        fq_score = 25.0
+    elif followers > 10000:
+        fq_score = 20.0
+    elif followers > 5000:
+        fq_score = 16.0
+    elif followers > 1000:
+        fq_score = 12.0
+    elif followers > 100:
+        fq_score = 6.0
+    else:
+        fq_score = 1.0
+    # Penalize suspicious follower/engagement ratio
+    if followers > 1000 and engagement > 15.0:
+        fq_score = max(0, fq_score - 8.0)  # likely bot followers
+    components["follower_quality"] = round(fq_score, 1)
+
+    # 3. Engagement authenticity sub-score (0-25)
+    if 1.0 <= engagement <= 5.0:
+        eng_score = 25.0  # healthy organic range
+    elif 0.5 <= engagement <= 8.0:
+        eng_score = 18.0  # acceptable
+    elif 0.1 <= engagement < 0.5:
+        eng_score = 10.0  # low but present
+    elif engagement > 15.0:
+        eng_score = 3.0   # suspiciously high — bot activity
+    elif engagement > 8.0:
+        eng_score = 8.0   # elevated but not extreme
+    else:
+        eng_score = 2.0   # zero or near-zero
+    components["engagement_authenticity"] = round(eng_score, 1)
+
+    # 4. Pre-project existence sub-score (0-25)
+    pre_score = 12.5  # neutral default
+    if creation_date and twitter_age > 0:
+        project_days = _days_since(creation_date)
+        if project_days:
+            if twitter_age > project_days + 180:
+                pre_score = 25.0   # account far predates project — very credible
+            elif twitter_age > project_days + 90:
+                pre_score = 22.0   # account predates project — credible
+            elif twitter_age > project_days:
+                pre_score = 16.0   # existed before but not by much
+            elif twitter_age > project_days - 30:
+                pre_score = 10.0   # created around project launch
+            else:
+                pre_score = 3.0    # created after project launch — suspicious
+    components["pre_project_existence"] = round(pre_score, 1)
+
+    total = _clamp(age_score + fq_score + eng_score + pre_score)
+
+    return {
+        "total_score": round(total, 1),
+        "components": components,
+        "twitter_age_days": int(twitter_age),
+        "followers": int(followers),
+        "engagement_rate": round(engagement, 2),
+    }
+
+
 def _f6_doxx_tier(agent: dict, ai: dict) -> float:
     """Dynamic doxx scoring with deeper Tier 2 analysis."""
     tier = int(agent.get("doxx_tier") or ai.get("team", {}).get("doxx_tier") or 3)
@@ -151,45 +242,9 @@ def _f6_doxx_tier(agent: dict, ai: dict) -> float:
     if tier == 1:
         base = 100.0
     elif tier == 2:
-        # Dynamic Tier 2 scoring — not just "has Twitter"
-        base = 60.0
-        twitter_age = _safe(agent.get("twitter_account_age"), 0)
-        followers = _safe(agent.get("twitter_followers"), 0)
-        engagement = _safe(agent.get("twitter_engagement_rate"), 0)
-        creation_date = agent.get("creation_date")
-
-        # Account age bonus: older accounts more credible
-        if twitter_age > 365:  # over 1 year
-            base += 10.0
-        elif twitter_age > 180:
-            base += 5.0
-
-        # Follower quality: very low followers = suspicious
-        if followers > 10000:
-            base += 8.0
-        elif followers > 1000:
-            base += 4.0
-        elif followers < 100:
-            base -= 5.0
-
-        # Engagement authenticity: suspiciously high or zero = red flag
-        if 0.5 <= engagement <= 8.0:
-            base += 5.0  # healthy range
-        elif engagement > 15.0:
-            base -= 5.0  # likely bot engagement
-        elif engagement <= 0:
-            base -= 3.0
-
-        # Account existed before project? (Compare twitter age vs project age)
-        if creation_date:
-            project_days = _days_since(creation_date)
-            if project_days and twitter_age > 0:
-                if twitter_age > project_days + 90:
-                    base += 5.0  # account predates project — more credible
-                elif twitter_age < project_days - 30:
-                    base -= 5.0  # account created after project launch — suspicious
-
-        base = _clamp(base)
+        # Use the dedicated Tier 2 scorer
+        tier2_result = score_doxx_tier2(agent)
+        base = tier2_result["total_score"]
     else:
         base = 20.0
 
@@ -600,6 +655,11 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
 
     # Build narrative
     narrative = _build_score_narrative(agent_data, ai_analysis, scores, composite, tier_scores)
+
+    # Compute dynamic Tier 2 doxx detail if applicable
+    if doxx_tier_val == 2:
+        tier2_detail = score_doxx_tier2(agent_data)
+        doxx_detail["tier2_breakdown"] = tier2_detail
 
     # Embed metadata into scores dict so it's available in scores_json on the frontend
     scores["_tier_scores"] = tier_scores
