@@ -1,5 +1,5 @@
 """
-VirtualsIQ — Database layer
+VirtualsIQ â Database layer
 SQLite with aiosqlite for async access
 """
 
@@ -373,7 +373,9 @@ async def get_stats() -> dict:
         async with db.execute("""
             SELECT
                 COUNT(*) as total_agents,
-                AVG(composite_score) as avg_score,
+                AVG(composite_score) as average_score,
+                COALESCE(SUM(volume_24h), 0) as total_volume_24h,
+                COALESCE(SUM(market_cap), 0) as total_market_cap,
                 COUNT(CASE WHEN status='Sentient' THEN 1 END) as sentient_count,
                 COUNT(CASE WHEN status='Prototype' THEN 1 END) as prototype_count,
                 COUNT(CASE WHEN first_mover=1 THEN 1 END) as first_mover_count,
@@ -481,7 +483,7 @@ async def bulk_upsert_agents(agents: list[dict], batch_size: int = 500) -> int:
         batch_tuples = [_dict_to_tuple(a) for a in batch_dicts]
         batch_num = i // batch_size + 1
         try:
-            # Fresh connection per batch — a failed batch cannot corrupt subsequent ones
+            # Fresh connection per batch â a failed batch cannot corrupt subsequent ones
             async with aiosqlite.connect(DB_PATH) as db:
                 await db.execute("PRAGMA journal_mode=WAL")
                 await db.executemany(UPSERT_SQL, batch_tuples)
@@ -489,7 +491,7 @@ async def bulk_upsert_agents(agents: list[dict], batch_size: int = 500) -> int:
             stored += len(batch_tuples)
             logger.info(f"Batch {batch_num}: saved {len(batch_tuples)} agents (total so far: {stored})")
         except Exception as e:
-            logger.error(f"Batch {batch_num} executemany failed: {e!r} — retrying row-by-row")
+            logger.error(f"Batch {batch_num} executemany failed: {e!r} â retrying row-by-row")
             # Fall back to one-by-one so a single bad row doesn't lose the whole batch
             for j, agent_dict in enumerate(batch_dicts):
                 try:
