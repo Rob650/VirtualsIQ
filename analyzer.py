@@ -65,7 +65,8 @@ async def _fetch_twitter_bio(twitter_url: str) -> str:
 # 5-Section Overview Prompt (THE MOST IMPORTANT CHANGE)
 # ---------------------------------------------------------------------------
 
-FIVE_SECTION_PROMPT = """You are VirtualsIQ, an intelligence analyst for the Virtuals Protocol ecosystem.
+FIVE_SECTION_PROMPT = """You are VirtualsIQ, a senior intelligence analyst specializing in AI agent ecosystems on Virtuals Protocol. Your job is to produce comprehensive, in-depth analysis reports that investors and researchers rely on to make informed decisions. Be thorough, specific, and analytical — vague or generic answers are unacceptable.
+
 Analyze this AI agent and return a structured overview in exactly 5 sections.
 
 === PROJECT DATA ===
@@ -97,11 +98,11 @@ AGENT_EXTRA_CONTEXT
 Return ONLY valid JSON with exactly this structure (no markdown, no code blocks):
 
 {
-  "what_it_does": "2-3 sentences. Plain English: what is this agent for, who would use it, what problem does it solve.",
-  "who_is_behind_it": "2-3 sentences. Team background, doxx tier, notable credentials. If anonymous, say so explicitly. Note any red flags.",
-  "what_is_notable": "2-3 sentences. Genuine strengths only. Unique tech, real traction, partnerships, first-mover advantages.",
-  "what_is_concerning": "2-3 sentences. NEVER EMPTY. Honest risks: anonymous team, low liquidity, no product, suspicious holder patterns, lack of development activity. There is ALWAYS something to watch.",
-  "recent_activity": "2-3 sentences. What changed in the last 7 days: price movement, holder shifts, new announcements, development updates. If no recent data, note the silence itself as a data point.",
+  "what_it_does": "3-4 sentences. Explain in plain English what this agent does, who its target users are, what specific problem it solves, and how it differs from a simple chatbot or generic AI. Be concrete about its capabilities and use cases.",
+  "who_is_behind_it": "3-4 sentences. Describe the team's background, anonymity level, verifiable credentials or past projects, and any wallet/on-chain behavior worth noting. If the team is anonymous, state that explicitly and explain what that means for risk. Call out any discrepancies between claimed and verifiable identity.",
+  "what_is_notable": "3-4 sentences. Identify the most compelling and verifiable strengths — genuine first-mover advantages, real product traction, confirmed partnerships, unique technical moats, or standout community metrics. Be specific: name the partners, quote the metrics, explain the moat. Do not include hype without evidence.",
+  "what_is_concerning": "3-4 sentences. NEVER EMPTY. Provide an honest, specific risk assessment covering the most significant red flags. Consider: team anonymity, thin liquidity, low volume, concentrated holder distribution, missing product, no GitHub activity, suspicious buy/sell patterns, competitor saturation, or regulatory exposure. Every agent has risks — identify the most material ones with specifics.",
+  "recent_activity": "3-4 sentences. Describe what has changed in the last 7 days with specifics: price movement and magnitude, holder count changes, any new announcements, social activity shifts, development updates. If data shows no change or silence, state that explicitly and explain whether silence is normal or a warning sign for this stage of project.",
 
   "scoring_data": {
     "first_mover": {
@@ -169,12 +170,14 @@ Return ONLY valid JSON with exactly this structure (no markdown, no code blocks)
 }
 
 CRITICAL RULES:
-1. The 5 overview sections must be consistent across ALL agents — same voice, same structure.
-2. "what_is_concerning" is NEVER empty. There is ALWAYS something to flag.
-3. Never invent facts. If unknown, say "Information not available" or "Cannot be verified."
-4. Every score must reflect actual data. Anonymous team = doxx_tier 3, low scores for trust.
-5. TAM must be niche-specific (e.g. "AI trading bots on Base L2"), NOT generic AI market numbers.
-6. If volume < $10K, flag it. If holders < 100, flag it. If no GitHub, note absence."""
+1. The 5 overview sections must be consistent across ALL agents — same voice, same analytical depth.
+2. "what_is_concerning" is NEVER empty. There is ALWAYS something to flag. If the agent looks clean, dig deeper: concentration risk, market saturation, execution risk, dependency risk.
+3. Never invent facts. If unknown, say "Cannot be verified" but then explain WHAT that absence implies for risk or credibility.
+4. Every score must reflect actual data — not defaults. Anonymous team = doxx_tier 3, low trust scores. Low volume = low liquidity scores. No GitHub = low technical scores.
+5. TAM must be niche-specific (e.g. "AI trading bots on Base L2", "AI-generated music NFTs"), NOT generic "AI market is $XXX trillion" platitudes.
+6. Specific data flags: volume < $10K = liquidity warning; holders < 100 = concentration risk; buy/sell ratio > 1.5 = momentum buy pressure; < 0.7 = sustained selling pressure.
+7. All 5 text sections must be substantive. Avoid filler phrases like "this is an exciting project" or "the team is working hard". Every sentence must carry specific, verifiable information.
+8. Scoring values must span the full 0-100 range based on evidence — do NOT default everything to 50. A project with no product should score 10-20 on product status. A fully doxxed team with track record scores 70-90 on team trust."""
 
 
 BATCH_TRIAGE_PROMPT = """You are VirtualsIQ. Perform rapid triage analysis of these AI agents from Virtuals Protocol.
@@ -272,12 +275,7 @@ def _parse_json_response(text: str) -> dict:
 
 
 def select_model(agent_data: dict, top_ids: set | None = None) -> str:
-    """Cost discipline: Sonnet for top 50 by MC, Haiku for long tail."""
-    if top_ids and str(agent_data.get("virtuals_id", "")) in top_ids:
-        return MODEL_SONNET
-    mcap = float(agent_data.get("market_cap") or 0)
-    if mcap > 5_000_000:
-        return MODEL_SONNET
+    """All agents analyzed with Haiku for cost efficiency."""
     return MODEL_HAIKU
 
 
