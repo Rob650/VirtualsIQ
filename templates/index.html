@@ -1,903 +1,934 @@
 <!DOCTYPE html>
-<!-- All data loaded from API. No Jinja2 template variables needed. -->
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VirtualsIQ — Agent Intelligence Terminal</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>VirtualsIQ â Intelligence Terminal</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+<style>
+/* ===== RESET & BASE ===== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --green:#00C853;
+  --green-dark:#00A844;
+  --green-light:#E8F5E9;
+  --green-bg:rgba(0,200,83,0.08);
+  --red:#FF1744;
+  --red-bg:rgba(255,23,68,0.08);
+  --bg:#FFFFFF;
+  --surface:#F8F9FA;
+  --surface2:#F0F2F5;
+  --border:#E8EAED;
+  --text:#1A1A2E;
+  --text2:#5F6368;
+  --text3:#9AA0A6;
+  --radius:12px;
+  --radius-sm:8px;
+  --radius-xs:6px;
+  --shadow:0 1px 3px rgba(0,0,0,0.08);
+  --shadow-lg:0 4px 16px rgba(0,0,0,0.12);
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+}
+body{
+  font-family:var(--font);
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  padding-bottom:120px;
+  -webkit-font-smoothing:antialiased;
+}
 
-    :root {
-      --green:       #00C853;
-      --green-hover: #00E676;
-      --green-dark:  #007E33;
-      --green-bg:    #E8F5E9;
-      --white:       #FFFFFF;
-      --card:        #F8F9FA;
-      --border:      #E0E0E0;
-      --text:        #1A1A1A;
-      --text-sec:    #555555;
-      --text-mute:   #888888;
-      --red:         #E53935;
-      --orange:      #FF6F00;
-      --shadow:      0 2px 8px rgba(0,0,0,0.08);
-      --shadow-md:   0 4px 20px rgba(0,0,0,0.12);
-      --radius:      12px;
-      --radius-sm:   8px;
-      --nav-h:       64px;
-      --bottom-h:    60px;
-    }
+/* ===== HEADER ===== */
+.header{
+  display:flex;align-items:center;gap:12px;
+  padding:12px 16px;
+  border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:100;
+  background:#fff;
+}
+.logo{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.logo-mark{
+  background:var(--green);color:#fff;
+  font-size:11px;font-weight:900;
+  padding:4px 7px;border-radius:6px;
+  letter-spacing:0.5px;
+}
+.logo-text{font-size:15px;font-weight:800;color:var(--text);white-space:nowrap}
+.header-search{
+  flex:1;display:flex;align-items:center;gap:6px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:20px;padding:0 12px;
+  min-width:0;
+}
+.header-search i{color:var(--text3);font-size:12px}
+.header-search input{
+  flex:1;border:none;background:none;
+  padding:7px 0;font-size:12px;
+  color:var(--text);outline:none;
+  min-width:0;
+}
+.header-search input::placeholder{color:var(--text3)}
+.header-live{
+  display:flex;align-items:center;gap:4px;
+  font-size:10px;font-weight:700;color:var(--green);
+  flex-shrink:0;
+}
+.header-live .dot{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--green);
+  animation:pulse 2s infinite;
+}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 
-    html, body {
-      height: 100%;
-      font-family: 'Inter', sans-serif;
-      background: var(--white);
-      color: var(--text);
-      overflow-x: hidden;
-    }
+/* ===== FEED TABS ===== */
+.feed-tabs{
+  display:flex;gap:8px;
+  padding:12px 16px 0;
+  overflow-x:auto;
+}
+.feed-tabs::-webkit-scrollbar{display:none}
+.feed-tab{
+  padding:6px 14px;
+  border-radius:20px;
+  font-size:12px;font-weight:600;
+  border:1.5px solid var(--border);
+  background:#fff;color:var(--text2);
+  cursor:pointer;white-space:nowrap;
+  transition:all 0.2s;
+  display:flex;align-items:center;gap:5px;
+}
+.feed-tab:hover{border-color:var(--green);color:var(--green)}
+.feed-tab.active{background:var(--green);color:#fff;border-color:var(--green)}
+.feed-tab .dot{
+  width:5px;height:5px;border-radius:50%;
+  background:var(--green);
+}
+.feed-tab.active .dot{background:#fff}
 
-    /* ── TOP NAV ── */
-    .topnav {
-      position: fixed; top: 0; left: 0; right: 0; height: var(--nav-h);
-      background: var(--white);
-      border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0 20px;
-      z-index: 100;
-      box-shadow: var(--shadow);
-    }
-    .logo {
-      font-size: 20px; font-weight: 800; letter-spacing: -0.5px;
-      color: var(--text);
-    }
-    .logo span { color: var(--green); }
-    .topnav-right { display: flex; align-items: center; gap: 12px; }
-    .status-dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      background: var(--green);
-      box-shadow: 0 0 6px var(--green);
-      animation: pulse 2s infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
-    }
-    .status-text { font-size: 12px; color: var(--text-sec); font-weight: 500; }
+/* ===== CATEGORY PILLS ===== */
+.cat-pills{
+  display:flex;gap:8px;
+  padding:10px 16px;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+}
+.cat-pills::-webkit-scrollbar{display:none}
+.cat-pill{
+  padding:5px 12px;
+  border-radius:16px;
+  font-size:11px;font-weight:600;
+  border:1.5px solid var(--border);
+  background:#fff;color:var(--text2);
+  cursor:pointer;white-space:nowrap;
+  transition:all 0.2s;
+}
+.cat-pill:hover{border-color:var(--green);color:var(--green)}
+.cat-pill.active{background:var(--green);color:#fff;border-color:var(--green)}
 
-    /* ── MAIN WRAPPER ── */
-    .wrapper {
-      padding-top: var(--nav-h);
-      padding-bottom: var(--bottom-h);
-      max-width: 900px;
-      margin: 0 auto;
-    }
+/* ===== STATS ROW ===== */
+.stats-row{
+  display:flex;align-items:center;gap:16px;
+  padding:8px 16px;
+  font-size:10px;font-weight:600;
+  color:var(--text3);
+  text-transform:uppercase;
+  letter-spacing:0.5px;
+  border-bottom:1px solid var(--border);
+  overflow-x:auto;white-space:nowrap;
+}
+.stats-row::-webkit-scrollbar{display:none}
+.stats-row .stat-val{color:var(--text);font-weight:700;margin-left:4px}
 
-    /* ── STATS BAR ── */
-    .stats-bar {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 12px;
-      padding: 16px 16px 0;
-    }
-    .stat-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 12px 14px;
-      text-align: center;
-    }
-    .stat-card .val {
-      font-size: 18px; font-weight: 700; color: var(--text);
-      line-height: 1.2;
-    }
-    .stat-card .lbl {
-      font-size: 10px; font-weight: 500; color: var(--text-mute);
-      text-transform: uppercase; letter-spacing: 0.5px;
-      margin-top: 3px;
-    }
-    .stat-card .val.green { color: var(--green-dark); }
+/* ===== COLUMN HEADERS ===== */
+.col-headers{
+  display:flex;align-items:center;
+  padding:8px 16px;gap:10px;
+  font-size:10px;font-weight:700;
+  color:var(--text3);
+  text-transform:uppercase;
+  letter-spacing:0.5px;
+  border-bottom:1px solid var(--border);
+}
+.col-agent{flex:1;min-width:0}
+.col-price{width:80px;text-align:right}
+.col-change{width:60px;text-align:right}
+.col-viq{width:40px;text-align:right}
+.col-rank{width:24px;text-align:center}
 
-    /* ── LOADING BANNER ── */
-    #loading-banner {
-      margin: 12px 16px 0;
-      background: var(--green-bg);
-      border: 1px solid #A5D6A7;
-      border-radius: var(--radius-sm);
-      padding: 8px 14px;
-      font-size: 12px; font-weight: 500; color: var(--green-dark);
-      display: none;
-      align-items: center; gap: 8px;
-    }
-    #loading-banner.visible { display: flex; }
-    .spinner-sm {
-      width: 14px; height: 14px;
-      border: 2px solid #A5D6A7;
-      border-top-color: var(--green);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      flex-shrink: 0;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
+/* ===== AGENT LIST ===== */
+.agent-list{padding:0}
+.agent-row{
+  display:flex;align-items:center;
+  padding:10px 16px;gap:10px;
+  border-bottom:1px solid var(--border);
+  cursor:pointer;
+  transition:background 0.15s;
+}
+.agent-row:hover{background:var(--surface)}
+.agent-rank{
+  font-size:12px;font-weight:700;color:var(--text3);
+  min-width:24px;text-align:center;flex-shrink:0;
+}
+.agent-avatar{
+  width:40px;height:40px;border-radius:50%;
+  object-fit:cover;
+  background:var(--surface2);
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:14px;color:var(--text2);
+  flex-shrink:0;overflow:hidden;
+}
+.agent-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.agent-info{flex:1;min-width:0}
+.agent-name-row{display:flex;align-items:center;gap:6px}
+.agent-name{font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.agent-ticker{font-size:11px;color:var(--text3);font-weight:500}
+.agent-desc{font-size:11px;color:var(--text3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.agent-sub-stats{font-size:10px;color:var(--text3);margin-top:2px;display:flex;gap:10px}
+.agent-sub-stats span{white-space:nowrap}
+.agent-price-col{
+  width:80px;text-align:right;flex-shrink:0;
+}
+.agent-price{font-size:13px;font-weight:600;color:var(--text)}
+.agent-change-col{
+  width:60px;text-align:right;flex-shrink:0;
+}
+.agent-change{font-size:12px;font-weight:700;border-radius:4px;padding:2px 6px}
+.agent-change.up{color:var(--green);background:var(--green-bg)}
+.agent-change.down{color:var(--red);background:var(--red-bg)}
+.agent-viq{
+  width:40px;text-align:center;flex-shrink:0;
+  font-size:14px;font-weight:800;
+}
 
-    /* ── FILTER TABS ── */
-    .filter-tabs {
-      display: flex; gap: 4px;
-      padding: 14px 16px 0;
-      overflow-x: auto;
-      scrollbar-width: none;
-    }
-    .filter-tabs::-webkit-scrollbar { display: none; }
-    .tab-btn {
-      flex-shrink: 0;
-      padding: 7px 16px;
-      border-radius: 20px;
-      border: 1px solid var(--border);
-      background: var(--white);
-      font-size: 13px; font-weight: 500; color: var(--text-sec);
-      cursor: pointer; transition: all 0.15s;
-    }
-    .tab-btn:hover { border-color: var(--green); color: var(--green-dark); }
-    .tab-btn.active {
-      background: var(--green); border-color: var(--green);
-      color: #fff; font-weight: 600;
-    }
+/* ===== PAGINATION ===== */
+.pagination{
+  display:flex;justify-content:center;align-items:center;gap:6px;
+  padding:16px;
+}
+.page-btn{
+  width:34px;height:34px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:600;
+  border:1.5px solid var(--border);
+  background:#fff;color:var(--text2);
+  cursor:pointer;transition:all 0.2s;
+}
+.page-btn:hover{border-color:var(--green);color:var(--green)}
+.page-btn.active{background:var(--green);color:#fff;border-color:var(--green)}
+.page-btn:disabled{opacity:0.4;cursor:not-allowed}
 
-    /* ── CATEGORY PILLS ── */
-    .cat-pills {
-      display: flex; gap: 6px;
-      padding: 10px 16px 0;
-      overflow-x: auto;
-      scrollbar-width: none;
-    }
-    .cat-pills::-webkit-scrollbar { display: none; }
-    .cat-pill {
-      flex-shrink: 0;
-      padding: 5px 13px;
-      border-radius: 14px;
-      border: 1px solid var(--border);
-      background: var(--card);
-      font-size: 12px; font-weight: 500; color: var(--text-sec);
-      cursor: pointer; transition: all 0.15s;
-    }
-    .cat-pill:hover { border-color: var(--green); color: var(--green-dark); }
-    .cat-pill.active {
-      background: var(--green-bg); border-color: var(--green);
-      color: var(--green-dark); font-weight: 600;
-    }
+/* ===== BOTTOM FILTERS ===== */
+.bottom-filters{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 16px;
+  border-top:1px solid var(--border);
+  border-bottom:1px solid var(--border);
+  overflow-x:auto;
+  background:#fff;
+}
+.bottom-filters::-webkit-scrollbar{display:none}
+.bfilter{
+  padding:5px 10px;
+  border-radius:14px;
+  font-size:11px;font-weight:600;
+  border:1px solid var(--border);
+  background:#fff;color:var(--text2);
+  cursor:pointer;white-space:nowrap;
+  display:flex;align-items:center;gap:4px;
+}
+.bfilter.active{background:var(--green);color:#fff;border-color:var(--green)}
 
-    /* ── SEARCH ── */
-    .search-wrap {
-      padding: 10px 16px 0;
-    }
-    .search-inner {
-      position: relative;
-    }
-    .search-icon {
-      position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
-      color: var(--text-mute); font-size: 15px; pointer-events: none;
-    }
-    #search-input {
-      width: 100%;
-      padding: 10px 12px 10px 36px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      background: var(--card);
-      font-size: 14px; color: var(--text);
-      font-family: inherit;
-      outline: none;
-      transition: border-color 0.15s;
-    }
-    #search-input::placeholder { color: var(--text-mute); }
-    #search-input:focus { border-color: var(--green); background: var(--white); }
+/* ===== MODAL ===== */
+.modal-overlay{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,0.5);z-index:200;
+  align-items:flex-end;justify-content:center;
+  animation:fadeIn 0.2s ease;
+}
+.modal-overlay.open{display:flex}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal-sheet{
+  width:100%;max-width:600px;
+  max-height:90vh;
+  background:#fff;
+  border-radius:20px 20px 0 0;
+  overflow-y:auto;
+  animation:slideUp 0.3s ease;
+  box-shadow:var(--shadow-lg);
+}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-handle{
+  width:36px;height:4px;
+  background:var(--border);border-radius:2px;
+  margin:10px auto;
+}
+.modal-close{
+  position:absolute;top:12px;right:12px;
+  width:32px;height:32px;border-radius:50%;
+  border:none;background:var(--surface);
+  font-size:16px;cursor:pointer;color:var(--text2);
+  display:flex;align-items:center;justify-content:center;
+}
+.modal-header{
+  position:relative;
+  padding:12px 20px 16px;
+  display:flex;align-items:center;gap:14px;
+  border-bottom:1px solid var(--border);
+}
+.modal-avatar{
+  width:56px;height:56px;border-radius:50%;
+  overflow:hidden;flex-shrink:0;
+  background:var(--surface2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;font-weight:700;color:var(--text2);
+}
+.modal-avatar img{width:100%;height:100%;object-fit:cover}
+.modal-title-wrap{flex:1;min-width:0}
+.modal-agent-name{font-size:18px;font-weight:800;color:var(--text)}
+.modal-agent-meta{font-size:12px;color:var(--text3)}
+.modal-score-ring{position:relative;width:64px;height:64px;flex-shrink:0}
+.modal-score-ring svg{width:64px;height:64px;transform:rotate(-90deg)}
+.modal-score-ring circle.track{stroke:var(--surface2);stroke-width:5;fill:none}
+.modal-score-ring circle.arc{stroke:var(--green);stroke-width:5;fill:none;stroke-linecap:round;transition:stroke-dashoffset 0.8s ease}
+.modal-score-value{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+}
+.modal-score-num{font-size:18px;font-weight:800}
+.modal-score-label{font-size:8px;color:var(--text3);text-transform:uppercase}
+.modal-body{padding:16px 20px 24px}
 
-    /* ── AGENT TABLE ── */
-    .agent-section {
-      padding: 12px 16px 0;
-    }
-    .agent-table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    .agent-table thead th {
-      padding: 8px 10px;
-      text-align: left;
-      font-size: 10px; font-weight: 600;
-      color: var(--text-mute);
-      text-transform: uppercase; letter-spacing: 0.5px;
-      border-bottom: 2px solid var(--border);
-      background: var(--card);
-    }
-    .agent-table thead th:first-child { border-radius: var(--radius-sm) 0 0 0; }
-    .agent-table thead th:last-child  { border-radius: 0 var(--radius-sm) 0 0; text-align: right; }
-    .agent-table thead th.r { text-align: right; }
-    .agent-row {
-      cursor: pointer;
-      transition: background 0.12s;
-      border-bottom: 1px solid var(--border);
-    }
-    .agent-row:hover { background: var(--green-bg); }
-    .agent-row td {
-      padding: 11px 10px;
-      font-size: 13px;
-      vertical-align: middle;
-    }
-    .agent-row td.r { text-align: right; }
-    .rank-cell { color: var(--text-mute); font-size: 12px; font-weight: 600; width: 36px; }
-    .avatar-cell { width: 44px; }
-    .avatar {
-      width: 34px; height: 34px; border-radius: 50%;
-      background: var(--green-bg);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 14px; font-weight: 700; color: var(--green-dark);
-      overflow: hidden; flex-shrink: 0;
-    }
-    .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
-    .name-cell .agent-name { font-weight: 600; font-size: 13px; color: var(--text); }
-    .name-cell .agent-ticker {
-      font-size: 11px; color: var(--text-mute); font-weight: 500;
-      margin-top: 1px;
-    }
-    .change-pos { color: var(--green-dark); font-weight: 600; }
-    .change-neg { color: var(--red); font-weight: 600; }
-    .viq-badge {
-      display: inline-flex; align-items: center; justify-content: center;
-      padding: 3px 8px; border-radius: 10px;
-      font-size: 11px; font-weight: 700;
-      min-width: 42px;
-    }
-    .viq-high   { background: #E8F5E9; color: #1B5E20; }
-    .viq-medium { background: #FFF8E1; color: #E65100; }
-    .viq-low    { background: #FFEBEE; color: #B71C1C; }
+/* Modal sections */
+.detail-section{margin-bottom:20px}
+.detail-section-title{
+  font-size:12px;font-weight:700;color:var(--text3);
+  text-transform:uppercase;letter-spacing:0.5px;
+  margin-bottom:10px;
+  display:flex;align-items:center;gap:6px;
+}
+.detail-section-title i{color:var(--green);font-size:13px}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.detail-item{
+  background:var(--surface);
+  border-radius:var(--radius-sm);
+  padding:10px 12px;
+}
+.detail-item-label{font-size:10px;color:var(--text3);text-transform:uppercase;margin-bottom:2px}
+.detail-item-value{font-size:15px;font-weight:700}
+.score-factor{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 0;
+  border-bottom:1px solid var(--border);
+}
+.score-factor:last-child{border-bottom:none}
+.score-factor-bar{flex:1;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden}
+.score-factor-fill{height:100%;border-radius:3px;background:var(--green);transition:width 0.6s ease}
+.score-factor-name{font-size:12px;color:var(--text2);min-width:80px}
+.score-factor-val{font-size:13px;font-weight:700;min-width:30px;text-align:right}
+.ai-summary{
+  background:var(--green-bg);
+  border-radius:var(--radius);
+  padding:14px;
+  font-size:13px;line-height:1.6;
+  color:var(--text);
+  border-left:3px solid var(--green);
+}
+.dex-chart-link{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:10px;
+  background:var(--surface);border-radius:var(--radius);
+  font-size:13px;font-weight:600;color:var(--green);
+  border:1.5px solid var(--green);
+  cursor:pointer;transition:all 0.2s;
+  text-decoration:none;
+}
+.dex-chart-link:hover{background:var(--green-bg)}
 
-    /* ── LOAD MORE ── */
-    .load-more-wrap {
-      padding: 14px 16px 0;
-      display: flex; justify-content: center;
-    }
-    #load-more-btn {
-      padding: 10px 28px;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      font-size: 13px; font-weight: 600; color: var(--text-sec);
-      cursor: pointer; transition: all 0.15s;
-    }
-    #load-more-btn:hover { border-color: var(--green); color: var(--green-dark); background: var(--green-bg); }
-    #load-more-btn:disabled { opacity: 0.45; cursor: default; }
+/* ===== BOTTOM NAV ===== */
+.bottom-nav{
+  position:fixed;bottom:0;left:0;right:0;
+  background:#fff;
+  border-top:1px solid var(--border);
+  display:flex;height:56px;z-index:100;
+  box-shadow:0 -2px 10px rgba(0,0,0,0.05);
+}
+.nav-item{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:2px;
+  font-size:10px;color:var(--text3);
+  cursor:pointer;border:none;background:none;
+  transition:color 0.2s;
+}
+.nav-item i{font-size:17px}
+.nav-item.active{color:var(--green)}
+.nav-item:hover{color:var(--green)}
 
-    /* ── EMPTY / ERROR ── */
-    .empty-state {
-      text-align: center; padding: 48px 16px;
-      color: var(--text-mute); font-size: 14px;
-    }
-    .empty-state .icon { font-size: 40px; margin-bottom: 10px; }
+/* ===== LOADING ===== */
+.spinner{
+  width:28px;height:28px;
+  border:3px solid var(--surface2);
+  border-top-color:var(--green);
+  border-radius:50%;
+  animation:spin 0.8s linear infinite;
+  margin:30px auto;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
 
-    /* ── BOTTOM NAV ── */
-    .bottom-nav {
-      position: fixed; bottom: 0; left: 0; right: 0;
-      height: var(--bottom-h);
-      background: var(--white);
-      border-top: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: space-around;
-      z-index: 100;
-    }
-    .nav-item {
-      flex: 1; display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      gap: 3px; cursor: pointer;
-      color: var(--text-mute); font-size: 10px; font-weight: 500;
-      transition: color 0.15s;
-    }
-    .nav-item.active { color: var(--green-dark); }
-    .nav-item svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* ===== TOAST ===== */
+.toast{
+  position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+  background:var(--text);color:#fff;
+  padding:10px 20px;border-radius:var(--radius);
+  font-size:13px;font-weight:500;
+  box-shadow:var(--shadow-lg);
+  z-index:300;
+  animation:toastIn 0.3s ease;
+}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 
-    /* ── MODAL ── */
-    .modal-backdrop {
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.35);
-      z-index: 200;
-      display: none; align-items: flex-end; justify-content: center;
-    }
-    .modal-backdrop.open { display: flex; }
-    .modal {
-      width: 100%; max-width: 900px;
-      max-height: 88vh;
-      background: var(--white);
-      border-radius: var(--radius) var(--radius) 0 0;
-      overflow-y: auto;
-      padding: 0 0 24px;
-      box-shadow: var(--shadow-md);
-      animation: slideUp 0.25s ease;
-    }
-    @keyframes slideUp {
-      from { transform: translateY(60px); opacity: 0; }
-      to   { transform: translateY(0);    opacity: 1; }
-    }
-    .modal-handle {
-      width: 40px; height: 4px; border-radius: 2px;
-      background: var(--border); margin: 12px auto 16px;
-    }
-    .modal-header {
-      display: flex; align-items: flex-start; gap: 14px;
-      padding: 0 20px 16px;
-      border-bottom: 1px solid var(--border);
-    }
-    .modal-avatar {
-      width: 52px; height: 52px; border-radius: 50%;
-      background: var(--green-bg);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 20px; font-weight: 800; color: var(--green-dark);
-      overflow: hidden; flex-shrink: 0;
-    }
-    .modal-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
-    .modal-title-wrap { flex: 1; }
-    .modal-name { font-size: 20px; font-weight: 700; color: var(--text); }
-    .modal-ticker { font-size: 13px; color: var(--text-mute); font-weight: 500; }
-    .modal-close {
-      background: var(--card); border: 1px solid var(--border);
-      border-radius: 50%; width: 32px; height: 32px;
-      cursor: pointer; font-size: 16px; line-height: 1;
-      display: flex; align-items: center; justify-content: center;
-      color: var(--text-sec); transition: background 0.15s;
-    }
-    .modal-close:hover { background: var(--border); }
+/* Enrichment banner */
+.enrich-banner{
+  display:none;padding:8px 16px;
+  background:var(--green-bg);
+  font-size:12px;color:var(--green);font-weight:600;
+  align-items:center;gap:8px;
+}
+.enrich-banner.active{display:flex}
+.enrich-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--green);animation:pulse 1.5s infinite;
+}
 
-    /* VIQ score big badge in modal */
-    .viq-score-big {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 10px 18px; border-radius: var(--radius-sm);
-      font-size: 22px; font-weight: 800;
-      margin: 16px 20px 0;
-    }
-    .viq-score-big.high   { background: #E8F5E9; color: #1B5E20; }
-    .viq-score-big.medium { background: #FFF8E1; color: #E65100; }
-    .viq-score-big.low    { background: #FFEBEE; color: #B71C1C; }
-    .viq-label { font-size: 12px; font-weight: 600; opacity: 0.7; }
-
-    /* metrics grid */
-    .metrics-grid {
-      display: grid; grid-template-columns: 1fr 1fr 1fr;
-      gap: 10px; padding: 14px 20px 0;
-    }
-    .metric-card {
-      background: var(--card); border: 1px solid var(--border);
-      border-radius: var(--radius-sm); padding: 12px;
-    }
-    .metric-card .m-val { font-size: 16px; font-weight: 700; color: var(--text); }
-    .metric-card .m-lbl { font-size: 10px; color: var(--text-mute); font-weight: 500; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.4px; }
-
-    /* bio */
-    .modal-bio {
-      padding: 14px 20px 0;
-      font-size: 13px; color: var(--text-sec); line-height: 1.65;
-    }
-    .modal-section-title {
-      font-size: 11px; font-weight: 700; color: var(--text-mute);
-      text-transform: uppercase; letter-spacing: 0.5px;
-      padding: 14px 20px 6px;
-    }
-
-    /* social links */
-    .socials-row {
-      display: flex; gap: 8px; flex-wrap: wrap;
-      padding: 0 20px;
-    }
-    .social-link {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 6px 12px; border-radius: 16px;
-      border: 1px solid var(--border); background: var(--card);
-      font-size: 12px; font-weight: 500; color: var(--text-sec);
-      text-decoration: none; transition: all 0.15s;
-    }
-    .social-link:hover { border-color: var(--green); color: var(--green-dark); background: var(--green-bg); }
-
-    /* spinner overlay for modal loading */
-    .modal-loading {
-      display: flex; align-items: center; justify-content: center;
-      padding: 48px 20px;
-    }
-    .spinner-lg {
-      width: 32px; height: 32px;
-      border: 3px solid var(--border);
-      border-top-color: var(--green);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
-    /* ── RESPONSIVE ── */
-    @media (max-width: 600px) {
-      .stats-bar { grid-template-columns: repeat(2, 1fr); }
-      .metrics-grid { grid-template-columns: 1fr 1fr; }
-      .agent-table thead th.hide-sm,
-      .agent-table tbody td.hide-sm { display: none; }
-    }
-  </style>
+/* Responsive */
+@media(min-width:768px){
+  .agent-list{max-width:700px;margin:0 auto}
+  .feed-tabs{max-width:700px;margin:0 auto}
+  .cat-pills{max-width:700px;margin:0 auto}
+  .stats-row{max-width:700px;margin:0 auto}
+  .col-headers{max-width:700px;margin:0 auto}
+  .pagination{max-width:700px;margin:0 auto}
+  .bottom-filters{max-width:700px;margin:0 auto}
+}
+</style>
 </head>
 <body>
 
-  <!-- TOP NAV -->
-  <nav class="topnav">
-    <div class="logo">Virtuals<span>IQ</span></div>
-    <div class="topnav-right">
-      <div class="status-dot" id="status-dot"></div>
-      <span class="status-text" id="status-text">Loading…</span>
-    </div>
-  </nav>
+<!-- ===== HEADER ===== -->
+<header class="header">
+  <div class="logo">
+    <div class="logo-mark">VIQ</div>
+    <span class="logo-text">VirtualsIQ</span>
+  </div>
+  <div class="header-search">
+    <i class="fas fa-search"></i>
+    <input type="text" placeholder="Search agents or tickersâ¦" id="search-input" autocomplete="off"/>
+  </div>
+  <div class="header-live"><div class="dot"></div>LIVE</div>
+</header>
 
-  <div class="wrapper">
+<!-- ===== ENRICHMENT BANNER ===== -->
+<div class="enrich-banner" id="enrich-banner">
+  <div class="enrich-dot"></div>
+  <span id="enrich-msg">Loading agentsâ¦</span>
+</div>
 
-    <!-- STATS BAR -->
-    <div class="stats-bar">
-      <div class="stat-card">
-        <div class="val" id="stat-agents">—</div>
-        <div class="lbl">Total Agents</div>
+<!-- ===== FEED TABS ===== -->
+<div class="feed-tabs" id="feed-tabs">
+  <button class="feed-tab active" data-feed="all">Trending</button>
+  <button class="feed-tab" data-feed="new">New</button>
+  <button class="feed-tab" data-feed="top-scored"><span class="dot"></span>Top VIQ</button>
+  <button class="feed-tab" data-feed="smart-money"><span class="dot"></span>Smart Money</button>
+  <button class="feed-tab" data-feed="first-movers">First Movers</button>
+</div>
+
+<!-- ===== CATEGORY PILLS ===== -->
+<div class="cat-pills" id="cat-pills">
+  <button class="cat-pill active" data-cat="">All</button>
+  <button class="cat-pill" data-cat="DeFi">DeFi</button>
+  <button class="cat-pill" data-cat="Gaming">Gaming</button>
+  <button class="cat-pill" data-cat="Social">Social</button>
+  <button class="cat-pill" data-cat="Trading">Trading</button>
+  <button class="cat-pill" data-cat="Infra">Infra</button>
+  <button class="cat-pill" data-cat="Info">Info</button>
+</div>
+
+<!-- ===== STATS ROW ===== -->
+<div class="stats-row">
+  <span>24H VOL<span class="stat-val" id="stat-vol">â</span></span>
+  <span>AGENTS<span class="stat-val" id="stat-total">â</span></span>
+  <span>AVG VIQ<span class="stat-val" id="stat-avg-score">â</span></span>
+  <span>SENTIENT<span class="stat-val" id="stat-sentient">â</span></span>
+</div>
+
+<!-- ===== COLUMN HEADERS ===== -->
+<div class="col-headers">
+  <div class="col-rank">#</div>
+  <div style="width:40px"></div>
+  <div class="col-agent">AGENT</div>
+  <div class="col-price">PRICE / MCAP</div>
+  <div class="col-change">24H %</div>
+  <div class="col-viq">VIQ</div>
+</div>
+
+<!-- ===== AGENT LIST ===== -->
+<div class="agent-list" id="agent-list">
+  <div class="spinner"></div>
+</div>
+
+<!-- ===== PAGINATION ===== -->
+<div class="pagination" id="pagination"></div>
+
+<!-- ===== BOTTOM FILTERS ===== -->
+<div class="bottom-filters">
+  <button class="bfilter active">24H</button>
+  <button class="bfilter">Base Chain</button>
+  <button class="bfilter"><i class="fas fa-sort"></i> Sort</button>
+  <select class="bfilter" id="filter-status" style="appearance:none;-webkit-appearance:none;outline:none">
+    <option value="">All Status</option>
+    <option value="Active">Active</option>
+    <option value="Inactive">Inactive</option>
+  </select>
+  <select class="bfilter" id="filter-doxx" style="appearance:none;-webkit-appearance:none;outline:none">
+    <option value="">All Doxx</option>
+    <option value="1">Tier 1</option>
+    <option value="2">Tier 2</option>
+    <option value="3">Tier 3</option>
+  </select>
+</div>
+
+<!-- ===== MODAL ===== -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal-sheet" id="modal-sheet">
+    <div class="modal-handle"></div>
+    <button class="modal-close" id="modal-close"><i class="fas fa-times"></i></button>
+    <div class="modal-header" id="modal-header">
+      <div class="modal-avatar" id="modal-avatar"></div>
+      <div class="modal-title-wrap">
+        <div class="modal-agent-name" id="modal-agent-name">Loadingâ¦</div>
+        <div class="modal-agent-meta" id="modal-agent-meta"></div>
       </div>
-      <div class="stat-card">
-        <div class="val" id="stat-mcap">—</div>
-        <div class="lbl">Total MCAP</div>
-      </div>
-      <div class="stat-card">
-        <div class="val" id="stat-vol">—</div>
-        <div class="lbl">24h Volume</div>
-      </div>
-      <div class="stat-card">
-        <div class="val green" id="stat-trending">—</div>
-        <div class="lbl">Trending</div>
-      </div>
-    </div>
-
-    <!-- LOADING BANNER -->
-    <div id="loading-banner">
-      <div class="spinner-sm"></div>
-      <span id="loading-text">Loading agents…</span>
-    </div>
-
-    <!-- FILTER TABS -->
-    <div class="filter-tabs">
-      <button class="tab-btn active" data-feed="hot">🔥 Trending</button>
-      <button class="tab-btn" data-feed="new">✨ New</button>
-      <button class="tab-btn" data-feed="top-scored">🏆 Top VIQ</button>
-      <button class="tab-btn" data-feed="smart-money">💎 Smart Money</button>
-    </div>
-
-    <!-- CATEGORY PILLS -->
-    <div class="cat-pills">
-      <button class="cat-pill active" data-cat="">All</button>
-      <button class="cat-pill" data-cat="defi">DeFi</button>
-      <button class="cat-pill" data-cat="gaming">Gaming</button>
-      <button class="cat-pill" data-cat="social">Social</button>
-      <button class="cat-pill" data-cat="ai">AI</button>
-      <button class="cat-pill" data-cat="infrastructure">Infrastructure</button>
-    </div>
-
-    <!-- SEARCH -->
-    <div class="search-wrap">
-      <div class="search-inner">
-        <span class="search-icon">🔍</span>
-        <input type="search" id="search-input" placeholder="Search agents by name or ticker…" autocomplete="off" />
+      <div class="modal-score-ring" id="modal-score-ring">
+        <svg viewBox="0 0 72 72">
+          <circle class="track" cx="36" cy="36" r="30"/>
+          <circle class="arc" id="modal-ring-arc" cx="36" cy="36" r="30"
+            stroke-dasharray="188.5" stroke-dashoffset="188.5"/>
+        </svg>
+        <div class="modal-score-value">
+          <div class="modal-score-num" id="modal-score-num">â</div>
+          <div class="modal-score-label">VIQ</div>
+        </div>
       </div>
     </div>
-
-    <!-- AGENT TABLE -->
-    <div class="agent-section">
-      <table class="agent-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th></th>
-            <th>Agent</th>
-            <th class="r hide-sm">VOL 24h</th>
-            <th class="r">MCAP</th>
-            <th class="r">Price %</th>
-            <th class="r">VIQ Score</th>
-          </tr>
-        </thead>
-        <tbody id="agent-tbody">
-          <tr><td colspan="7"><div class="empty-state"><div class="icon">⏳</div>Fetching agents…</div></td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- LOAD MORE -->
-    <div class="load-more-wrap">
-      <button id="load-more-btn" style="display:none">Load More</button>
-    </div>
-
-  </div><!-- /wrapper -->
-
-  <!-- BOTTOM NAV -->
-  <nav class="bottom-nav">
-    <div class="nav-item active" id="nav-home">
-      <svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg>
-      Home
-    </div>
-    <div class="nav-item" id="nav-trending">
-      <svg viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-      Trending
-    </div>
-    <div class="nav-item" id="nav-watchlist">
-      <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-      Watchlist
-    </div>
-    <div class="nav-item" id="nav-portfolio">
-      <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
-      Portfolio
-    </div>
-  </nav>
-
-  <!-- DETAIL MODAL -->
-  <div class="modal-backdrop" id="modal-backdrop">
-    <div class="modal" id="modal" role="dialog" aria-modal="true">
-      <div class="modal-handle"></div>
-      <div id="modal-content">
-        <div class="modal-loading"><div class="spinner-lg"></div></div>
-      </div>
+    <div class="modal-body" id="modal-body">
+      <div class="spinner"></div>
     </div>
   </div>
+</div>
+
+<!-- ===== BOTTOM NAV ===== -->
+<nav class="bottom-nav">
+  <button class="nav-item active" data-view="dashboard"><i class="fas fa-th-large"></i><span>Dashboard</span></button>
+  <button class="nav-item" data-view="search"><i class="fas fa-search"></i><span>Search</span></button>
+  <button class="nav-item" data-view="watchlist"><i class="fas fa-star"></i><span>Watchlist</span></button>
+  <button class="nav-item" data-view="alerts"><i class="fas fa-bell"></i><span>Alerts</span></button>
+  <button class="nav-item" data-view="settings"><i class="fas fa-cog"></i><span>Settings</span></button>
+</nav>
 
 {% raw %}
 <script>
-  // ── STATE ──────────────────────────────────────────────────────────────────
-  let currentFeed     = 'hot';
-  let currentCategory = '';
-  let currentSearch   = '';
-  let currentPage     = 1;
-  let totalPages      = 1;
-  let isLoading       = false;
-  let searchTimer     = null;
-  const PAGE_SIZE     = 25;
+/* =================================================================
+   VirtualsIQ â White/Green Leaderboard UI
+   All data loaded from API. No Jinja2 template variables needed.
+   ================================================================= */
 
-  // ── FORMAT HELPERS ─────────────────────────────────────────────────────────
-  function fmtMcap(v) {
-    if (v == null || isNaN(v)) return '—';
-    if (v >= 1e9) return `$${(v/1e9).toFixed(2)}B`;
-    if (v >= 1e6) return `$${(v/1e6).toFixed(2)}M`;
-    if (v >= 1e3) return `$${(v/1e3).toFixed(1)}K`;
-    return `$${v.toFixed(2)}`;
+// â State â
+let currentPage = 1;
+let currentCategory = '';
+let currentSort = 'market_cap';
+let currentSearch = '';
+let currentStatus = '';
+let currentFeed = 'all';
+let totalPages = 1;
+let enrichInterval = null;
+
+// â Formatters â
+function fmtMcap(v) {
+  if (!v && v !== 0) return 'â';
+  if (v >= 1e9) return '$' + (v / 1e9).toFixed(2) + 'B';
+  if (v >= 1e6) return '$' + (v / 1e6).toFixed(1) + 'M';
+  if (v >= 1e3) return '$' + (v / 1e3).toFixed(1) + 'K';
+  return '$' + Number(v).toFixed(2);
+}
+
+function fmtChange(v) {
+  if (v === null || v === undefined) return 'â';
+  const pct = Number(v);
+  const sign = pct >= 0 ? '+' : '';
+  return sign + pct.toFixed(2) + '%';
+}
+
+function fmtNumber(v) {
+  if (!v && v !== 0) return 'â';
+  return Number(v).toLocaleString();
+}
+
+function fmtVol(v) {
+  if (!v && v !== 0) return 'â';
+  if (v >= 1e9) return '$' + (v / 1e9).toFixed(1) + 'B';
+  if (v >= 1e6) return '$' + (v / 1e6).toFixed(1) + 'M';
+  if (v >= 1e3) return '$' + (v / 1e3).toFixed(0) + 'K';
+  return '$' + Number(v).toFixed(0);
+}
+
+function scoreColor(score) {
+  if (!score && score !== 0) return '#9AA0A6';
+  if (score >= 80) return '#00C853';
+  if (score >= 60) return '#64DD17';
+  if (score >= 40) return '#FFD600';
+  if (score >= 20) return '#FF9100';
+  return '#FF1744';
+}
+
+function changeClass(v) {
+  if (v === null || v === undefined) return '';
+  return Number(v) >= 0 ? 'up' : 'down';
+}
+
+function initials(name) {
+  if (!name) return '?';
+  return name.split(/[\s_-]+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+}
+
+// â Load Stats â
+async function loadStats() {
+  try {
+    const resp = await fetch('/api/stats');
+    const s = await resp.json();
+    document.getElementById('stat-total').textContent = fmtNumber(s.total_agents || 0);
+    document.getElementById('stat-avg-score').textContent = (s.average_score || 0).toFixed(0);
+    document.getElementById('stat-sentient').textContent = fmtNumber(s.sentient_count || 0);
+    document.getElementById('stat-vol').textContent = fmtVol(s.total_volume_24h || 0);
+  } catch (e) {
+    console.error('Stats error:', e);
   }
-  function fmtVol(v)    { return fmtMcap(v); }
-  function fmtChange(v) {
-    if (v == null || isNaN(v)) return '<span style="color:var(--text-mute)">—</span>';
-    const s = v.toFixed(2);
-    return v >= 0
-      ? `<span class="change-pos">+${s}%</span>`
-      : `<span class="change-neg">${s}%</span>`;
-  }
-  function fmtScore(v) {
-    if (v == null || isNaN(v)) return { cls: 'viq-low', txt: '—' };
-    const n = Number(v);
-    if (n >= 70) return { cls: 'viq-high',   txt: n.toFixed(0) };
-    if (n >= 40) return { cls: 'viq-medium', txt: n.toFixed(0) };
-    return          { cls: 'viq-low',    txt: n.toFixed(0) };
-  }
-  function scoreClass(v) {
-    if (v == null || isNaN(v)) return 'low';
-    if (v >= 70) return 'high';
-    if (v >= 40) return 'medium';
-    return 'low';
-  }
-  function initials(name) {
-    if (!name) return '?';
-    return name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
-  }
-  function avatarEl(agent, size) {
-    const cls  = size === 'lg' ? 'modal-avatar' : 'avatar';
-    const img  = agent.image_url || agent.image || '';
-    const init = initials(agent.name || agent.agent_name || '');
-    if (img) return `<div class="${cls}"><img src="${img}" alt="${init}" onerror="this.parentNode.innerHTML='${init}'"></div>`;
-    return `<div class="${cls}">${init}</div>`;
-  }
+}
 
-  // ── STATUS POLLING ─────────────────────────────────────────────────────────
-  async function checkStatus() {
-    try {
-      const r = await fetch('/api/status');
-      if (!r.ok) return;
-      const d = await r.json();
-      const phase = d.phase || d.state || 'ready';
-      const dot   = document.getElementById('status-dot');
-      const txt   = document.getElementById('status-text');
-      if (phase === 'complete' || phase === 'ready') {
-        dot.style.background = 'var(--green)';
-        txt.textContent = 'Live';
-      } else {
-        dot.style.background = 'var(--orange)';
-        txt.textContent = phase.replace('_', ' ');
-        setTimeout(checkStatus, 5000);
-      }
-    } catch (_) {}
-  }
+// â Load Agents â
+async function loadAgents() {
+  const list = document.getElementById('agent-list');
+  list.innerHTML = '<div class="spinner"></div>';
 
-  // ── STATS ──────────────────────────────────────────────────────────────────
-  async function loadStats() {
-    try {
-      const r = await fetch('/api/stats');
-      if (!r.ok) return;
-      const d = await r.json();
-      document.getElementById('stat-agents').textContent   = (d.total_agents   ?? d.total ?? '—').toLocaleString();
-      document.getElementById('stat-mcap').textContent     = fmtMcap(d.total_market_cap ?? d.total_mcap);
-      document.getElementById('stat-vol').textContent      = fmtVol(d.total_volume_24h  ?? d.volume_24h);
-      document.getElementById('stat-trending').textContent = (d.trending_count ?? d.sentient_count ?? '—').toLocaleString();
-    } catch (_) {}
-  }
+  const params = new URLSearchParams();
+  params.set('page', currentPage);
+  params.set('page_size', 25);
+  if (currentCategory) params.set('category', currentCategory);
+  if (currentSort) params.set('sort', currentSort);
+  if (currentSearch) params.set('search', currentSearch);
+  if (currentStatus) params.set('status', currentStatus);
 
-  // ── LOAD BANNER ────────────────────────────────────────────────────────────
-  function setBanner(visible, text) {
-    const el = document.getElementById('loading-banner');
-    const tx = document.getElementById('loading-text');
-    el.classList.toggle('visible', visible);
-    if (text) tx.textContent = text;
-  }
+  try {
+    const resp = await fetch(`/api/agents?${params}`);
+    const data = await resp.json();
+    const agents = data.agents || [];
+    totalPages = data.total_pages || 1;
 
-  // ── LOAD AGENTS ───────────────────────────────────────────────────────────
-  async function loadAgents(reset = true) {
-    if (isLoading) return;
-    isLoading = true;
-
-    if (reset) {
-      currentPage = 1;
-      document.getElementById('agent-tbody').innerHTML =
-        `<tr><td colspan="7"><div class="modal-loading"><div class="spinner-lg"></div></div></td></tr>`;
-      document.getElementById('load-more-btn').style.display = 'none';
-    }
-
-    setBanner(true, `Loading agents… page ${currentPage}`);
-
-    try {
-      let data, agents = [], total = 0;
-
-      // Trending feeds go through /api/trending/{feed}
-      if (currentFeed !== 'all' && !currentSearch && !currentCategory) {
-        const feed = currentFeed;
-        const r = await fetch(`/api/trending/${feed}?limit=${PAGE_SIZE}`);
-        if (r.ok) {
-          data   = await r.json();
-          agents = data.agents || data.results || data || [];
-          total  = agents.length;
-        }
-      }
-
-      // Fallback / search / category → /api/agents
-      if (!agents.length || currentSearch || currentCategory) {
-        const params = new URLSearchParams({
-          page:      currentPage,
-          page_size: PAGE_SIZE,
-        });
-        if (currentCategory) params.set('category', currentCategory);
-        if (currentSearch)   params.set('search',   currentSearch);
-
-        // Map tab to sort
-        const sortMap = { hot: 'market_cap', new: 'newest', 'top-scored': 'composite_score', 'smart-money': 'holders', 'first-movers': 'market_cap' };
-        const sort = sortMap[currentFeed] || 'market_cap';
-        params.set('sort', sort);
-
-        const r = await fetch(`/api/agents?${params}`);
-        if (!r.ok) throw new Error('API error');
-        data   = await r.json();
-        agents = data.agents || data.results || [];
-        total  = data.total  || agents.length;
-        totalPages = Math.ceil(total / PAGE_SIZE);
-      }
-
-      setBanner(false);
-      renderAgents(agents, reset);
-
-      const btn = document.getElementById('load-more-btn');
-      btn.style.display = (currentPage < totalPages) ? 'block' : 'none';
-    } catch (e) {
-      setBanner(false);
-      if (reset) {
-        document.getElementById('agent-tbody').innerHTML =
-          `<tr><td colspan="7"><div class="empty-state"><div class="icon">⚠️</div>Failed to load agents. Try again shortly.</div></td></tr>`;
-      }
-    } finally {
-      isLoading = false;
-    }
-  }
-
-  function renderAgents(agents, reset) {
-    const tbody = document.getElementById('agent-tbody');
-    if (reset) tbody.innerHTML = '';
-
-    if (!agents.length && reset) {
-      tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="icon">🔍</div>No agents found.</div></td></tr>`;
+    if (!agents.length) {
+      list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3)">No agents found</div>';
+      renderPagination();
       return;
     }
 
-    const offset = reset ? 0 : tbody.querySelectorAll('tr').length;
+    list.innerHTML = agents.map((a, i) => {
+      const rank = (currentPage - 1) * 25 + i + 1;
+      const score = a.composite_score || 0;
+      const change = a.price_change_24h;
+      const chClass = changeClass(change);
+      const imgUrl = a.image_url || a.image;
+      const avatarHTML = imgUrl
+        ? `<div class="agent-avatar"><img src="${imgUrl}" onerror="this.parentNode.textContent='${initials(a.name)}'" /></div>`
+        : `<div class="agent-avatar">${initials(a.name)}</div>`;
+      const descParts = [a.category, a.status].filter(Boolean);
+      const descLine = descParts.join(' Â· ');
+      return `<div class="agent-row" onclick="openModal('${a.virtuals_id || a.id}')">
+        <div class="agent-rank">${rank}</div>
+        ${avatarHTML}
+        <div class="agent-info">
+          <div class="agent-name-row">
+            <div class="agent-name">${a.name || 'â'}</div>
+            <div class="agent-ticker">${a.symbol || a.ticker || ''}</div>
+          </div>
+          <div class="agent-desc">${descLine}</div>
+          <div class="agent-sub-stats">
+            <span>VOL ${fmtVol(a.volume_24h)}</span>
+            <span>MCAP ${fmtMcap(a.market_cap)}</span>
+          </div>
+        </div>
+        <div class="agent-price-col">
+          <div class="agent-price">${fmtMcap(a.market_cap)}</div>
+        </div>
+        <div class="agent-change-col">
+          <div class="agent-change ${chClass}">${fmtChange(change)}</div>
+        </div>
+        <div class="agent-viq" style="color:${scoreColor(score)}">${Math.round(score)}</div>
+      </div>`;
+    }).join('');
 
-    agents.forEach((a, i) => {
-      const rank  = offset + i + 1;
-      const id    = a.virtuals_id || a.id || a._id || '';
-      const name  = a.name || a.agent_name || 'Unknown';
-      const ticker= a.ticker || a.symbol || '';
-      const mcap  = a.market_cap ?? a.mcap ?? null;
-      const vol   = a.volume_24h ?? a.vol24h ?? null;
-      const chg   = a.price_change_24h ?? a.change_24h ?? null;
-      const score = a.composite_score ?? a.viq_score ?? a.score ?? null;
-      const sc    = fmtScore(score);
+    renderPagination();
+  } catch (e) {
+    console.error('Load agents error:', e);
+    list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--red)">Failed to load agents</div>';
+  }
+}
 
-      const tr = document.createElement('tr');
-      tr.className = 'agent-row';
-      tr.dataset.id = id;
-      tr.innerHTML = `
-        <td class="rank-cell">${rank}</td>
-        <td class="avatar-cell">${avatarEl(a, 'sm')}</td>
-        <td class="name-cell">
-          <div class="agent-name">${name}</div>
-          <div class="agent-ticker">${ticker ? '$'+ticker : ''}</div>
-        </td>
-        <td class="r hide-sm">${fmtVol(vol)}</td>
-        <td class="r">${fmtMcap(mcap)}</td>
-        <td class="r">${fmtChange(chg)}</td>
-        <td class="r"><span class="viq-badge ${sc.cls}">${sc.txt}</span></td>
-      `;
-      tr.addEventListener('click', () => openModal(id, a));
-      tbody.appendChild(tr);
+// â Pagination â
+function renderPagination() {
+  const container = document.getElementById('pagination');
+  if (totalPages <= 1) { container.innerHTML = ''; return; }
+
+  let html = '';
+  html += `<button class="page-btn" onclick="gotoPage(${currentPage - 1})" ${currentPage <= 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>`;
+
+  const start = Math.max(1, currentPage - 2);
+  const end = Math.min(totalPages, currentPage + 2);
+  for (let p = start; p <= end; p++) {
+    html += `<button class="page-btn ${p === currentPage ? 'active' : ''}" onclick="gotoPage(${p})">${p}</button>`;
+  }
+
+  html += `<button class="page-btn" onclick="gotoPage(${currentPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>`;
+  container.innerHTML = html;
+}
+
+function gotoPage(p) {
+  if (p < 1 || p > totalPages) return;
+  currentPage = p;
+  loadAgents();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// â Modal â
+async function openModal(virtualsId) {
+  const overlay = document.getElementById('modal-overlay');
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  document.getElementById('modal-agent-name').textContent = 'Loadingâ¦';
+  document.getElementById('modal-agent-meta').textContent = '';
+  document.getElementById('modal-avatar').innerHTML = '';
+  document.getElementById('modal-score-num').textContent = 'â';
+  document.getElementById('modal-ring-arc').style.strokeDashoffset = '188.5';
+  document.getElementById('modal-body').innerHTML = '<div class="spinner"></div>';
+
+  try {
+    const resp = await fetch(`/api/agent/${virtualsId}`);
+    const agent = await resp.json();
+    renderModal(agent);
+  } catch (e) {
+    document.getElementById('modal-body').innerHTML =
+      '<div style="text-align:center;padding:30px;color:var(--red)">Failed to load agent details</div>';
+  }
+}
+
+function renderModal(a) {
+  const imgUrl = a.image_url || a.image;
+  const avatarEl = document.getElementById('modal-avatar');
+  if (imgUrl) {
+    avatarEl.innerHTML = `<img src="${imgUrl}" onerror="this.parentNode.textContent='${initials(a.name)}'" />`;
+  } else {
+    avatarEl.textContent = initials(a.name);
+  }
+
+  document.getElementById('modal-agent-name').textContent = a.name || 'â';
+  const metaParts = [a.symbol || a.ticker, a.category, a.status].filter(Boolean);
+  document.getElementById('modal-agent-meta').textContent = metaParts.join(' Â· ');
+
+  const score = a.composite_score || 0;
+  const scoreNum = document.getElementById('modal-score-num');
+  scoreNum.textContent = Math.round(score);
+  scoreNum.style.color = scoreColor(score);
+
+  const arc = document.getElementById('modal-ring-arc');
+  arc.style.stroke = scoreColor(score);
+  const circumference = 188.5;
+  const offset = circumference - (score / 100) * circumference;
+  setTimeout(() => { arc.style.strokeDashoffset = offset; }, 50);
+
+  let html = '';
+
+  html += `<div class="detail-section">
+    <div class="detail-section-title"><i class="fas fa-chart-bar"></i> Key Metrics</div>
+    <div class="detail-grid">
+      <div class="detail-item"><div class="detail-item-label">Market Cap</div><div class="detail-item-value">${fmtMcap(a.market_cap)}</div></div>
+      <div class="detail-item"><div class="detail-item-label">24h Change</div><div class="detail-item-value" style="color:${Number(a.price_change_24h) >= 0 ? 'var(--green)' : 'var(--red)'}">${fmtChange(a.price_change_24h)}</div></div>
+      <div class="detail-item"><div class="detail-item-label">Holders</div><div class="detail-item-value">${fmtNumber(a.holder_count || a.holders)}</div></div>
+      <div class="detail-item"><div class="detail-item-label">24h Volume</div><div class="detail-item-value">${fmtVol(a.volume_24h)}</div></div>
+    </div>
+  </div>`;
+
+  if (a.score_breakdown || a.scoring) {
+    const sb = a.score_breakdown || a.scoring || {};
+    html += `<div class="detail-section">
+      <div class="detail-section-title"><i class="fas fa-star"></i> VIQ Score Breakdown</div>`;
+    Object.entries(sb).forEach(([k, v]) => {
+      const val = typeof v === 'object' ? (v.score || v.value || 0) : (v || 0);
+      const pct = Math.min(100, Math.max(0, val));
+      const label = k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      html += `<div class="score-factor">
+        <div class="score-factor-name">${label}</div>
+        <div class="score-factor-bar"><div class="score-factor-fill" style="width:${pct}%;background:${scoreColor(pct)}"></div></div>
+        <div class="score-factor-val">${Math.round(pct)}</div>
+      </div>`;
     });
+    html += '</div>';
   }
 
-  // ── MODAL ──────────────────────────────────────────────────────────────────
-  async function openModal(id, preview) {
-    const backdrop = document.getElementById('modal-backdrop');
-    const content  = document.getElementById('modal-content');
-    backdrop.classList.add('open');
-    document.body.style.overflow = 'hidden';
-
-    // Show skeleton with preview data
-    if (preview) renderModal(preview, true);
-    else content.innerHTML = `<div class="modal-loading"><div class="spinner-lg"></div></div>`;
-
-    if (!id) return;
-    try {
-      const r = await fetch(`/api/agent/${id}`);
-      if (!r.ok) return;
-      const d = await r.json();
-      renderModal(d.agent || d, false);
-    } catch (_) {}
+  if (a.ai_summary || a.analysis_summary) {
+    html += `<div class="detail-section">
+      <div class="detail-section-title"><i class="fas fa-robot"></i> AI Analysis</div>
+      <div class="ai-summary">${a.ai_summary || a.analysis_summary}</div>
+    </div>`;
   }
 
-  function renderModal(a, isPreview) {
-    const content = document.getElementById('modal-content');
-    const name   = a.name || a.agent_name || 'Unknown';
-    const ticker = a.ticker || a.symbol || '';
-    const mcap   = a.market_cap ?? a.mcap ?? null;
-    const vol    = a.volume_24h ?? a.vol24h ?? null;
-    const price  = a.price ?? a.current_price ?? null;
-    const chg    = a.price_change_24h ?? a.change_24h ?? null;
-    const holders= a.holders ?? null;
-    const score  = a.composite_score ?? a.viq_score ?? a.score ?? null;
-    const bio    = a.description || a.bio || a.biography || '';
-    const scNum  = score != null ? Number(score) : null;
-    const scClass= scoreClass(scNum);
-    const scTxt  = scNum != null ? scNum.toFixed(0) : '—';
-
-    // Social links
-    const socials = [];
-    if (a.twitter || a.twitter_url)   socials.push({ label: '𝕏 Twitter',  href: a.twitter   || a.twitter_url });
-    if (a.telegram || a.telegram_url) socials.push({ label: '✈ Telegram', href: a.telegram  || a.telegram_url });
-    if (a.discord || a.discord_url)   socials.push({ label: '💬 Discord',  href: a.discord   || a.discord_url });
-    if (a.website || a.website_url)   socials.push({ label: '🌐 Website',  href: a.website   || a.website_url });
-    if (a.github || a.github_url)     socials.push({ label: '🐙 GitHub',   href: a.github    || a.github_url });
-
-    const socialsHtml = socials.length
-      ? socials.map(s => `<a class="social-link" href="${s.href}" target="_blank" rel="noopener">${s.label}</a>`).join('')
-      : '<span style="color:var(--text-mute);font-size:13px">No social links</span>';
-
-    const priceStr = price != null ? `$${Number(price).toFixed(6)}` : '—';
-    const holdersStr = holders != null ? Number(holders).toLocaleString() : '—';
-
-    content.innerHTML = `
-      <div class="modal-header">
-        ${avatarEl(a, 'lg')}
-        <div class="modal-title-wrap">
-          <div class="modal-name">${name}</div>
-          <div class="modal-ticker">${ticker ? '$'+ticker : '—'}</div>
-        </div>
-        <button class="modal-close" id="modal-close-btn" aria-label="Close">✕</button>
+  if (a.doxx_tier || a.tier) {
+    const tier = a.doxx_tier || a.tier;
+    const tierLabels = { 1: 'Tier 1 â Fully Doxxed', 2: 'Tier 2 â Partially Doxxed', 3: 'Tier 3 â Anonymous' };
+    html += `<div class="detail-section">
+      <div class="detail-section-title"><i class="fas fa-shield-alt"></i> Trust Tier</div>
+      <div class="detail-item" style="text-align:center">
+        <div class="detail-item-value" style="color:${tier === 1 ? 'var(--green)' : tier === 2 ? '#FFD600' : 'var(--red)'}">${tierLabels[tier] || 'Tier ' + tier}</div>
       </div>
-
-      <div class="viq-score-big ${scClass}">
-        <span>${scTxt}</span>
-        <span class="viq-label">VIQ Score${isPreview ? ' (preview)' : ''}</span>
-      </div>
-
-      <div class="metrics-grid">
-        <div class="metric-card">
-          <div class="m-val">${fmtMcap(mcap)}</div>
-          <div class="m-lbl">Market Cap</div>
-        </div>
-        <div class="metric-card">
-          <div class="m-val">${fmtVol(vol)}</div>
-          <div class="m-lbl">24h Volume</div>
-        </div>
-        <div class="metric-card">
-          <div class="m-val">${priceStr}</div>
-          <div class="m-lbl">Price</div>
-        </div>
-        <div class="metric-card">
-          <div class="m-val">${fmtChange(chg)}</div>
-          <div class="m-lbl">24h Change</div>
-        </div>
-        <div class="metric-card">
-          <div class="m-val">${holdersStr}</div>
-          <div class="m-lbl">Holders</div>
-        </div>
-        <div class="metric-card">
-          <div class="m-val">${a.status || a.stage || '—'}</div>
-          <div class="m-lbl">Status</div>
-        </div>
-      </div>
-
-      ${bio ? `<div class="modal-section-title">About</div><div class="modal-bio">${bio}</div>` : ''}
-
-      <div class="modal-section-title">Socials</div>
-      <div class="socials-row">${socialsHtml}</div>
-    `;
-
-    document.getElementById('modal-close-btn').addEventListener('click', closeModal);
+    </div>`;
   }
 
-  function closeModal() {
-    document.getElementById('modal-backdrop').classList.remove('open');
-    document.body.style.overflow = '';
+  if (a.token_address || a.dex_pair) {
+    const addr = a.token_address || a.dex_pair;
+    html += `<div class="detail-section">
+      <a class="dex-chart-link" href="https://dexscreener.com/base/${addr}" target="_blank" rel="noopener">
+        <i class="fas fa-chart-line"></i> View on DexScreener
+      </a>
+    </div>`;
   }
 
-  // ── EVENT WIRING ───────────────────────────────────────────────────────────
-  document.getElementById('modal-backdrop').addEventListener('click', e => {
-    if (e.target === document.getElementById('modal-backdrop')) closeModal();
+  if (a.virtuals_id || a.id) {
+    html += `<div class="detail-section">
+      <a class="dex-chart-link" href="https://app.virtuals.io/virtuals/${a.virtuals_id || a.id}" target="_blank" rel="noopener" style="border-color:var(--text3);color:var(--text2)">
+        <i class="fas fa-external-link-alt"></i> View on Virtuals.io
+      </a>
+    </div>`;
+  }
+
+  document.getElementById('modal-body').innerHTML = html;
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// â Enrichment Status â
+async function checkEnrichmentStatus() {
+  try {
+    const resp = await fetch('/api/status');
+    const data = await resp.json();
+    const banner = document.getElementById('enrich-banner');
+    const msg = document.getElementById('enrich-msg');
+
+    if (data.phase === 'idle' || data.phase === 'complete' || data.phase === 'done') {
+      banner.classList.remove('active');
+      if (enrichInterval) { clearInterval(enrichInterval); enrichInterval = null; }
+      loadStats();
+      loadAgents();
+    } else {
+      banner.classList.add('active');
+      const progress = data.progress || 0;
+      const total = data.total || 0;
+      const phase = data.phase || 'loading';
+      if (total > 0) {
+        msg.textContent = `${phase}â¦ ${progress}/${total} agents`;
+      } else {
+        msg.textContent = `${phase}â¦`;
+      }
+    }
+  } catch (e) {}
+}
+
+function startEnrichmentPolling() {
+  checkEnrichmentStatus();
+  enrichInterval = setInterval(checkEnrichmentStatus, 5000);
+}
+
+// â Toast â
+function showToast(message) {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = message;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+// â Event Listeners â
+function init() {
+  document.getElementById('feed-tabs').addEventListener('click', e => {
+    const tab = e.target.closest('.feed-tab');
+    if (!tab) return;
+    document.querySelectorAll('.feed-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentFeed = tab.dataset.feed;
+    currentPage = 1;
+    loadAgents();
   });
 
-  // Tab buttons
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      currentFeed = btn.dataset.feed;
-      loadAgents(true);
-    });
+  document.getElementById('cat-pills').addEventListener('click', e => {
+    const pill = e.target.closest('.cat-pill');
+    if (!pill) return;
+    document.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
+    pill.classList.add('active');
+    currentCategory = pill.dataset.cat;
+    currentPage = 1;
+    loadAgents();
   });
 
-  // Category pills
-  document.querySelectorAll('.cat-pill').forEach(pill => {
-    pill.addEventListener('click', () => {
-      document.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
-      pill.classList.add('active');
-      currentCategory = pill.dataset.cat;
-      loadAgents(true);
-    });
-  });
-
-  // Search with 400ms debounce
+  let searchTimeout;
   document.getElementById('search-input').addEventListener('input', e => {
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
       currentSearch = e.target.value.trim();
-      loadAgents(true);
+      currentPage = 1;
+      loadAgents();
     }, 400);
   });
 
-  // Load more
-  document.getElementById('load-more-btn').addEventListener('click', () => {
-    currentPage++;
-    loadAgents(false);
+  document.getElementById('filter-status').addEventListener('change', e => {
+    currentStatus = e.target.value;
+    currentPage = 1;
+    loadAgents();
   });
 
-  // Bottom nav (cosmetic — pages not implemented, just style toggle)
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.getElementById('modal-overlay').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeModal();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeModal();
+  });
+
   document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', () => {
       document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
       item.classList.add('active');
+      if (item.dataset.view === 'search') {
+        document.getElementById('search-input').focus();
+      }
     });
   });
 
-  // ── INIT ───────────────────────────────────────────────────────────────────
   loadStats();
-  checkStatus();
-  loadAgents(true);
+  loadAgents();
+  startEnrichmentPolling();
+}
+
+document.addEventListener('DOMContentLoaded', init);
 </script>
 {% endraw %}
 </body>
