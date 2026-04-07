@@ -87,7 +87,7 @@ input { font-family: inherit; }
 .stat-item strong { color: var(--text); font-weight: 600; }
 
 /* Agent Table */
-.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
 table.agents { width: 100%; border-collapse: collapse; min-width: 640px; }
 table.agents th { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim); padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; position: sticky; top: 56px; background: var(--bg); z-index: 10; cursor: pointer; user-select: none; }
 table.agents th:hover { color: var(--text-muted); }
@@ -259,10 +259,16 @@ td.rank-cell { font-size: 13px; color: var(--text-dim); width: 40px; text-align:
 .sort-option:hover, .sort-option.active { background: var(--accent-bg); color: var(--accent-dark); }
 
 /* Responsive */
+/* Mobile search toggle */
+.search-toggle { display: none; width: 36px; height: 36px; border-radius: 50%; background: var(--bg-2); align-items: center; justify-content: center; flex-shrink: 0; color: var(--text-muted); }
+.search-toggle svg { width: 16px; height: 16px; }
+
 @media (max-width: 768px) {
   .header-inner { gap: 8px; }
   .logo-text { display: none; }
-  .search-wrap { max-width: 100%; }
+  .search-wrap { max-width: 100%; display: none; }
+  .search-wrap.mobile-open { display: block; position: absolute; left: 8px; right: 8px; top: 10px; z-index: 10; max-width: none; }
+  .search-toggle { display: flex; }
   .header-updated { display: none; }
   .cat-bar { display: none; }
   .bottom-nav { display: block; }
@@ -291,6 +297,9 @@ td.rank-cell { font-size: 13px; color: var(--text-dim); width: 40px; text-align:
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
       <input type="text" id="searchInput" placeholder="Search agents..." autocomplete="off">
     </div>
+    <button class="search-toggle" id="searchToggle">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+    </button>
     <div class="header-right">
       <span class="header-updated" id="headerUpdated"></span>
     </div>
@@ -508,19 +517,31 @@ async function loadAgents() {
   S.error = null;
   render();
   try {
-    const params = new URLSearchParams();
-    params.set('page', String(S.page));
-    params.set('page_size', String(S.pageSize));
-    params.set('sort', S.sort);
-    if (S.category && S.category !== 'All' && S.category !== 'Watchlist') {
-      params.set('category', S.category);
+    if (S.category === 'Watchlist' && S.watchlist.length > 0) {
+      /* Fetch each watchlisted agent individually to ensure all show */
+      var fetches = S.watchlist.map(function(id) {
+        return apiFetch('/api/agent/' + encodeURIComponent(id)).catch(function() { return null; });
+      });
+      var results = await Promise.all(fetches);
+      S.agents = results.filter(function(a) { return a && !a._error; });
+      S.total = S.agents.length;
+      S.totalPages = 1;
+      S.page = 1;
+    } else {
+      const params = new URLSearchParams();
+      params.set('page', String(S.page));
+      params.set('page_size', String(S.pageSize));
+      params.set('sort', S.sort);
+      if (S.category && S.category !== 'All' && S.category !== 'Watchlist') {
+        params.set('category', S.category);
+      }
+      if (S.search) params.set('search', S.search);
+      const data = await apiFetch('/api/agents?' + params.toString());
+      S.agents = data.agents || [];
+      S.total = data.total || 0;
+      S.totalPages = data.total_pages || 1;
+      S.page = data.page || 1;
     }
-    if (S.search) params.set('search', S.search);
-    const data = await apiFetch('/api/agents?' + params.toString());
-    S.agents = data.agents || [];
-    S.total = data.total || 0;
-    S.totalPages = data.total_pages || 1;
-    S.page = data.page || 1;
     S.loading = false;
     updateTimestamp();
   } catch(e) {
@@ -707,6 +728,13 @@ function updateBottomNav() {
 
 /* ====== EVENT DELEGATION ====== */
 document.getElementById('logoBtn').addEventListener('click', function() { navigateTo('/'); });
+document.getElementById('searchToggle').addEventListener('click', function() {
+  var wrap = document.querySelector('.search-wrap');
+  wrap.classList.toggle('mobile-open');
+  if (wrap.classList.contains('mobile-open')) {
+    document.getElementById('searchInput').focus();
+  }
+});
 document.getElementById('bnHome').addEventListener('click', function() { S.category = 'All'; navigateTo('/'); });
 document.getElementById('bnWatch').addEventListener('click', function() {
   closeMobilePopups();
@@ -833,6 +861,8 @@ document.getElementById('app').addEventListener('click', function(e) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     return;
   }
+  /* Retry button */
+  if (e.target.closest('.retry-btn')) { loadAgents(); return; }
   /* Detail back */
   if (e.target.closest('.detail-back')) { history.back(); return; }
   /* Analyze button */
@@ -941,16 +971,31 @@ function renderHome() {
   /* Error state */
   if (S.error) {
     return h + '<div class="error-state"><h3>Failed to load agents</h3><p>' + esc(S.error) +
-      '</p><button class="btn btn-primary" onclick="location.reload()">Retry</button></div>';
+      '</p><button class="btn btn-primary retry-btn">Retry</button></div>';
   }
 
   /* Filter for watchlist */
   var agents = S.agents;
   if (S.category === 'Watchlist') {
     agents = agents.filter(function(a) { return S.watchlist.indexOf(a.virtuals_id) > -1; });
-    if (!agents.length) {
+    if (!agents.length && S.watchlist.length === 0) {
       return h + '<div class="error-state"><h3>No watchlisted agents</h3><p>Tap the star icon on any agent to add them to your watchlist.</p></div>';
     }
+    if (!agents.length && S.watchlist.length > 0) {
+      return h + '<div class="error-state"><h3>Loading watchlist...</h3><p>Your watchlisted agents are not on this page. Loading all pages may take a moment.</p></div>';
+    }
+  }
+
+  /* Updated timestamp above table */
+  var latestUpdate = null;
+  agents.forEach(function(a) {
+    if (a.updated_at) {
+      var d = new Date(a.updated_at);
+      if (!latestUpdate || d > latestUpdate) latestUpdate = d;
+    }
+  });
+  if (latestUpdate) {
+    h += '<div style="font-size:12px;color:var(--text-dim);padding:4px 0 8px;text-align:right">Updated ' + timeAgo(latestUpdate) + '</div>';
   }
 
   /* Sort arrow */
@@ -1124,6 +1169,21 @@ function renderDetail() {
   if (a.created_at) h += '<div class="dstat"><div class="dstat-label">Age</div><div class="dstat-val">' + timeAgo(a.created_at) + '</div></div>';
   if (a.updated_at) h += '<div class="dstat"><div class="dstat-label">Updated</div><div class="dstat-val">' + timeAgo(a.updated_at) + '</div></div>';
   h += '</div>';
+
+  /* On-chain signals section */
+  h += '<div class="overview-section" style="margin-bottom:20px"><h3>On-Chain Signals</h3>';
+  h += '<div class="detail-stats" style="margin-bottom:0">';
+  if (a.top_10_concentration) {
+    var concRisk = a.top_10_concentration > 80 ? 'High' : (a.top_10_concentration > 50 ? 'Medium' : 'Low');
+    var concColor = a.top_10_concentration > 80 ? 'var(--red)' : (a.top_10_concentration > 50 ? 'var(--amber)' : 'var(--green)');
+    h += '<div class="dstat"><div class="dstat-label">Whale Concentration</div><div class="dstat-val" style="color:' + concColor + '">' + Number(a.top_10_concentration).toFixed(1) + '%</div></div>';
+    h += '<div class="dstat"><div class="dstat-label">Concentration Risk</div><div class="dstat-val" style="font-size:14px;color:' + concColor + '">' + concRisk + '</div></div>';
+  }
+  if (a.buy_sell_ratio != null) h += '<div class="dstat"><div class="dstat-label">Buy/Sell Ratio</div><div class="dstat-val">' + Number(a.buy_sell_ratio).toFixed(2) + '</div></div>';
+  if (a.tx_count_24h) h += '<div class="dstat"><div class="dstat-label">Txns 24h</div><div class="dstat-val">' + fmt(a.tx_count_24h, 0) + '</div></div>';
+  h += '<div class="dstat"><div class="dstat-label">Smart Money Flow</div><div class="dstat-val" style="font-size:12px;color:var(--text-dim)">Coming Soon</div></div>';
+  h += '<div class="dstat"><div class="dstat-label">Team Wallet Activity</div><div class="dstat-val" style="font-size:12px;color:var(--text-dim)">Coming Soon</div></div>';
+  h += '</div></div>';
 
   /* DexScreener chart embed */
   if (a.contract_address) {
