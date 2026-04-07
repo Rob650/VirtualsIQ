@@ -515,6 +515,24 @@ async def get_category_summary(category: str) -> dict:
     }
 
 
+async def search_agents(query: str, limit: int = 10) -> list[dict]:
+    """Search agents by name or ticker, return top matches."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT virtuals_id, name, ticker, image_url, agent_type,
+                      market_cap, price_usd, price_change_24h, composite_score,
+                      tier_classification, holder_count
+               FROM agents
+               WHERE name LIKE ? OR ticker LIKE ?
+               ORDER BY market_cap DESC
+               LIMIT ?""",
+            (f"%{query}%", f"%{query}%", limit)
+        ) as cur:
+            rows = await cur.fetchall()
+    return [dict(r) for r in rows]
+
+
 async def get_agents_needing_reanalysis(limit: int = 10) -> list[dict]:
     """Find agents that need re-analysis: never analyzed, status change, big MC move."""
     async with aiosqlite.connect(DB_PATH) as db:
