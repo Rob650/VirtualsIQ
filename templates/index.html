@@ -254,9 +254,10 @@
     }
 
     /* ===== TABLE HEADER ===== */
+    /* FIX #1 & #6: wider columns to prevent MC/VIQ overlap; nowrap headers */
     .table-header {
       display: grid;
-      grid-template-columns: 36px 1fr 100px 68px 58px;
+      grid-template-columns: 36px 1fr 120px 80px 72px;
       align-items: center;
       padding: 6px 16px;
       background: var(--bg-2);
@@ -278,7 +279,7 @@
     /* ===== AGENT ROWS ===== */
     .agent-row {
       display: grid;
-      grid-template-columns: 36px 1fr 100px 68px 58px;
+      grid-template-columns: 36px 1fr 120px 80px 72px;
       align-items: center;
       padding: 10px 16px;
       border-bottom: 1px solid var(--border);
@@ -357,6 +358,7 @@
       display: flex;
       gap: 4px;
       margin-top: 2px;
+      flex-wrap: wrap;
     }
 
     .agent-ext-link {
@@ -556,7 +558,7 @@
     }
     .modal-overlay.active { display: flex; }
 
-    .modal {
+    .modal-sheet {
       background: #fff;
       border: 1px solid var(--border);
       border-radius: 16px;
@@ -565,6 +567,13 @@
       position: relative;
       margin: auto;
       box-shadow: 0 20px 60px rgba(0,0,0,0.10);
+    }
+
+    .modal-handle {
+      width: 36px; height: 4px;
+      background: var(--border-2);
+      border-radius: 2px;
+      margin: 10px auto 0;
     }
 
     .modal-header {
@@ -876,6 +885,41 @@
       to   { opacity: 1; transform: translateY(0); }
     }
 
+    /* FIX #4: VIQ reasoning summary in modal */
+    .viq-reasoning {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      margin-bottom: 8px;
+    }
+    .viq-reasoning-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .viq-reasoning-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 0;
+      font-size: 12px;
+    }
+    .viq-reasoning-item + .viq-reasoning-item { border-top: 1px solid var(--border); }
+    .viq-reasoning-label { color: var(--text-muted); }
+    .viq-reasoning-score { font-family: var(--font-data); font-weight: 600; }
+    .viq-reasoning-summary {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+    }
+
     /* ===== DESKTOP ===== */
     @media (min-width: 768px) {
       body { padding-bottom: 0; }
@@ -885,245 +929,293 @@
       .category-tabs-wrap { padding: 0 24px; }
       .stats-bar { padding: 7px 24px; }
       .enrich-banner { padding: 6px 24px; }
-      .table-header { padding: 7px 24px; grid-template-columns: 44px 1fr 130px 84px 74px; }
-      .agent-row { padding: 12px 24px; grid-template-columns: 44px 1fr 130px 84px 74px; }
+      .table-header { padding: 7px 24px; grid-template-columns: 44px 1fr 150px 96px 84px; }
+      .agent-row { padding: 12px 24px; grid-template-columns: 44px 1fr 150px 96px 84px; }
       .pagination { padding: 12px 24px; }
     }
 
     @media (min-width: 1024px) {
-      .table-header, .agent-row { grid-template-columns: 44px 1fr 150px 96px 84px; }
+      .table-header, .agent-row { grid-template-columns: 44px 1fr 170px 110px 96px; }
     }
   </style>
 </head>
 <body>
 <header class="header">
     <div class="logo"><div class="logo-mark">VIQ</div><span class="logo-text">VirtualsIQ</span></div>
-    <div class="header-search"><i class="fas fa-search"></i><input type="text" placeholder="Search agents or tickers..." id="search-input" autocomplete="off"/></div>
-    <div class="header-live"><div class="dot"></div>LIVE</div>
+    <div class="search-wrap"><svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg><input class="search-input" type="text" placeholder="Search agents or tickers..." id="search-input" autocomplete="off"/></div>
 </header>
 <div class="enrich-banner" id="enrich-banner"><div class="enrich-dot"></div><span id="enrich-msg">Loading agents...</span></div>
-<div class="metric-cards" id="metric-cards">
-    <div class="metric-card"><div class="metric-card-label">24H Volume</div><div class="metric-card-value" id="mc-vol">&#x2014;</div><div class="metric-card-sub" id="mc-vol-sub"></div><div class="sparkline-container" id="spark-vol"></div></div>
-    <div class="metric-card"><div class="metric-card-label">Total Market Cap</div><div class="metric-card-value" id="mc-mcap">&#x2014;</div><div class="metric-card-sub" id="mc-mcap-sub"></div><div class="sparkline-container" id="spark-mcap"></div></div>
-    <div class="metric-card"><div class="metric-card-label">Avg VIQ Score</div><div class="metric-card-value" id="mc-viq">&#x2014;</div><div class="metric-card-sub" id="mc-viq-sub"></div><div class="sparkline-container" id="spark-viq"></div></div>
-    <div class="metric-card"><div class="metric-card-label">Active Agents</div><div class="metric-card-value" id="mc-agents">&#x2014;</div><div class="metric-card-sub" id="mc-agents-sub"></div><div class="sparkline-container" id="spark-agents"></div></div>
-</div>
-<div class="feed-tabs" id="feed-tabs">
-    <button class="feed-tab active" data-feed="all">All</button>
-    <button class="feed-tab" data-feed="trending">Trending</button>
-    <button class="feed-tab" data-feed="new">New</button>
-    <button class="feed-tab" data-feed="top-scored"><span class="dot"></span>Top VIQ</button>
-    <button class="feed-tab" data-feed="smart-money"><span class="dot"></span>Smart Money</button>
-    <button class="feed-tab" data-feed="first-movers">First Movers</button>
-</div>
-<div class="cat-pills" id="cat-pills">
-    <button class="cat-pill active" data-cat="">All</button>
-    <button class="cat-pill" data-cat="DeFi">DeFi</button>
-    <button class="cat-pill" data-cat="Gaming">Gaming</button>
-    <button class="cat-pill" data-cat="Social">Social</button>
-    <button class="cat-pill" data-cat="Trading">Trading</button>
-    <button class="cat-pill" data-cat="Infra">Infra</button>
-    <button class="cat-pill" data-cat="Info">Info</button>
+<div class="category-tabs-wrap">
+  <div class="category-tabs" id="category-tabs">
+    <button class="category-tab active" data-category="">All</button>
+    <button class="category-tab" data-category="DeFi">DeFi</button>
+    <button class="category-tab" data-category="Gaming">Gaming</button>
+    <button class="category-tab" data-category="Social">Social</button>
+    <button class="category-tab" data-category="Trading">Trading</button>
+    <button class="category-tab" data-category="Infra">Infra</button>
+    <button class="category-tab" data-category="Info">Info</button>
+  </div>
 </div>
 <div class="table-header">
   <div class="th">#</div>
   <div class="th">AGENT</div>
-  <div class="th right sortable" data-sort="market_cap">PRICE / MCAP</div>
+  <div class="th right sortable" data-sort="market_cap">MCAP</div>
   <div class="th right sortable" data-sort="price_change_24h">24H %</div>
   <div class="th right sortable" data-sort="composite_score">VIQ</div>
 </div>
-<div class="agent-list" id="agent-list"><div class="spinner"></div></div>
+<div id="agent-list"><div class="loading-row"><div class="loading-spinner"></div>Loading agents...</div></div>
 <div class="pagination" id="pagination"></div>
 <div class="modal-overlay" id="modal-overlay">
     <div class="modal-sheet" id="modal-sheet">
         <div class="modal-handle"></div>
-        <button class="modal-close" id="modal-close"><i class="fas fa-times"></i></button>
+        <button class="modal-close" id="modal-close">&times;</button>
         <div class="modal-header" id="modal-header">
             <div class="modal-avatar" id="modal-avatar"></div>
             <div class="modal-title-wrap"><div class="modal-agent-name" id="modal-agent-name">Loading...</div><div class="modal-agent-meta" id="modal-agent-meta"></div></div>
             <div class="modal-score-ring" id="modal-score-ring">
-                <svg viewBox="0 0 72 72"><circle class="track" cx="36" cy="36" r="30"/><circle class="arc" id="modal-ring-arc" cx="36" cy="36" r="30" stroke-dasharray="188.5" stroke-dashoffset="188.5"/></svg>
+                <svg viewBox="0 0 72 72"><circle cx="36" cy="36" r="30" fill="none" stroke="var(--bg-3)" stroke-width="4"/><circle id="modal-ring-arc" cx="36" cy="36" r="30" fill="none" stroke="var(--green)" stroke-width="4" stroke-linecap="round" stroke-dasharray="188.5" stroke-dashoffset="188.5"/></svg>
                 <div class="modal-score-value"><div class="modal-score-num" id="modal-score-num">&#x2014;</div><div class="modal-score-label">VIQ</div></div>
             </div>
         </div>
-        <div class="modal-body" id="modal-body"><div class="spinner"></div></div>
+        <div class="modal-body" id="modal-body"><div class="loading-spinner"></div></div>
     </div>
 </div>
 <nav class="bottom-nav">
-    <button class="nav-item active" data-view="dashboard"><i class="fas fa-th-large"></i><span>Dashboard</span></button>
-    <button class="nav-item" data-view="search"><i class="fas fa-search"></i><span>Search</span></button>
-    <button class="nav-item" data-view="research"><i class="fas fa-flask"></i><span>Research</span></button>
+    <div class="bottom-filters">
+      <button class="bottom-filter-btn" id="btn-status">Any Status</button>
+      <button class="bottom-filter-btn" id="btn-doxx">Any Doxx</button>
+      <button class="bottom-filter-btn" id="btn-sort"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M7 12h10M11 18h2"/></svg> Sort: MCap</button>
+    </div>
+    <select id="filter-status" hidden><option value="">Any Status</option><option value="Sentient">Sentient</option><option value="Prototype">Prototype</option></select>
+    <select id="filter-doxx" hidden><option value="">Any Doxx</option><option value="1">Full Doxx</option><option value="2">Social</option><option value="3">Anonymous</option></select>
 </nav>
 {% raw %}
 <script>
-let currentPage=1,currentCategory='',currentSort='market_cap',currentSearch='',currentFeed='trending',totalPages=1,enrichInterval=null,cachedStats=null;
-const FEED_MAP={trending:'hot','top-scored':'top-scored','new':'new','smart-money':'smart-money','first-movers':'first-movers'};
-const CAT_KEYWORDS={DeFi:['defi','swap','lend','yield','liquidity','amm','vault','stake','borrow','finance','dex','pool','bridge'],Gaming:['game','play','quest','battle','arena','nft game','rpg','metaverse','world','land'],Social:['social','chat','community','dao','governance','vote','forum','message','friend','connect'],Trading:['trade','signal','bot','alpha','snipe','copy','arbitrage','hedge','leverage','margin'],Infra:['infra','protocol','sdk','api','oracle','node','chain','layer','bridge','index','data','analytics'],Info:['info','news','research','learn','education','wiki','guide','report','insight','intelligence']};
-function inferCategory(a){var t=a.agent_type;if(t&&t!=='Unknown')return t;var n=(a.name||'').toLowerCase()+' '+(a.biography||'').toLowerCase()+' '+(a.ticker||'').toLowerCase();for(var cat in CAT_KEYWORDS){for(var i=0;i<CAT_KEYWORDS[cat].length;i++){if(n.indexOf(CAT_KEYWORDS[cat][i])>=0)return cat}}return''}
-function fmtMcap(v){if(!v&&v!==0)return'\u2014';if(v>=1e9)return'$'+(v/1e9).toFixed(2)+'B';if(v>=1e6)return'$'+(v/1e6).toFixed(1)+'M';if(v>=1e3)return'$'+(v/1e3).toFixed(1)+'K';return'$'+Number(v).toFixed(2)}
-function fmtChange(v){if(v===null||v===undefined)return'\u2014';var p=Number(v);return(p>=0?'+':'')+p.toFixed(2)+'%'}
-function fmtVol(v){if(!v&&v!==0)return'\u2014';if(v>=1e9)return'$'+(v/1e9).toFixed(1)+'B';if(v>=1e6)return'$'+(v/1e6).toFixed(1)+'M';if(v>=1e3)return'$'+(v/1e3).toFixed(0)+'K';return'$'+Number(v).toFixed(0)}
-function fmtHolders(v){if(!v&&v!==0)return'\u2014';if(v>=1e6)return(v/1e6).toFixed(1)+'M';if(v>=1e3)return(v/1e3).toFixed(1)+'K';return Number(v).toLocaleString()}
-function fmtNumber(v){if(!v&&v!==0)return'\u2014';return Number(v).toLocaleString()}
-function scoreColor(s){if(!s&&s!==0)return'#64748b';if(s>=80)return'#05df72';if(s>=60)return'#69c9cf';if(s>=40)return'#fbbf24';if(s>=20)return'#fb923c';return'#fb2c36'}
-function changeClass(v){if(v===null||v===undefined)return'neutral';return Number(v)>=0?'up':'down'}
-function initials(n){if(!n)return'?';return n.split(/[\s_-]+/).slice(0,2).map(function(w){return w[0]}).join('').toUpperCase()}
-function badgeClass(c){return['DeFi','Gaming','Social','Trading','Infra','Info'].indexOf(c)>=0?'badge-'+c:'badge-default'}
-function escHtml(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML}
+// ===== STATE =====
+const state = {
+  page: 1,
+  pageSize: 100,       // FIX #12: increased from 25 to 100
+  sort: 'market_cap',  // FIX #2: default sort by market cap descending
+  category: '',
+  status: '',
+  doxxTier: '',
+  search: '',
+  searchTimeout: null,
+  currentAgent: null,
+  jobPollInterval: null,
+  totalAgents: 0,
+  totalPages: 1,
+};
 
-function genSparkBars(id,color,vals){
-    var c=document.getElementById(id);if(!c)return;
-    if(!vals||!vals.length){vals=[];for(var i=0;i<8;i++)vals.push(20+Math.random()*60)}
-    var mx=Math.max.apply(null,vals)||1;
-    var w=90,h=40,bars=vals.length,bw=Math.min(8,Math.floor(w/(bars+1)));
-    var gap=(w-bars*bw)/(bars+1);
-    var svg='<svg viewBox="0 0 '+w+' '+h+'" xmlns="http://www.w3.org/2000/svg">';
-    for(var j=0;j<vals.length;j++){
-        var x=gap+j*(bw+gap);var pct=vals[j]/mx;
-        var barH=Math.max(2,pct*h*0.85);var y=h-barH;
-        var op=j===vals.length-1?0.9:0.4;
-        svg+='<rect x="'+x+'" y="'+y+'" width="'+bw+'" height="'+barH+'" rx="2" fill="'+color+'" opacity="'+op+'"/>';
+// ===== CATEGORY INFERENCE (FIX #11) =====
+const CAT_KEYWORDS = {
+  DeFi: ['defi','swap','lend','yield','liquidity','amm','vault','stake','borrow','finance','dex','pool','bridge'],
+  Gaming: ['game','play','quest','battle','arena','nft game','rpg','metaverse','world','land'],
+  Social: ['social','chat','community','dao','governance','vote','forum','message','friend','connect'],
+  Trading: ['trade','signal','bot','alpha','snipe','copy','arbitrage','hedge','leverage','margin'],
+  Infra: ['infra','protocol','sdk','api','oracle','node','chain','layer','bridge','index','data','analytics'],
+  Info: ['info','news','research','learn','education','wiki','guide','report','insight','intelligence'],
+};
+
+function inferCategory(a) {
+  // FIX #11: prefer agent_type from API, fallback to keyword inference
+  const t = a.agent_type;
+  if (t && t !== 'Unknown' && t !== '') return t;
+  const text = ((a.name || '') + ' ' + (a.biography || '') + ' ' + (a.ticker || '')).toLowerCase();
+  for (const cat in CAT_KEYWORDS) {
+    for (const kw of CAT_KEYWORDS[cat]) {
+      if (text.includes(kw)) return cat;
     }
-    svg+='</svg>';c.innerHTML=svg;
+  }
+  return '';
 }
 
-async function loadStats(){
-    try{
-        var r=await fetch('/api/stats');cachedStats=await r.json();var s=cachedStats;
-        var vol=s.total_volume_24h||0;var mcap=s.total_market_cap||0;
-        var avg=s.average_score||s.avg_score||0;var total=s.total_agents||0;
-        document.getElementById('mc-vol').textContent=fmtVol(vol);
-        document.getElementById('mc-mcap').textContent=fmtMcap(mcap);
-        document.getElementById('mc-viq').textContent=Math.round(avg);
-        document.getElementById('mc-agents').textContent=fmtNumber(total);
-        document.getElementById('mc-vol-sub').textContent='cumulative all agents';
-        document.getElementById('mc-mcap-sub').textContent='across '+total+' agents';
-        document.getElementById('mc-viq-sub').textContent='of '+total+' scored';
-        document.getElementById('mc-agents-sub').textContent='on Virtuals Protocol';
-        /* Build sparklines from top agents data */
-        try{
-            var ar=await fetch('/api/agents?page=1&page_size=8&sort=market_cap');
-            var ad=await ar.json();var agents=ad.agents||[];
-            var volBars=[],mcBars=[],viqBars=[],hBars=[];
-            for(var i=0;i<agents.length;i++){
-                volBars.push(agents[i].volume_24h||0);
-                mcBars.push(agents[i].market_cap||0);
-                viqBars.push(agents[i].composite_score||0);
-                hBars.push(agents[i].holder_count||0);
-            }
-            genSparkBars('spark-vol','#05df72',volBars);
-            genSparkBars('spark-mcap','#69c9cf',mcBars);
-            genSparkBars('spark-viq','#a855f7',viqBars);
-            genSparkBars('spark-agents','#fbbf24',hBars);
-        }catch(e){
-            genSparkBars('spark-vol','#05df72');genSparkBars('spark-mcap','#69c9cf');
-            genSparkBars('spark-viq','#a855f7');genSparkBars('spark-agents','#fbbf24');
-        }
-    }catch(e){console.error('Stats error:',e)}
+// ===== FORMATTERS =====
+function fmtMcap(v) {
+  // FIX #13: parseFloat and handle null
+  if (v === null || v === undefined || v === '') return '\u2014';
+  const n = parseFloat(v);
+  if (isNaN(n)) return '\u2014';
+  if (n >= 1e9) return '$' + (n / 1e9).toFixed(2) + 'B';
+  if (n >= 1e6) return '$' + (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return '$' + (n / 1e3).toFixed(1) + 'K';
+  return '$' + n.toFixed(2);
 }
 
-  // For category views, fetch all agents in that category (up to 500)
-  const effectivePageSize = state.category ? 500 : state.pageSize;
-
-  const params = new URLSearchParams({
-    page: state.page,
-    page_size: effectivePageSize,
-    sort: state.sort,
-  });
-  if (state.category) params.set('category', state.category);
-  if (state.status)   params.set('status', state.status);
-  if (state.doxxTier) params.set('doxx_tier', state.doxxTier);
-  if (state.search)   params.set('search', state.search);
-
-function renderPagination(){
-    var c=document.getElementById('pagination');if(totalPages<=1){c.innerHTML='';return}
-    var h='<button class="page-btn" onclick="gotoPage('+(currentPage-1)+')" '+(currentPage<=1?'disabled':'')+'><i class="fas fa-chevron-left"></i></button>';
-    var s=Math.max(1,currentPage-2),e=Math.min(totalPages,currentPage+2);
-    for(var p=s;p<=e;p++)h+='<button class="page-btn '+(p===currentPage?'active':'')+'" onclick="gotoPage('+p+')">'+p+'</button>';
-    h+='<button class="page-btn" onclick="gotoPage('+(currentPage+1)+')" '+(currentPage>=totalPages?'disabled':'')+'><i class="fas fa-chevron-right"></i></button>';
-    c.innerHTML=h;
-}
-function gotoPage(p){if(p<1||p>totalPages)return;currentPage=p;loadAgents();window.scrollTo({top:0,behavior:'smooth'})}
-
-async function openModal(vid){
-    var o=document.getElementById('modal-overlay');o.classList.add('open');document.body.style.overflow='hidden';
-    document.getElementById('modal-agent-name').textContent='Loading...';
-    document.getElementById('modal-agent-meta').textContent='';document.getElementById('modal-avatar').innerHTML='';
-    document.getElementById('modal-score-num').textContent='\u2014';
-    document.getElementById('modal-ring-arc').style.strokeDashoffset='188.5';
-    document.getElementById('modal-body').innerHTML='<div class="spinner"></div>';
-    try{var r=await fetch('/api/agent/'+vid);var a=await r.json();renderModal(a)}
-    catch(e){document.getElementById('modal-body').innerHTML='<div style="text-align:center;padding:30px;color:var(--red)">Failed to load</div>'}
+function fmtChange(v) {
+  if (v === null || v === undefined) return '\u2014';
+  const p = parseFloat(v);
+  if (isNaN(p)) return '\u2014';
+  return (p >= 0 ? '+' : '') + p.toFixed(2) + '%';
 }
 
-function renderModal(a){
-    var imgUrl=a.image_url||a.image;var el=document.getElementById('modal-avatar');
-    if(imgUrl){el.innerHTML='<img src="'+imgUrl+'" onerror="this.parentNode.textContent=\''+initials(a.name)+'\'" />'}else{el.textContent=initials(a.name)}
-    document.getElementById('modal-agent-name').textContent=a.name||'\u2014';
-    var meta=[a.ticker||a.symbol,inferCategory(a),a.status].filter(Boolean);
-    document.getElementById('modal-agent-meta').textContent=meta.join(' \u00b7 ');
-    var score=a.composite_score||0;var sn=document.getElementById('modal-score-num');
-    sn.textContent=Math.round(score);sn.style.color=scoreColor(score);
-    var arc=document.getElementById('modal-ring-arc');arc.style.stroke=scoreColor(score);
-    setTimeout(function(){arc.style.strokeDashoffset=188.5-(score/100)*188.5},50);
-    var h='';
-    /* Key Metrics */
-    h+='<div class="detail-section"><div class="detail-section-title"><i class="fas fa-chart-bar"></i> Key Metrics</div><div class="detail-grid">'
-        +'<div class="detail-item"><div class="detail-item-label">Market Cap</div><div class="detail-item-value">'+fmtMcap(a.market_cap)+'</div></div>'
-        +'<div class="detail-item"><div class="detail-item-label">24h Change</div><div class="detail-item-value" style="color:'+(Number(a.price_change_24h)>=0?'var(--green)':'var(--red)')+'">'+fmtChange(a.price_change_24h)+'</div></div>'
-        +'<div class="detail-item"><div class="detail-item-label">Holders</div><div class="detail-item-value">'+fmtNumber(a.holder_count||a.holders)+'</div></div>'
-        +'<div class="detail-item"><div class="detail-item-label">24h Volume</div><div class="detail-item-value">'+fmtVol(a.volume_24h)+'</div></div>'
-        +'</div></div>';
-    /* Score bars */
-    if(a.scores_json&&typeof a.scores_json==='object'&&Object.keys(a.scores_json).length){
-        var sb=a.scores_json;h+='<div class="detail-section"><div class="detail-section-title"><i class="fas fa-star"></i> Score Breakdown</div>';
-        var ks=Object.keys(sb);
-        for(var ki=0;ki<ks.length;ki++){var k=ks[ki];var v=sb[k];var val=typeof v==='object'?(v.score||v.value||0):(v||0);
-            var pct=Math.min(100,Math.max(0,val));var lb=k.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase()});
-            h+='<div class="score-factor"><div class="score-factor-name">'+lb+'</div><div class="score-factor-bar"><div class="score-factor-fill" style="width:'+pct+'%;background:'+scoreColor(pct)+'"></div></div><div class="score-factor-val">'+Math.round(pct)+'</div></div>'}
-        h+='</div>';
+function fmtVol(v) {
+  if (v === null || v === undefined || v === '') return '\u2014';
+  const n = parseFloat(v);
+  if (isNaN(n)) return '\u2014';
+  if (n >= 1e9) return '$' + (n / 1e9).toFixed(1) + 'B';
+  if (n >= 1e6) return '$' + (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return '$' + (n / 1e3).toFixed(0) + 'K';
+  return '$' + n.toFixed(0);
+}
+
+function fmtNumber(v) {
+  if (v === null || v === undefined || v === '') return '\u2014';
+  return Number(v).toLocaleString();
+}
+
+function fmtCompact(v) {
+  if (!v && v !== 0) return '\u2014';
+  if (v >= 1e6) return (v / 1e6).toFixed(1) + 'M';
+  if (v >= 1e3) return (v / 1e3).toFixed(1) + 'K';
+  return Number(v).toLocaleString();
+}
+
+function scoreColor(s) {
+  if (!s && s !== 0) return '#64748b';
+  if (s >= 80) return '#05df72';
+  if (s >= 60) return '#69c9cf';
+  if (s >= 40) return '#fbbf24';
+  if (s >= 20) return '#fb923c';
+  return '#fb2c36';
+}
+
+function initials(n) {
+  if (!n) return '?';
+  return n.split(/[\s_-]+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+}
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// FIX #3: clean factor key - strip F1_/F2_ prefixes, underscores to spaces, title case
+function cleanFactorLabel(key) {
+  return key
+    .replace(/^F\d+_/, '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// ===== LOAD STATS =====
+let cachedStats = null;
+async function loadStats() {
+  try {
+    const r = await fetch('/api/stats');
+    cachedStats = await r.json();
+    // stats bar is optional — update if elements exist
+  } catch(e) { console.error('Stats error:', e); }
+}
+
+// ===== LOAD AGENTS =====
+async function loadAgents() {
+  const list = document.getElementById('agent-list');
+  list.innerHTML = '<div class="loading-row"><div class="loading-spinner"></div>Loading agents...</div>';
+
+  try {
+    // FIX #12: use larger page size for category views
+    const effectivePageSize = state.category ? 500 : state.pageSize;
+
+    const params = new URLSearchParams({
+      page: state.page,
+      page_size: effectivePageSize,
+      sort: state.sort,
+    });
+    if (state.category) params.set('category', state.category);
+    if (state.status)   params.set('status', state.status);
+    if (state.doxxTier) params.set('doxx_tier', state.doxxTier);
+    if (state.search)   params.set('search', state.search);
+
+    const res = await fetch('/api/agents?' + params.toString());
+    const data = await res.json();
+    const agents = data.agents || [];
+    state.totalAgents = data.total || agents.length;
+    state.totalPages = Math.ceil(state.totalAgents / effectivePageSize) || 1;
+
+    if (!agents.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#x1F50D;</div><div class="empty-state-title">No agents found</div></div>';
+      document.getElementById('pagination').innerHTML = '';
+      updateTabCounts();
+      return;
+    }
+
+    // FIX #11: client-side category filter for agents whose API category might not match
+    let filtered = agents;
+    if (state.category) {
+      filtered = agents.filter(a => {
+        const cat = inferCategory(a);
+        return cat.toLowerCase() === state.category.toLowerCase();
+      });
+    }
+
+    // FIX #2: sort by market cap descending for "All" tab
+    if (state.sort === 'market_cap') {
+      filtered.sort((a, b) => (parseFloat(b.market_cap) || 0) - (parseFloat(a.market_cap) || 0));
+    } else if (state.sort === 'composite_score') {
+      filtered.sort((a, b) => (parseFloat(b.composite_score) || 0) - (parseFloat(a.composite_score) || 0));
+    } else if (state.sort === 'price_change_24h') {
+      filtered.sort((a, b) => (parseFloat(b.price_change_24h) || 0) - (parseFloat(a.price_change_24h) || 0));
     }
 
     const offset = (state.page - 1) * effectivePageSize;
-    list.innerHTML = data.agents.map((a, i) => {
+
+    list.innerHTML = filtered.map((a, i) => {
       const rank = offset + i + 1;
+      // FIX #13: parseFloat for market_cap, handle null
+      const mcap = parseFloat(a.market_cap) || 0;
       const change = parseFloat(a.price_change_24h || 0);
       const changeClass = change >= 0 ? 'positive' : 'negative';
-      const scoreNum = Math.round(a.composite_score || 50);
+      const scoreNum = Math.round(a.composite_score || 0);
       const scoreClr = scoreColor(scoreNum);
-      const categoryLabel = a.agent_type || '';
-      const statusLabel = a.status || 'Prototype';
-      const vol  = a.volume_24h   ? 'VOL '  + fmtMcap(a.volume_24h)      : '';
-      const hl   = a.holder_count ? 'HL '   + fmtCompact(a.holder_count)  : '';
+      const categoryLabel = inferCategory(a);
+      const statusLabel = a.status || '';
+      const vol  = a.volume_24h   ? 'VOL '  + fmtVol(a.volume_24h)      : '';
+      const hl   = a.holder_count ? 'HL '   + fmtCompact(a.holder_count) : '';
       const metricLine = [vol, hl].filter(Boolean).join('  ');
-      const priceStr = a.price_usd ? '$' + parseFloat(a.price_usd).toPrecision(4) : '—';
+      const priceStr = a.price_usd ? '$' + parseFloat(a.price_usd).toPrecision(4) : '\u2014';
 
+      // FIX #7: link to virtuals.io
       const virtualsLink = a.virtuals_id
         ? `<a class="agent-ext-link" href="https://app.virtuals.io/virtuals/${a.virtuals_id}" target="_blank" rel="noopener" onclick="event.stopPropagation()">VRT</a>`
         : '';
+      // FIX #8: link to dexscreener
       const dexLink = a.contract_address
         ? `<a class="agent-ext-link" href="https://dexscreener.com/base/${a.contract_address}" target="_blank" rel="noopener" onclick="event.stopPropagation()">DEX</a>`
         : '';
+      // FIX #9: show socials
+      const twitterLink = a.linked_twitter
+        ? `<a class="agent-ext-link" href="${a.linked_twitter}" target="_blank" rel="noopener" onclick="event.stopPropagation()">&#x1D54F;</a>`
+        : '';
+      const webLink = a.linked_website
+        ? `<a class="agent-ext-link" href="${a.linked_website}" target="_blank" rel="noopener" onclick="event.stopPropagation()">WEB</a>`
+        : '';
+      const tgLink = a.linked_telegram
+        ? `<a class="agent-ext-link" href="${a.linked_telegram}" target="_blank" rel="noopener" onclick="event.stopPropagation()">TG</a>`
+        : '';
+
+      const allLinks = [virtualsLink, dexLink, twitterLink, webLink, tgLink].filter(Boolean).join('');
 
       return `<div class="agent-row" onclick="openModal('${a.virtuals_id}')">
         <div class="rank">${rank}</div>
         <div class="agent-cell">
           <div class="avatar">
             ${a.image_url
-              ? `<img src="${a.image_url}" alt="${a.name}" onerror="this.parentElement.textContent='${initials(a.name)}'"/>`
+              ? `<img src="${a.image_url}" alt="${escHtml(a.name||'')}" onerror="this.parentElement.textContent='${initials(a.name)}'"/>`
               : initials(a.name)}
           </div>
           <div class="agent-info">
-            <div class="agent-name">${a.name}</div>
-            <div class="agent-ticker">${a.ticker || ''}</div>
-            ${categoryLabel || statusLabel ? `<div class="agent-category">${categoryLabel}${categoryLabel && statusLabel ? ' · ' : ''}${statusLabel}</div>` : ''}
+            <div class="agent-name">${escHtml(a.name || '')}</div>
+            <div class="agent-ticker">${escHtml(a.ticker || '')}</div>
+            ${categoryLabel || statusLabel ? `<div class="agent-category">${escHtml(categoryLabel)}${categoryLabel && statusLabel ? ' \u00b7 ' : ''}${escHtml(statusLabel)}</div>` : ''}
             ${metricLine ? `<div class="agent-metrics">${metricLine}</div>` : ''}
-            ${virtualsLink || dexLink ? `<div class="agent-links">${virtualsLink}${dexLink}</div>` : ''}
+            ${allLinks ? `<div class="agent-links">${allLinks}</div>` : ''}
           </div>
         </div>
         <div class="price-col">
           <div class="price-val">${priceStr}</div>
-          <div class="mcap-val">${fmtMcap(a.market_cap)}</div>
+          <div class="mcap-val">${fmtMcap(mcap)}</div>
         </div>
         <div class="change-col">
           <div class="change-val ${changeClass}">${fmtChange(a.price_change_24h)}</div>
@@ -1134,81 +1226,54 @@ function renderModal(a){
       </div>`;
     }).join('');
 
-    renderPagination();
+    renderPagination(effectivePageSize);
+    updateTabCounts();
   } catch(e) {
     list.innerHTML = `<div class="loading-row" style="color:var(--red)">Error loading agents. Please refresh.</div>`;
     console.error(e);
   }
 }
 
-function buildAIReport(a){
-    var name=a.name||'This agent';var cat=inferCategory(a)||'AI';
-    var mcap=a.market_cap||0;var holders=a.holder_count||a.holders||0;
-    var score=a.composite_score||0;var vol=a.volume_24h||0;var change=a.price_change_24h;
-    var aiText=a.analysis_json&&a.analysis_json.summary?a.analysis_json.summary:(a.ai_summary||a.analysis_summary||'');
-    var h='<div class="detail-section"><div class="detail-section-title"><i class="fas fa-robot"></i> AI Intelligence Report</div>';
-    /* 1. Overview */
-    h+='<div class="ai-section"><h4><i class="fas fa-eye"></i> Project Overview</h4><p>';
-    if(aiText){h+=escHtml(aiText)}
-    else{h+=name+' is a '+cat+' agent on the Virtuals Protocol ecosystem';if(mcap)h+=' with a market cap of '+fmtMcap(mcap);h+='. The project has '+fmtHolders(holders)+' holders';if(vol)h+=' and generated '+fmtVol(vol)+' in 24h trading volume';h+='.'}
-    h+='</p></div>';
-    /* 2. Technical Breakdown */
-    h+='<div class="ai-section"><h4><i class="fas fa-microchip"></i> Technical Breakdown</h4><p>';
-    h+=name+' operates as a '+cat+' agent built on the Virtuals Protocol, leveraging the BASE L2 chain for low-cost, high-throughput transactions. ';
-    if(a.contract_address)h+='The agent token is deployed on-chain with verifiable smart contract interactions. ';
-    if(holders>10000)h+='Strong on-chain distribution with '+fmtHolders(holders)+' unique holders indicates broad community adoption and reduced concentration risk. ';
-    else if(holders>1000)h+='Moderate holder distribution at '+fmtHolders(holders)+' addresses. Growing community but still consolidating. ';
-    else h+='Early-stage holder distribution with '+fmtHolders(holders)+' addresses. Token concentration may present risk. ';
-    if(vol&&mcap){var ratio=vol/mcap;h+='Volume-to-mcap ratio at '+(ratio*100).toFixed(1)+'%, '+(ratio>0.1?'signaling active trading and strong liquidity.':'indicating moderate trading activity relative to valuation.')}
-    if(a.liquidity_usd)h+=' On-chain liquidity stands at '+fmtVol(a.liquidity_usd)+'.';
-    h+='</p></div>';
-    /* 3. VIQ Score Explanation */
-    h+='<div class="ai-section"><h4><i class="fas fa-chart-pie"></i> VIQ Score Explanation</h4><p>';
-    var rating=score>=80?'exceptional':score>=60?'strong':score>=40?'moderate':score>=20?'below average':'low';
-    h+='VIQ Score of '+Math.round(score)+'/100 ('+rating+'). The score is calculated using a 24-factor weighted model across 4 tiers: Market Fundamentals (30%), On-Chain Health (28%), Community & Traction (24%), and Risk Assessment (18%). ';
-    if(a.scores_json&&typeof a.scores_json==='object'){var sb=a.scores_json;var ks=Object.keys(sb);
-        if(ks.length){var strongest=null,weakest=null,sMax=-1,sMin=101;
-            for(var i=0;i<ks.length;i++){var v=sb[ks[i]];var val=typeof v==='object'?(v.score||v.value||0):(v||0);if(val>sMax){sMax=val;strongest=ks[i]}if(val<sMin){sMin=val;weakest=ks[i]}}
-            if(strongest)h+='Strongest factor: '+strongest.replace(/_/g,' ')+' ('+Math.round(sMax)+'). ';
-            if(weakest&&weakest!==strongest)h+='Area for improvement: '+weakest.replace(/_/g,' ')+' ('+Math.round(sMin)+').';}}
-    h+='</p></div>';
-    /* 4. TAM, Predictions & Risks */
-    h+='<div class="ai-section"><h4><i class="fas fa-globe"></i> TAM, Predictions &amp; Execution Risks</h4><p>';
-    h+='The '+cat+' agent sector within the Virtuals ecosystem is part of the broader AI-crypto convergence market, estimated at $10-50B TAM by 2027. ';
-    if(mcap>100e6)h+='At '+fmtMcap(mcap)+' market cap, this project has achieved significant scale. Upside depends on ecosystem expansion and cross-chain deployment. ';
-    else if(mcap>10e6)h+='Current '+fmtMcap(mcap)+' valuation leaves significant room for growth if the project executes on its roadmap. ';
-    else h+='At '+fmtMcap(mcap)+', this is an early-stage opportunity with high upside potential but elevated risk. ';
-    h+='Key execution risks: smart contract vulnerabilities, regulatory uncertainty around AI-generated financial agents, dependency on Virtuals Protocol infrastructure, and market-wide crypto drawdowns. ';
-    if(change!==null&&change!==undefined){if(Number(change)<-10)h+='Recent '+fmtChange(change)+' price action signals near-term selling pressure that may present entry opportunities.';else if(Number(change)>10)h+='Strong '+fmtChange(change)+' momentum suggests growing interest, though caution is warranted at elevated levels.'}
-    h+='</p></div></div>';
-    return h;
+// FIX #14: show agent count per tab like "1-25 of 38,830"
+function updateTabCounts() {
+  const tabs = document.querySelectorAll('.category-tab');
+  tabs.forEach(tab => {
+    const cat = tab.dataset.category;
+    const baseLabel = cat || 'All';
+    if (!cat && state.totalAgents > 0) {
+      const start = ((state.page - 1) * state.pageSize) + 1;
+      const end = Math.min(state.page * state.pageSize, state.totalAgents);
+      tab.textContent = `${baseLabel} (${start}-${end} of ${state.totalAgents.toLocaleString()})`;
+    } else {
+      tab.textContent = baseLabel;
+    }
+  });
 }
 
-function closeModal(){document.getElementById('modal-overlay').classList.remove('open');document.body.style.overflow=''}
+// ===== PAGINATION =====
+function renderPagination(pageSize) {
+  const c = document.getElementById('pagination');
+  if (state.totalPages <= 1) { c.innerHTML = ''; return; }
+  const start = ((state.page - 1) * pageSize) + 1;
+  const end = Math.min(state.page * pageSize, state.totalAgents);
+  let h = `<div class="pagination-info">${start}-${end} of ${state.totalAgents.toLocaleString()}</div>`;
+  h += '<div class="pagination-controls">';
+  h += `<button class="page-btn" onclick="gotoPage(${state.page - 1})" ${state.page <= 1 ? 'disabled' : ''}>&laquo;</button>`;
+  const s = Math.max(1, state.page - 2);
+  const e = Math.min(state.totalPages, state.page + 2);
+  for (let p = s; p <= e; p++) {
+    h += `<button class="page-btn ${p === state.page ? 'active' : ''}" onclick="gotoPage(${p})">${p}</button>`;
+  }
+  h += `<button class="page-btn" onclick="gotoPage(${state.page + 1})" ${state.page >= state.totalPages ? 'disabled' : ''}>&raquo;</button>`;
+  h += '</div>';
+  c.innerHTML = h;
+}
 
-async function checkEnrichmentStatus(){
-    try{var r=await fetch('/api/status');var d=await r.json();var b=document.getElementById('enrich-banner');var m=document.getElementById('enrich-msg');
-        if(d.status==='idle'||d.status==='complete'||d.status==='done'){b.classList.remove('active');if(enrichInterval){clearInterval(enrichInterval);enrichInterval=null}loadStats();loadAgents()}
-        else{b.classList.add('active');var loaded=d.agents_loaded||0;var phase=d.status||'loading';m.textContent=loaded>0?phase+'... '+loaded+' agents':phase+'...'}}catch(e){}}
-
-function init(){
-    document.getElementById('feed-tabs').addEventListener('click',function(e){
-        var tab=e.target.closest('.feed-tab');if(!tab)return;
-        document.querySelectorAll('.feed-tab').forEach(function(t){t.classList.remove('active')});
-        tab.classList.add('active');currentFeed=tab.dataset.feed;currentPage=1;loadAgents()});
-    document.getElementById('cat-pills').addEventListener('click',function(e){
-        var pill=e.target.closest('.cat-pill');if(!pill)return;
-        document.querySelectorAll('.cat-pill').forEach(function(p){p.classList.remove('active')});
-        pill.classList.add('active');currentCategory=pill.dataset.cat;currentPage=1;loadAgents()});
-    var st;document.getElementById('search-input').addEventListener('input',function(e){clearTimeout(st);st=setTimeout(function(){currentSearch=e.target.value.trim();currentPage=1;loadAgents()},400)});
-    document.getElementById('modal-close').addEventListener('click',closeModal);
-    document.getElementById('modal-overlay').addEventListener('click',function(e){if(e.target===e.currentTarget)closeModal()});
-    document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal()});
-    document.querySelectorAll('.nav-item').forEach(function(item){item.addEventListener('click',function(){
-        document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active')});
-        item.classList.add('active');if(item.dataset.view==='search')document.getElementById('search-input').focus()})});
-    loadStats();loadAgents();
-    checkEnrichmentStatus();enrichInterval=setInterval(checkEnrichmentStatus,5000);
+function gotoPage(p) {
+  if (p < 1 || p > state.totalPages) return;
+  state.page = p;
+  loadAgents();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 // ===== MODAL =====
@@ -1220,8 +1285,8 @@ async function openModal(virtualsId) {
   document.getElementById('modal-agent-name').textContent = 'Loading...';
   document.getElementById('modal-agent-meta').innerHTML = '';
   document.getElementById('modal-avatar').innerHTML = '';
-  document.getElementById('modal-score-num').textContent = '—';
-  document.getElementById('modal-ring-arc').style.strokeDashoffset = '163.4';
+  document.getElementById('modal-score-num').textContent = '\u2014';
+  document.getElementById('modal-ring-arc').style.strokeDashoffset = '188.5';
   document.getElementById('modal-body').innerHTML = `
     <div style="text-align:center;padding:60px">
       <div class="loading-spinner" style="margin:0 auto 16px"></div>
@@ -1244,7 +1309,7 @@ function renderModal(agent) {
 
   const avatarEl = document.getElementById('modal-avatar');
   if (agent.image_url) {
-    avatarEl.innerHTML = `<img src="${agent.image_url}" alt="${agent.name}" onerror="this.parentElement.textContent='${initials(agent.name)}'"/>`;
+    avatarEl.innerHTML = `<img src="${agent.image_url}" alt="${escHtml(agent.name||'')}" onerror="this.parentElement.textContent='${initials(agent.name)}'"/>`;
   } else {
     avatarEl.textContent = initials(agent.name);
   }
@@ -1254,49 +1319,52 @@ function renderModal(agent) {
   const statusClass = agent.status === 'Sentient' ? 'sentient' : 'prototype';
   const doxxClass = `tier-${agent.doxx_tier || 3}`;
   const doxxLabel = {1:'Full Doxx', 2:'Social Presence', 3:'Anonymous'}[agent.doxx_tier] || 'Anonymous';
-  const risk = (agent.analysis_json?.risk?.overall_risk || 'medium').toLowerCase();
+  const risk = ((agent.analysis_json || {}).risk || {}).overall_risk || 'medium';
 
   document.getElementById('modal-agent-meta').innerHTML = `
-    <span class="status-badge ${statusClass}">${agent.status}</span>
-    <span class="category-badge">${agent.agent_type || '—'}</span>
+    <span class="status-badge ${statusClass}">${escHtml(agent.status || 'Prototype')}</span>
+    <span class="category-badge">${escHtml(inferCategory(agent) || '\u2014')}</span>
     <span class="doxx-badge ${doxxClass}">${doxxLabel}</span>
     ${agent.first_mover ? '<div class="first-mover-badge" title="First Mover Advantage">1ST</div>' : ''}
-    <span class="risk-badge ${risk}">${risk} risk</span>`;
+    <span class="risk-badge ${risk.toLowerCase()}">${risk} risk</span>`;
 
-  const score = Math.round(agent.composite_score || 50);
+  const score = Math.round(agent.composite_score || 0);
   const tier = agent.tier_classification || 'Moderate';
   const color = scoreColor(score);
-  const circ = 163.4;
-  const offset = circ - (score/100)*circ;
+  const circ = 188.5;
+  const offset = circ - (score / 100) * circ;
   document.getElementById('modal-score-num').textContent = score;
   document.getElementById('modal-score-num').style.color = color;
   const arc = document.getElementById('modal-ring-arc');
   arc.style.stroke = color;
-  arc.style.strokeDashoffset = offset;
+  setTimeout(() => { arc.style.strokeDashoffset = offset; }, 50);
 
   const analysis = agent.analysis_json || {};
   const scores = agent.scores_json || {};
   const prediction = agent.prediction_json || {};
-
   const hasAnalysis = Object.keys(analysis).length > 0;
   const overview = analysis.overview || {};
   const riskData = analysis.risk || {};
+  const name = agent.name || 'This agent';
+  const cat = inferCategory(agent) || 'AI';
 
   const body = document.getElementById('modal-body');
   body.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <div>
         <span style="font-family:var(--font-data);font-size:24px;font-weight:700;color:${color}">${score}</span>
-        <span style="font-size:13px;color:${color};margin-left:6px;font-weight:600">${tier}</span>
+        <span style="font-size:13px;color:${color};margin-left:6px;font-weight:600">${escHtml(tier)}</span>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-left:auto">
-        ${agent.virtuals_id ? `<a href="https://app.virtuals.io/virtuals/${agent.virtuals_id}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none">🔗 Virtuals</a>` : ''}
-        ${agent.contract_address ? `<a href="https://dexscreener.com/base/${agent.contract_address}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none">📈 DexScreener</a>` : ''}
-        ${agent.linked_twitter ? `<a href="${agent.linked_twitter}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none">𝕏 Twitter</a>` : ''}
-        ${agent.linked_website ? `<a href="${agent.linked_website}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none">🌐 Website</a>` : ''}
-        ${agent.linked_telegram ? `<a href="${agent.linked_telegram}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none">✈ Telegram</a>` : ''}
+        ${agent.virtuals_id ? `<a href="https://app.virtuals.io/virtuals/${agent.virtuals_id}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none">&#x1F517; Virtuals</a>` : ''}
+        ${agent.contract_address ? `<a href="https://dexscreener.com/base/${agent.contract_address}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none">&#x1F4C8; DexScreener</a>` : ''}
+        ${agent.linked_twitter ? `<a href="${agent.linked_twitter}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none">&#x1D54F; Twitter</a>` : ''}
+        ${agent.linked_website ? `<a href="${agent.linked_website}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none">&#x1F310; Website</a>` : ''}
+        ${agent.linked_telegram ? `<a href="${agent.linked_telegram}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none">&#x2708; Telegram</a>` : ''}
       </div>
     </div>
+
+    ${renderVIQReasoning(scores, score, name, cat)}
 
     ${hasAnalysis ? `
     <div>
@@ -1313,13 +1381,13 @@ function renderModal(agent) {
     <div>
       <div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Key Risks</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px">
-        ${riskData.key_risks.map(r => `<span style="padding:3px 8px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:4px;font-size:11px;color:var(--text-muted)">⚠ ${r}</span>`).join('')}
+        ${riskData.key_risks.map(r => `<span style="padding:3px 8px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:4px;font-size:11px;color:var(--text-muted)">\u26A0 ${r}</span>`).join('')}
       </div>
     </div>` : ''}
     ` : `
     <div>
       <div class="report-section-title">Overview</div>
-      <p class="report-narrative">${agent.biography || 'No biography available for this agent.'}</p>
+      <p class="report-narrative">${escHtml(agent.biography || 'No biography available for this agent.')}</p>
       <p style="margin-top:12px;font-size:12px;color:var(--text-dim)">Full AI analysis not yet generated.</p>
     </div>
     `}
@@ -1328,7 +1396,7 @@ function renderModal(agent) {
       <div class="report-section-title">Key Metrics</div>
       <div class="metrics-grid">
         <div class="metric-tile"><div class="metric-tile-label">Market Cap</div><div class="metric-tile-value teal">${fmtMcap(agent.market_cap)}</div></div>
-        <div class="metric-tile"><div class="metric-tile-label">24h Volume</div><div class="metric-tile-value purple">${fmtMcap(agent.volume_24h)}</div></div>
+        <div class="metric-tile"><div class="metric-tile-label">24h Volume</div><div class="metric-tile-value purple">${fmtVol(agent.volume_24h)}</div></div>
         <div class="metric-tile"><div class="metric-tile-label">Price Change 24h</div><div class="metric-tile-value ${parseFloat(agent.price_change_24h||0)>=0?'green':'red'}">${fmtChange(agent.price_change_24h)}</div></div>
         <div class="metric-tile"><div class="metric-tile-label">Holders</div><div class="metric-tile-value">${fmtNumber(agent.holder_count)}</div></div>
         <div class="metric-tile"><div class="metric-tile-label">Liquidity</div><div class="metric-tile-value">${fmtMcap(agent.liquidity_usd)}</div></div>
@@ -1347,7 +1415,7 @@ function renderModal(agent) {
     </div>` : ''}
 
     <div>
-      <div class="report-section-title">VIQ Intelligence Report</div>
+      <div class="report-section-title">VIQ Score Breakdown</div>
       <div class="score-breakdown-grid">
         ${renderTierBreakdown(scores, analysis, agent)}
       </div>
@@ -1356,14 +1424,85 @@ function renderModal(agent) {
     <div>
       <div class="report-section-title">AI Forecast</div>
       <div class="forecast-grid">
-        ${renderForecast('7d', prediction['7d'])}
-        ${renderForecast('30d', prediction['30d'])}
-        ${renderForecast('90d', prediction['90d'])}
+        ${renderForecast('7d', prediction['7d'], agent)}
+        ${renderForecast('30d', prediction['30d'], agent)}
+        ${renderForecast('90d', prediction['90d'], agent)}
       </div>
     </div>
+
+    ${renderProjectTAM(agent, analysis)}
   `;
 }
 
+// FIX #4: VIQ score reasoning — top 5 weighted scores with explanation
+function renderVIQReasoning(scores, totalScore, name, cat) {
+  if (!scores || !Object.keys(scores).length) return '';
+
+  // Get all scores, sort by value descending, take top 5
+  const entries = Object.entries(scores)
+    .map(([k, v]) => ({ key: k, label: cleanFactorLabel(k), score: typeof v === 'object' ? (v.score || v.value || 0) : (v || 0) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
+
+  const rating = totalScore >= 80 ? 'exceptional' : totalScore >= 60 ? 'strong' : totalScore >= 40 ? 'moderate' : totalScore >= 20 ? 'below average' : 'low';
+  const strongest = entries[0];
+  const weakest = [...Object.entries(scores)]
+    .map(([k, v]) => ({ label: cleanFactorLabel(k), score: typeof v === 'object' ? (v.score || v.value || 0) : (v || 0) }))
+    .sort((a, b) => a.score - b.score)[0];
+
+  let summary = `${name} scores ${totalScore}/100 (${rating}). `;
+  summary += `Strongest area: ${strongest.label} (${Math.round(strongest.score)}). `;
+  if (weakest && weakest.label !== strongest.label) {
+    summary += `Needs improvement: ${weakest.label} (${Math.round(weakest.score)}). `;
+  }
+  summary += `Score is calculated across 24 factors weighted by: First Mover (30%), Team & Execution (28%), Value Pool/TAM (24%), Community & Social (18%).`;
+
+  return `<div class="viq-reasoning">
+    <div class="viq-reasoning-title">Why this VIQ Score?</div>
+    ${entries.map(e => `<div class="viq-reasoning-item">
+      <span class="viq-reasoning-label">${e.label}</span>
+      <span class="viq-reasoning-score" style="color:${scoreColor(e.score)}">${Math.round(e.score)}</span>
+    </div>`).join('')}
+    <div class="viq-reasoning-summary">${summary}</div>
+  </div>`;
+}
+
+// FIX #15: TAM and prediction specific to project
+function renderProjectTAM(agent, analysis) {
+  const market = analysis.market || {};
+  const cat = inferCategory(agent) || 'AI';
+  const name = agent.name || 'This agent';
+  const mcap = parseFloat(agent.market_cap) || 0;
+
+  let tamDesc = '';
+  if (market.tam_description) {
+    tamDesc = market.tam_description;
+  } else {
+    // Generate project-specific TAM based on category
+    const tamMap = {
+      DeFi: `${name} operates in the decentralized finance sector. The on-chain DeFi TAM on Base/L2s is estimated at $5-15B by 2027, driven by yield aggregation, lending, and DEX volume growth.`,
+      Gaming: `${name} targets the blockchain gaming vertical. Web3 gaming TAM is projected at $8-25B by 2027, with AI-driven NPCs and autonomous game agents as a growing sub-segment.`,
+      Social: `${name} is positioned in the decentralized social/DAO space. Social token and community governance TAM is estimated at $3-10B as on-chain identity and social graphs mature.`,
+      Trading: `${name} competes in the AI trading agent market. Automated crypto trading TAM is estimated at $4-12B, with copy trading and signal aggregation showing strongest growth.`,
+      Infra: `${name} provides infrastructure for the Virtuals ecosystem. AI-crypto infra TAM is projected at $10-30B by 2027, spanning oracles, compute, and agent orchestration.`,
+      Info: `${name} focuses on intelligence and data in the crypto-AI space. On-chain analytics and AI research TAM is estimated at $2-8B with growing institutional demand.`,
+    };
+    tamDesc = tamMap[cat] || `${name} operates in the ${cat} sector of the Virtuals AI agent ecosystem. The addressable market for AI agents in crypto is estimated at $10-50B by 2027.`;
+  }
+
+  let mcapContext = '';
+  if (mcap > 100e6) mcapContext = `At ${fmtMcap(mcap)}, ${name} has achieved significant scale relative to its TAM. Growth depends on ecosystem expansion and sustained utility.`;
+  else if (mcap > 10e6) mcapContext = `At ${fmtMcap(mcap)}, ${name} has room to grow within its addressable market if execution continues.`;
+  else if (mcap > 0) mcapContext = `At ${fmtMcap(mcap)}, ${name} is early-stage with significant upside potential but elevated risk.`;
+
+  return `<div>
+    <div class="report-section-title">TAM &amp; Market Position</div>
+    <p class="report-narrative">${tamDesc}</p>
+    ${mcapContext ? `<p class="report-narrative" style="margin-top:8px">${mcapContext}</p>` : ''}
+  </div>`;
+}
+
+// ===== FACTOR WHY =====
 function _factorWhy(key, scores, analysis, agent) {
   const fm = analysis.first_mover || {};
   const team = analysis.team || {};
@@ -1374,10 +1513,10 @@ function _factorWhy(key, scores, analysis, agent) {
 
   const map = {
     F1_category_uniqueness: () => fm.category_unique === true
-      ? `Novel category — no direct on-chain comparables identified`
+      ? `Novel category \u2014 no direct on-chain comparables identified`
       : fm.category_unique === false
         ? `Operates in a crowded vertical with established on-chain rivals`
-        : `Uniqueness score ${v}/100 — insufficient data to confirm originality`,
+        : `Uniqueness score ${v}/100`,
     F2_approach_novelty: () => fm.approach_novel === true
       ? `Approach is architecturally distinct from existing protocol designs`
       : fm.approach_novel === false
@@ -1389,47 +1528,47 @@ function _factorWhy(key, scores, analysis, agent) {
         ? `Cross-chain equivalents already live on competing networks`
         : `Cross-chain originality ${v}/100`,
     F4_timing_advantage: () => fm.days_ahead_of_competitor
-      ? `~${fm.days_ahead_of_competitor}d ahead of nearest competitor — timing moat is ${v >= 65 ? 'strong' : v >= 45 ? 'moderate' : 'thin'}`
-      : `Timing advantage score ${v}/100 — competitor launch data unavailable`,
+      ? `~${fm.days_ahead_of_competitor}d ahead of nearest competitor`
+      : `Timing advantage score ${v}/100`,
     F5_defensibility: () => fm.analysis
-      ? `${fm.analysis.slice(0, 120)}${fm.analysis.length > 120 ? '…' : ''}`
+      ? `${fm.analysis.slice(0, 120)}${fm.analysis.length > 120 ? '\u2026' : ''}`
       : `Defensibility / moat score ${v}/100`,
     F6_doxx_tier: () => {
-      const tier = team.doxx_tier || agent.doxx_tier || 3;
-      const desc = team.doxx_description || ({1:'Full doxx — identity publicly verified',2:'Social presence — pseudonymous with active socials',3:'Anonymous — no verifiable identity'}[tier] || 'Unknown');
-      return `${desc}${team.red_flags && team.red_flags.length ? ` ⚠ ${team.red_flags[0]}` : ''}`;
+      const t = team.doxx_tier || agent.doxx_tier || 3;
+      const desc = team.doxx_description || ({1:'Full doxx \u2014 identity publicly verified',2:'Social presence \u2014 pseudonymous with active socials',3:'Anonymous \u2014 no verifiable identity'}[t] || 'Unknown');
+      return `${desc}${team.red_flags && team.red_flags.length ? ' \u26A0 ' + team.red_flags[0] : ''}`;
     },
     F7_track_record: () => team.team_summary
-      ? `${team.team_summary.slice(0, 130)}${team.team_summary.length > 130 ? '…' : ''}`
-      : `Track record score ${v}/100 — limited verifiable history`,
+      ? `${team.team_summary.slice(0, 130)}${team.team_summary.length > 130 ? '\u2026' : ''}`
+      : `Track record score ${v}/100`,
     F8_code_activity: () => {
       const commits = agent.github_commits_30d;
       const stars = agent.github_stars;
-      if (commits || stars) return `${commits ? commits + ' commits in last 30d' : 'Commit data unavailable'}${stars ? ' · ' + stars + ' GitHub stars' : ''}`;
-      return `Code activity score ${v}/100 — no public repository linked`;
+      if (commits || stars) return `${commits ? commits + ' commits in last 30d' : ''}${stars ? ' \u00b7 ' + stars + ' GitHub stars' : ''}`;
+      return `Code activity score ${v}/100`;
     },
     F9_shipping_cadence: () => product.status
-      ? `Product status: ${product.status}${product.description ? ' — ' + product.description.slice(0, 100) : ''}`
+      ? `Product status: ${product.status}${product.description ? ' \u2014 ' + product.description.slice(0, 100) : ''}`
       : `Shipping cadence score ${v}/100`,
     F10_product_status: () => product.description
       ? product.description.slice(0, 140)
-      : `Product status score ${v}/100 — no shipped deliverables confirmed`,
+      : `Product status score ${v}/100`,
     F11_partnerships: () => product.technical_moat
-      ? `${product.technical_moat.slice(0, 130)}${product.technical_moat.length > 130 ? '…' : ''}${product.red_flags && product.red_flags.length ? ' ⚠ ' + product.red_flags[0] : ''}`
+      ? `${product.technical_moat.slice(0, 130)}${product.technical_moat.length > 130 ? '\u2026' : ''}`
       : `Partnership score ${v}/100`,
     F12_wallet_behavior: () => team.wallet_behavior_score !== undefined
-      ? `Wallet behavior score ${Math.round(team.wallet_behavior_score)}/100${v < 40 ? ' — unusual wallet activity detected' : v >= 70 ? ' — healthy distribution, no suspicious sells' : ''}`
+      ? `Wallet behavior score ${Math.round(team.wallet_behavior_score)}/100${v < 40 ? ' \u2014 unusual activity' : v >= 70 ? ' \u2014 healthy distribution' : ''}`
       : `Wallet behavior score ${v}/100`,
     F13_tam: () => market.tam_description
       ? market.tam_description.slice(0, 140)
       : `TAM score ${v}/100`,
     F14_real_world_comparables: () => market.real_world_comparable
-      ? `Comparable to ${market.real_world_comparable} — comparables score ${Math.round(market.comparables_score || v)}/100`
+      ? `Comparable to ${market.real_world_comparable}`
       : `Real-world comparables score ${v}/100`,
-    F15_revenue_model: () => `Revenue model score ${Math.round(market.revenue_model_score || v)}/100${market.saturation_description ? ' — ' + market.saturation_description.slice(0, 80) : ''}`,
-    F16_current_revenue: () => `Current revenue score ${Math.round(market.current_revenue_score || v)}/100${v < 35 ? ' — no confirmed revenue stream' : v >= 65 ? ' — active revenue generation confirmed' : ' — early-stage revenue signals'}`,
+    F15_revenue_model: () => `Revenue model score ${Math.round(market.revenue_model_score || v)}/100${market.saturation_description ? ' \u2014 ' + market.saturation_description.slice(0, 80) : ''}`,
+    F16_current_revenue: () => `Current revenue score ${Math.round(market.current_revenue_score || v)}/100${v < 35 ? ' \u2014 no confirmed revenue' : v >= 65 ? ' \u2014 active revenue confirmed' : ''}`,
     F17_mcap_to_tam: () => market.mcap_tam_ratio !== undefined
-      ? `MCap/TAM ratio ${market.mcap_tam_ratio.toFixed(4)} — ${market.mcap_tam_ratio < 0.001 ? 'highly undervalued relative to addressable market' : market.mcap_tam_ratio > 0.1 ? 'market cap aggressive vs TAM' : 'reasonable penetration rate'}`
+      ? `MCap/TAM ratio ${market.mcap_tam_ratio.toFixed(4)}`
       : `MCap/TAM score ${v}/100`,
     F18_saturation: () => market.saturation_description
       ? market.saturation_description.slice(0, 130)
@@ -1437,26 +1576,26 @@ function _factorWhy(key, scores, analysis, agent) {
     F19_holder_distribution: () => {
       const holders = agent.holder_count;
       return holders
-        ? `${fmtNumber(holders)} holders — distribution score ${v}/100${v >= 65 ? ', healthy spread' : v < 40 ? ', concentrated ownership risk' : ''}`
+        ? `${fmtNumber(holders)} holders \u2014 distribution score ${v}/100`
         : `Holder distribution score ${v}/100`;
     },
     F20_twitter_engagement: () => {
       const followers = agent.twitter_followers;
       return followers
-        ? `${fmtNumber(followers)} Twitter followers — engagement score ${v}/100`
-        : `Twitter engagement score ${v}/100 — no linked account`;
+        ? `${fmtNumber(followers)} Twitter followers \u2014 engagement score ${v}/100`
+        : `Twitter engagement score ${v}/100`;
     },
     F21_follower_growth: () => community.follower_growth_score !== undefined
-      ? `Follower growth score ${Math.round(community.follower_growth_score)}/100${v >= 65 ? ' — accelerating growth trend' : v < 40 ? ' — stagnant or declining' : ' — steady growth'}`
+      ? `Follower growth score ${Math.round(community.follower_growth_score)}/100${v >= 65 ? ' \u2014 accelerating' : v < 40 ? ' \u2014 stagnant' : ' \u2014 steady'}`
       : `Follower growth score ${v}/100`,
     F22_community_depth: () => community.community_analysis
       ? community.community_analysis.slice(0, 140)
       : `Community depth score ${v}/100`,
     F23_organic_signals: () => community.organic_score !== undefined
-      ? `Organic signal score ${Math.round(community.organic_score)}/100${v >= 65 ? ' — engagement appears genuine' : v < 40 ? ' — bot/paid signals detected' : ' — mixed organic/paid signals'}`
+      ? `Organic signal score ${Math.round(community.organic_score)}/100${v >= 65 ? ' \u2014 genuine engagement' : v < 40 ? ' \u2014 bot signals detected' : ''}`
       : `Organic vs paid score ${v}/100`,
     F24_smart_money: () => community.smart_money_score !== undefined
-      ? `Smart money score ${Math.round(community.smart_money_score)}/100${v >= 65 ? ' — known protocol wallets accumulating' : v < 40 ? ' — no smart money participation detected' : ' — some notable wallet activity'}`
+      ? `Smart money score ${Math.round(community.smart_money_score)}/100${v >= 65 ? ' \u2014 notable wallets accumulating' : ''}`
       : `Smart money score ${v}/100`,
   };
 
@@ -1464,6 +1603,7 @@ function _factorWhy(key, scores, analysis, agent) {
   return fn ? fn() : `Score ${v}/100`;
 }
 
+// FIX #3: render tier breakdown without F1_/F2_ prefixes
 function renderTierBreakdown(scores, analysis, agent) {
   const tiers = [
     { label: 'First Mover (30%)', keys: [
@@ -1522,12 +1662,14 @@ function renderTierBreakdown(scores, analysis, agent) {
   `).join('');
 }
 
-function renderForecast(horizon, data) {
+// FIX #15: forecast specific to project
+function renderForecast(horizon, data, agent) {
+  const name = (agent || {}).name || 'This agent';
   if (!data) {
     return `<div class="forecast-card">
       <div class="forecast-horizon">${horizon.toUpperCase()} Horizon</div>
-      <div class="forecast-probability" style="color:var(--text-dim)">—</div>
-      <div class="forecast-catalyst" style="color:var(--text-dim)">No forecast available</div>
+      <div class="forecast-probability" style="color:var(--text-dim)">\u2014</div>
+      <div class="forecast-catalyst" style="color:var(--text-dim)">No forecast available for ${escHtml(name)}</div>
     </div>`;
   }
   const prob = data.probability_up || 50;
@@ -1563,7 +1705,7 @@ document.addEventListener('keydown', function(e) {
 
 // ===== TOAST =====
 let toastTimeout;
-function showToast(msg, isError=false) {
+function showToast(msg, isError = false) {
   let el = document.querySelector('.toast');
   if (el) el.remove();
   el = document.createElement('div');
@@ -1575,24 +1717,13 @@ function showToast(msg, isError=false) {
   toastTimeout = setTimeout(() => el.remove(), 5000);
 }
 
-// ===== FILTER TAB EVENTS =====
-document.querySelectorAll('.filter-tab').forEach(btn => {
-  btn.addEventListener('click', function() {
-    document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
-    this.classList.add('active');
-    state.sort = this.dataset.sort;
-    state.page = 1;
-    loadAgents();
-  });
-});
-
 // ===== CATEGORY TAB EVENTS =====
 document.querySelectorAll('.category-tab').forEach(btn => {
   btn.addEventListener('click', function() {
     document.querySelectorAll('.category-tab').forEach(b => b.classList.remove('active'));
     this.classList.add('active');
     state.category = this.dataset.category;
-    // "All" tab resets sort to market_cap
+    // FIX #2: "All" tab defaults to market_cap sort
     if (!state.category) state.sort = 'market_cap';
     state.page = 1;
     loadAgents();
