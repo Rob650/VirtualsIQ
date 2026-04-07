@@ -20,10 +20,9 @@ CLAUDE_MODEL = "claude-sonnet-4-20250514"
 # ---------------------------------------------------------------------------
 
 DEEP_ANALYSIS_PROMPT = """You are VirtualsIQ, an elite intelligence analyst for the Virtuals Protocol ecosystem.
+You have been given comprehensive data about an AI agent project. Produce a DEEP, PROJECT-SPECIFIC analysis.
 
-Analyze this AI agent and return a structured JSON intelligence report.
-
-AGENT DATA:
+=== PROJECT DATA ===
 Name: AGENT_NAME
 Ticker: AGENT_TICKER
 Category: AGENT_CATEGORY
@@ -32,33 +31,72 @@ Biography: AGENT_BIO
 Twitter: AGENT_TWITTER
 Website: AGENT_WEBSITE
 Telegram: AGENT_TELEGRAM
+
+=== MARKET DATA (from DexScreener) ===
+Current Price: $AGENT_PRICE
 Market Cap: $AGENT_MCAP
 24h Volume: $AGENT_VOL
 Price Change 24h: AGENT_CHANGE%
+Liquidity (USD): $AGENT_LIQUIDITY
+Buy/Sell Ratio: AGENT_BSR
 Holder Count: AGENT_HOLDERS
+
+=== DEVELOPMENT DATA ===
 GitHub Stars: AGENT_GITHUB_STARS
 GitHub Commits (30d): AGENT_GITHUB_COMMITS
+
+=== ADDITIONAL CONTEXT ===
+Virtuals Protocol Page: https://app.virtuals.io/virtuals/AGENT_VIRTUAL_ID
+AGENT_EXTRA_CONTEXT
+
+=== ANALYSIS INSTRUCTIONS ===
+You MUST produce an exhaustive, project-specific report. Do NOT give generic AI industry analysis.
+Research and reason deeply about THIS specific project based on ALL the data above.
+
+For each section, be SPECIFIC to this project:
+- Reference actual data points (holder count, volume, mcap, bio details)
+- If the team is anonymous, say so explicitly and score accordingly
+- If there's no website or GitHub, flag that as a risk
+- Compare to REAL competitors in the same niche on Virtuals Protocol
+- The TAM should be specific to their niche (e.g., "AI trading bots on Base L2"), NOT generic "AI market"
 
 Return ONLY valid JSON in this exact structure (no markdown, no code blocks):
 {
   "overview": {
-    "summary": "2-3 sentence executive summary of what this agent does",
-    "value_proposition": "core value proposition in one sentence",
+    "summary": "3-5 sentence comprehensive summary of what this project does, its core product/service, and current state. Be specific about what it actually builds or offers.",
+    "what_it_is": "Detailed explanation of the project's core product, service, or protocol. What problem does it solve? How does it work?",
+    "value_proposition": "Core value proposition — what makes someone want to use or invest in this specific agent",
+    "niche": "The specific sub-niche this operates in (e.g., 'AI-powered DeFi yield optimization on Base' not just 'DeFi')",
+    "competitive_advantages": "What makes this project unique vs direct competitors. Moat analysis — network effects, proprietary tech, data advantages, brand, partnerships",
     "stage": "concept|pre-product|testnet|beta|live"
+  },
+  "swot": {
+    "strengths": ["strength 1 specific to THIS project", "strength 2", "strength 3"],
+    "weaknesses": ["weakness 1 specific to THIS project", "weakness 2", "weakness 3"],
+    "opportunities": ["opportunity 1", "opportunity 2", "opportunity 3"],
+    "threats": ["threat 1", "threat 2", "threat 3"]
+  },
+  "technical": {
+    "architecture_summary": "What is known about the technical architecture, AI models used, blockchain integration, smart contracts",
+    "tech_stack_score": 50,
+    "ai_model_details": "What AI/ML models or frameworks does this agent use? Is it a wrapper or proprietary?",
+    "blockchain_integration": "How does it integrate with Virtuals Protocol and Base chain? Token utility?",
+    "open_source": true,
+    "audit_status": "audited|unaudited|unknown"
   },
   "team": {
     "doxx_tier": 1,
-    "doxx_description": "Full Doxx / Social Presence / Anonymous",
-    "team_summary": "what is known about the team",
+    "doxx_description": "Full Doxx / Social Presence / Anonymous — be specific about what is known",
+    "team_summary": "Detailed summary: who is behind this project, their backgrounds, prior projects, credibility. If anonymous, state that clearly.",
     "track_record_score": 50,
     "wallet_behavior_score": 50,
     "red_flags": []
   },
   "product": {
     "status": "live|beta|testnet|pre-product|vaporware",
-    "description": "what has actually been shipped",
+    "description": "What has actually been shipped and is usable today. Be brutally honest.",
     "partnership_score": 50,
-    "technical_moat": "description of technical advantages or lack thereof",
+    "technical_moat": "Description of technical advantages or lack thereof — specific to this project",
     "red_flags": []
   },
   "first_mover": {
@@ -67,56 +105,65 @@ Return ONLY valid JSON in this exact structure (no markdown, no code blocks):
     "cross_chain_original": true,
     "days_ahead_of_competitor": 90,
     "defensibility_score": 60,
-    "analysis": "first mover analysis narrative"
+    "analysis": "Detailed first mover analysis — who are the direct competitors on Virtuals and other platforms? How far ahead or behind is this project?"
   },
   "market": {
     "tam_score": 50,
-    "tam_description": "description of addressable market",
-    "real_world_comparable": "Bloomberg Terminal / Stripe / etc",
+    "tam_description": "SPECIFIC TAM for this project's niche. E.g., 'The on-chain AI trading bot market on EVM L2s is estimated at $X-YB' — NOT generic 'the AI industry is worth $500B'",
+    "tam_size_estimate": "$500M-2B",
+    "growth_trajectory": "Description of market growth specific to their vertical",
+    "real_world_comparable": "Bloomberg Terminal / Stripe / etc — what Web2 company is the closest analogy?",
     "comparables_score": 50,
+    "competitor_landscape": "Name specific competitors and compare. Who else does this on Virtuals? On Solana? On other chains?",
     "revenue_model_score": 50,
     "current_revenue_score": 50,
     "mcap_tam_ratio": 0.001,
     "saturation_score": 50,
-    "saturation_description": "how saturated is this vertical"
+    "saturation_description": "How saturated is this specific vertical? How many similar projects exist?"
   },
   "community": {
     "depth_score": 50,
     "organic_score": 50,
     "smart_money_score": 50,
     "follower_growth_score": 50,
-    "community_analysis": "narrative on community quality"
+    "community_analysis": "Detailed narrative on community quality — are holders organic? Is there real engagement or bot activity? Reference actual holder count and volume data."
   },
   "risk": {
     "overall_risk": "low|medium|high|extreme",
-    "key_risks": ["risk 1", "risk 2", "risk 3"],
-    "bull_case": "what needs to go right",
-    "bear_case": "what could go wrong"
+    "key_risks": ["risk 1 specific to this project", "risk 2", "risk 3"],
+    "bull_case": "Specific bull case: what needs to go right for this project to 5-10x. Reference actual catalysts.",
+    "bear_case": "Specific bear case: what could cause this to lose 80%+ of value. Be honest."
   },
   "prediction": {
     "7d": {
       "probability_up": 55,
       "range_low": -20,
       "range_high": 30,
-      "catalyst": "what could drive this"
+      "catalyst": "Specific short-term catalyst for THIS project"
     },
     "30d": {
       "probability_up": 55,
       "range_low": -40,
       "range_high": 80,
-      "catalyst": "30 day outlook"
+      "catalyst": "30 day outlook specific to this project"
     },
     "90d": {
       "probability_up": 55,
       "range_low": -60,
       "range_high": 200,
-      "catalyst": "3 month thesis"
+      "catalyst": "3 month thesis specific to this project"
     }
   },
-  "intelligence_notes": "additional insights, patterns, or observations not captured above"
+  "intelligence_notes": "Additional insights, patterns, alpha, or observations. What would a smart investor want to know that isn't captured above?"
 }
 
-Base your analysis on the data provided. For unknown fields, use neutral scores (50). Be honest about uncertainty."""
+CRITICAL RULES:
+1. Every score MUST reflect the actual data. If team is anonymous (no Twitter, no website), doxx_tier=3 and track_record_score should be LOW (10-25).
+2. If volume is under $10K, that's a red flag. If holder count is under 100, flag it.
+3. If there's no GitHub, open_source=false and code_activity should be noted as absent.
+4. Do NOT hallucinate partnerships or features not evident from the data.
+5. For unknown fields, use neutral scores (50) but note the uncertainty.
+6. TAM must be NICHE-SPECIFIC, not generic AI industry numbers."""
 
 
 BATCH_TRIAGE_PROMPT = """You are VirtualsIQ. Perform rapid triage analysis of these AI agents from Virtuals Protocol.
@@ -152,16 +199,38 @@ def _build_analysis_prompt(agent: dict) -> str:
     prompt = prompt.replace("AGENT_TICKER", str(agent.get("ticker", "N/A")))
     prompt = prompt.replace("AGENT_CATEGORY", str(agent.get("agent_type", "Unknown")))
     prompt = prompt.replace("AGENT_STATUS", str(agent.get("status", "Prototype")))
-    prompt = prompt.replace("AGENT_BIO", str(agent.get("biography", "No biography available"))[:500])
+    prompt = prompt.replace("AGENT_BIO", str(agent.get("biography", "No biography available"))[:1000])
     prompt = prompt.replace("AGENT_TWITTER", str(agent.get("linked_twitter", "None")))
     prompt = prompt.replace("AGENT_WEBSITE", str(agent.get("linked_website", "None")))
     prompt = prompt.replace("AGENT_TELEGRAM", str(agent.get("linked_telegram", "None")))
+    prompt = prompt.replace("AGENT_PRICE", f"{agent.get('price_usd', 0)}")
     prompt = prompt.replace("AGENT_MCAP", f"{agent.get('market_cap', 0):,.0f}")
     prompt = prompt.replace("AGENT_VOL", f"{agent.get('volume_24h', 0):,.0f}")
     prompt = prompt.replace("AGENT_CHANGE", f"{agent.get('price_change_24h', 0):+.1f}")
+    prompt = prompt.replace("AGENT_LIQUIDITY", f"{agent.get('liquidity_usd', 0):,.0f}")
+    prompt = prompt.replace("AGENT_BSR", f"{agent.get('buy_sell_ratio', 'N/A')}")
     prompt = prompt.replace("AGENT_HOLDERS", str(agent.get("holder_count", 0)))
     prompt = prompt.replace("AGENT_GITHUB_STARS", str(agent.get("github_stars", 0)))
     prompt = prompt.replace("AGENT_GITHUB_COMMITS", str(agent.get("github_commits_30d", 0)))
+    prompt = prompt.replace("AGENT_VIRTUAL_ID", str(agent.get("virtuals_id", "")))
+
+    # Build extra context from any additional data we have
+    extra = []
+    if agent.get("contract_address"):
+        extra.append(f"Contract Address: {agent['contract_address']}")
+        extra.append(f"DexScreener: https://dexscreener.com/base/{agent['contract_address']}")
+    if agent.get("twitter_followers"):
+        extra.append(f"Twitter Followers: {agent['twitter_followers']:,}")
+    if agent.get("twitter_engagement_rate"):
+        extra.append(f"Twitter Engagement Rate: {agent['twitter_engagement_rate']}%")
+    if agent.get("top_10_concentration"):
+        extra.append(f"Top 10 Holder Concentration: {agent['top_10_concentration']}%")
+    if agent.get("github_contributors"):
+        extra.append(f"GitHub Contributors: {agent['github_contributors']}")
+    if agent.get("github_last_commit"):
+        extra.append(f"Last GitHub Commit: {agent['github_last_commit']}")
+    prompt = prompt.replace("AGENT_EXTRA_CONTEXT", "\n".join(extra) if extra else "No additional context available.")
+
     return prompt
 
 
@@ -205,7 +274,7 @@ async def analyze_agent(agent_data: dict) -> dict:
 
         message = client.messages.create(
             model=CLAUDE_MODEL,
-            max_tokens=2048,
+            max_tokens=4096,
             messages=[{"role": "user", "content": prompt}]
         )
 
