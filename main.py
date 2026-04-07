@@ -184,15 +184,15 @@ async def _run_analysis_job(job_id: str, virtuals_id: str):
         jobs[job_id]["completed_at"] = datetime.utcnow().isoformat()
 
 
-async def _auto_analyze_all():
+async def _auto_analyze_all(force: bool = False):
     """
-    Startup background task: run AI analysis on ALL agents after preload.
+    Startup background task: run AI analysis on agents that need it.
     - Top 100 by market cap: full analyze_agent (Sonnet/Haiku per MC)
     - Remaining: batch_triage in batches of 20
-    This ensures VIQ scores are real, not all 50, after every deploy.
+    - Skips agents analyzed within 7 days unless force=True.
     """
     try:
-        logger.info("Auto-analysis starting for all agents...")
+        logger.info(f"Auto-analysis starting (force={force})...")
         enrichment_state["status"] = "analyzing"
 
         top_ids_list = await get_top_agent_ids(100)
@@ -201,12 +201,23 @@ async def _auto_analyze_all():
         # Semaphore: max 5 concurrent full analyses to avoid API overload
         sem = asyncio.Semaphore(5)
 
-        async def _analyze_one(virtuals_id: str):
+        async def _analyze_one(virtuals_id: str, force: bool = False):
             async with sem:
                 try:
                     agent = await get_agent_detail(virtuals_id)
                     if not agent:
                         return
+                    # Skip if analyzed within the last 7 days (unless forced)
+                    if not force:
+                        last = agent.get("last_analyzed")
+                        if last:
+                            try:
+                                age = (datetime.utcnow() - datetime.fromisoformat(last)).total_seconds()
+                                if age < 7 * 24 * 3600:
+                                    logger.info(f"Skipping {agent.get('name')} — analyzed {age/3600:.1f}h ago")
+                                    return
+                            except Exception:
+                                pass
                     result = await analyze_agent(agent, top_ids=top_ids_set)
                     scores = result["scores"]
                     analysis = result["analysis"]
@@ -239,7 +250,7 @@ async def _auto_analyze_all():
                     logger.error(f"Auto-analysis failed for {virtuals_id}: {e}")
 
         # Full analysis for top 100 (concurrent, throttled)
-        tasks = [_analyze_one(vid) for vid in top_ids_list]
+        tasks = [_analyze_one(vid, force=force) for vid in top_ids_list]
         await asyncio.gather(*tasks)
         logger.info(f"Full analysis complete for top {len(top_ids_list)} agents")
 
@@ -612,4 +623,21 @@ async def system_status():
     return {
         **enrichment_state,
         "total_agents_in_db": stats.get("total_agents", 0),
+    }
+
+
+@app.post("/api/admin/refresh-analysis")
+async def admin_refresh_analysis(force: bool = Query(False)):
+    """
+    Manually trigger a full AI re-analysis cycle.
+    - force=false (default): only re-analyze agents older than 7 days
+    - force=true: re-analyze ALL agents regardless of last_analyzed
+    """
+    if enrichment_state.get("status") == "analyzing":
+        return {"status": "already_running", "message": "Analysis already in progress"}
+    asyncio.create_task(_auto_analyze_all(force=force))
+    return {
+        "status": "queued",
+        "force": force,
+        "message": f"Analysis {'(forced, all agents)' if force else '(stale only, >7 days)'} queued",
     }
