@@ -20,8 +20,8 @@
       --text-dim:   #9CA3AF;
 
       --green:      #168389;
-      --green-bg:   rgba(34,197,94,0.10);
-      --green-dark: #16A34A;
+      --green-bg:   rgba(22,131,137,0.10);
+      --green-dark: #168389;
       --red:        #EF4444;
       --red-bg:     rgba(239,68,68,0.10);
       --amber:      #F59E0B;
@@ -75,7 +75,7 @@
     .logo-mark {
       width: 34px;
       height: 34px;
-      background: linear-gradient(135deg, #2DD4BF, #168389);
+      background: linear-gradient(135deg, #168389, #14B8A6);
       border-radius: 9px;
       display: flex;
       align-items: center;
@@ -256,7 +256,7 @@
     /* ===== TABLE HEADER ===== */
     .table-header {
       display: grid;
-      grid-template-columns: 36px 1fr 100px 68px 58px;
+      grid-template-columns: 36px 1fr 92px 62px 52px;
       align-items: center;
       padding: 6px 16px;
       background: var(--bg-2);
@@ -269,7 +269,6 @@
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: var(--text-dim);
-      white-space: nowrap;
     }
     .th.sortable { cursor: pointer; user-select: none; }
     .th.sortable:hover { color: var(--text-muted); }
@@ -278,7 +277,7 @@
     /* ===== AGENT ROWS ===== */
     .agent-row {
       display: grid;
-      grid-template-columns: 36px 1fr 100px 68px 58px;
+      grid-template-columns: 36px 1fr 92px 62px 52px;
       align-items: center;
       padding: 10px 16px;
       border-bottom: 1px solid var(--border);
@@ -352,28 +351,6 @@
       font-family: var(--font-data);
       white-space: nowrap;
     }
-
-    .agent-links {
-      display: flex;
-      gap: 4px;
-      margin-top: 2px;
-    }
-
-    .agent-ext-link {
-      display: inline-flex;
-      align-items: center;
-      padding: 1px 5px;
-      border-radius: 3px;
-      font-size: 9px;
-      font-family: var(--font-data);
-      font-weight: 500;
-      text-decoration: none;
-      border: 1px solid var(--border);
-      color: var(--text-dim);
-      background: var(--bg-2);
-      transition: all 0.12s;
-    }
-    .agent-ext-link:hover { border-color: var(--green); color: var(--green-dark); background: var(--green-bg); }
 
     .price-col { text-align: right; }
 
@@ -778,7 +755,7 @@
       font-size: 10px;
       font-weight: 500;
     }
-    .doxx-badge.tier-1 { background: var(--green-bg); color: var(--green-dark); border: 1px solid rgba(34,197,94,0.25); }
+    .doxx-badge.tier-1 { background: var(--green-bg); color: var(--green-dark); border: 1px solid rgba(22,131,137,0.25); }
     .doxx-badge.tier-2 { background: rgba(168,85,247,0.10); color: var(--purple); border: 1px solid rgba(168,85,247,0.25); }
     .doxx-badge.tier-3 { background: var(--bg-3); color: var(--text-muted); border: 1px solid var(--border); }
 
@@ -791,7 +768,7 @@
       font-weight: 500;
       text-transform: uppercase;
     }
-    .risk-badge.low     { background: var(--green-bg); color: var(--green-dark); border: 1px solid rgba(34,197,94,0.2); }
+    .risk-badge.low     { background: var(--green-bg); color: var(--green-dark); border: 1px solid rgba(22,131,137,0.2); }
     .risk-badge.medium  { background: rgba(245,158,11,0.10); color: var(--amber); border: 1px solid rgba(245,158,11,0.2); }
     .risk-badge.high    { background: var(--red-bg); color: var(--red); border: 1px solid rgba(239,68,68,0.2); }
     .risk-badge.extreme { background: rgba(239,68,68,0.15); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
@@ -885,13 +862,13 @@
       .category-tabs-wrap { padding: 0 24px; }
       .stats-bar { padding: 7px 24px; }
       .enrich-banner { padding: 6px 24px; }
-      .table-header { padding: 7px 24px; grid-template-columns: 44px 1fr 130px 84px 74px; }
-      .agent-row { padding: 12px 24px; grid-template-columns: 44px 1fr 130px 84px 74px; }
+      .table-header { padding: 7px 24px; grid-template-columns: 44px 1fr 120px 80px 70px; }
+      .agent-row { padding: 12px 24px; grid-template-columns: 44px 1fr 120px 80px 70px; }
       .pagination { padding: 12px 24px; }
     }
 
     @media (min-width: 1024px) {
-      .table-header, .agent-row { grid-template-columns: 44px 1fr 150px 96px 84px; }
+      .table-header, .agent-row { grid-template-columns: 44px 1fr 140px 90px 80px; }
     }
   </style>
 </head>
@@ -962,7 +939,7 @@
 <div class="table-header">
   <div class="th">#</div>
   <div class="th">AGENT</div>
-  <div class="th right sortable" data-sort="market_cap">PRICE / MCAP</div>
+  <div class="th right sortable" data-sort="market_cap">PRICE/MCAP</div>
   <div class="th right sortable" data-sort="price_change_24h">24H %</div>
   <div class="th right sortable" data-sort="composite_score">VIQ</div>
 </div>
@@ -1109,7 +1086,7 @@ function fmtCompact(v) {
 }
 
 function scoreColor(score) {
-  if (score >= 75) return '#16A34A';
+  if (score >= 75) return '#168389';
   if (score >= 50) return '#A855F7';
   if (score >= 30) return '#F59E0B';
   return '#EF4444';
@@ -1117,7 +1094,7 @@ function scoreColor(score) {
 
 function tierColor(tier) {
   const map = {
-    'Top Tier': '#16A34A',
+    'Top Tier': '#168389',
     'Strong': '#A855F7',
     'Moderate': '#F59E0B',
     'Weak': '#EF4444',
@@ -1165,12 +1142,9 @@ async function loadAgents() {
   const list = document.getElementById('agent-list');
   list.innerHTML = '<div class="loading-row"><div class="loading-spinner"></div>Loading agents...</div>';
 
-  // For category views, fetch all agents in that category (up to 500)
-  const effectivePageSize = state.category ? 500 : state.pageSize;
-
   const params = new URLSearchParams({
     page: state.page,
-    page_size: effectivePageSize,
+    page_size: state.pageSize,
     sort: state.sort,
   });
   if (state.category) params.set('category', state.category);
@@ -1195,7 +1169,7 @@ async function loadAgents() {
       return;
     }
 
-    const offset = (state.page - 1) * effectivePageSize;
+    const offset = (state.page - 1) * state.pageSize;
     list.innerHTML = data.agents.map((a, i) => {
       const rank = offset + i + 1;
       const change = parseFloat(a.price_change_24h || 0);
@@ -1204,17 +1178,11 @@ async function loadAgents() {
       const scoreClr = scoreColor(scoreNum);
       const categoryLabel = a.agent_type || '';
       const statusLabel = a.status || 'Prototype';
-      const vol  = a.volume_24h   ? 'VOL '  + fmtMcap(a.volume_24h)      : '';
-      const hl   = a.holder_count ? 'HL '   + fmtCompact(a.holder_count)  : '';
-      const metricLine = [vol, hl].filter(Boolean).join('  ');
-      const priceStr = a.price_usd ? '$' + parseFloat(a.price_usd).toPrecision(4) : '—';
-
-      const virtualsLink = a.virtuals_id
-        ? `<a class="agent-ext-link" href="https://app.virtuals.io/virtuals/${a.virtuals_id}" target="_blank" rel="noopener" onclick="event.stopPropagation()">VRT</a>`
-        : '';
-      const dexLink = a.contract_address
-        ? `<a class="agent-ext-link" href="https://dexscreener.com/base/${a.contract_address}" target="_blank" rel="noopener" onclick="event.stopPropagation()">DEX</a>`
-        : '';
+      const vol  = a.volume_24h   ? 'VOL '  + fmtMcap(a.volume_24h)     : '';
+      const mc   = a.market_cap   ? 'MCAP ' + fmtMcap(a.market_cap)     : '';
+      const hl   = a.holder_count ? 'HL '   + fmtCompact(a.holder_count) : '';
+      const metricLine = [vol, mc, hl].filter(Boolean).join('  ');
+      const priceStr = a.price ? '$' + parseFloat(a.price).toPrecision(4) : '—';
 
       return `<div class="agent-row" onclick="openModal('${a.virtuals_id}')">
         <div class="rank">${rank}</div>
@@ -1229,7 +1197,6 @@ async function loadAgents() {
             <div class="agent-ticker">${a.ticker || ''}</div>
             ${categoryLabel || statusLabel ? `<div class="agent-category">${categoryLabel}${categoryLabel && statusLabel ? ' · ' : ''}${statusLabel}</div>` : ''}
             ${metricLine ? `<div class="agent-metrics">${metricLine}</div>` : ''}
-            ${virtualsLink || dexLink ? `<div class="agent-links">${virtualsLink}${dexLink}</div>` : ''}
           </div>
         </div>
         <div class="price-col">
@@ -1366,13 +1333,6 @@ function renderModal(agent) {
         <span style="font-family:var(--font-data);font-size:24px;font-weight:700;color:${color}">${score}</span>
         <span style="font-size:13px;color:${color};margin-left:6px;font-weight:600">${tier}</span>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-left:auto">
-        ${agent.virtuals_id ? `<a href="https://app.virtuals.io/virtuals/${agent.virtuals_id}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none">🔗 Virtuals</a>` : ''}
-        ${agent.contract_address ? `<a href="https://dexscreener.com/base/${agent.contract_address}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none">📈 DexScreener</a>` : ''}
-        ${agent.linked_twitter ? `<a href="${agent.linked_twitter}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none">𝕏 Twitter</a>` : ''}
-        ${agent.linked_website ? `<a href="${agent.linked_website}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none">🌐 Website</a>` : ''}
-        ${agent.linked_telegram ? `<a href="${agent.linked_telegram}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none">✈ Telegram</a>` : ''}
-      </div>
     </div>
 
     ${hasAnalysis ? `
@@ -1383,7 +1343,7 @@ function renderModal(agent) {
       ${overview.stage ? `<p style="margin-top:6px;font-size:11px;font-family:var(--font-data);color:var(--text-dim)">Stage: <span style="color:var(--amber)">${overview.stage.toUpperCase()}</span></p>` : ''}
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-      ${riskData.bull_case ? `<div style="padding:10px;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:var(--radius-sm)"><div style="font-size:10px;color:var(--green-dark);font-weight:700;letter-spacing:0.5px;margin-bottom:4px">BULL CASE</div><div style="font-size:12px;color:var(--text-muted)">${riskData.bull_case}</div></div>` : ''}
+      ${riskData.bull_case ? `<div style="padding:10px;background:rgba(22,131,137,0.06);border:1px solid rgba(22,131,137,0.2);border-radius:var(--radius-sm)"><div style="font-size:10px;color:var(--green-dark);font-weight:700;letter-spacing:0.5px;margin-bottom:4px">BULL CASE</div><div style="font-size:12px;color:var(--text-muted)">${riskData.bull_case}</div></div>` : ''}
       ${riskData.bear_case ? `<div style="padding:10px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-sm)"><div style="font-size:10px;color:var(--red);font-weight:700;letter-spacing:0.5px;margin-bottom:4px">BEAR CASE</div><div style="font-size:12px;color:var(--text-muted)">${riskData.bear_case}</div></div>` : ''}
     </div>
     ${riskData.key_risks && riskData.key_risks.length ? `
@@ -1438,6 +1398,13 @@ function renderModal(agent) {
         ${renderForecast('90d', prediction['90d'])}
       </div>
     </div>
+
+    ${agent.linked_twitter || agent.linked_website || agent.linked_telegram ? `
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${agent.linked_twitter ? `<a href="${agent.linked_twitter}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none">𝕏 Twitter</a>` : ''}
+      ${agent.linked_website ? `<a href="${agent.linked_website}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none">🌐 Website</a>` : ''}
+      ${agent.linked_telegram ? `<a href="${agent.linked_telegram}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none">✈ Telegram</a>` : ''}
+    </div>` : ''}
   `;
 }
 
@@ -1543,14 +1510,14 @@ function _factorWhy(key, scores, analysis, agent) {
 
 function renderTierBreakdown(scores, analysis, agent) {
   const tiers = [
-    { label: 'First Mover (30%)', keys: [
+    { label: 'TIER 1 — FIRST MOVER (30%)', keys: [
       ['F1_category_uniqueness', 'Category Uniqueness'],
       ['F2_approach_novelty', 'Approach Novelty'],
       ['F3_cross_chain_originality', 'Cross-Chain Original'],
       ['F4_timing_advantage', 'Timing Advantage'],
       ['F5_defensibility', 'Defensibility / Moat'],
     ]},
-    { label: 'Team & Execution (28%)', keys: [
+    { label: 'TIER 2 — TEAM & EXECUTION (28%)', keys: [
       ['F6_doxx_tier', 'Team Visibility'],
       ['F7_track_record', 'Track Record'],
       ['F8_code_activity', 'Code Activity'],
@@ -1559,7 +1526,7 @@ function renderTierBreakdown(scores, analysis, agent) {
       ['F11_partnerships', 'Partnerships'],
       ['F12_wallet_behavior', 'Wallet Behavior'],
     ]},
-    { label: 'Value Pool / TAM (24%)', keys: [
+    { label: 'TIER 3 — VALUE POOL / TAM (24%)', keys: [
       ['F13_tam', 'Total Addressable Market'],
       ['F14_real_world_comparables', 'Real-World Comparables'],
       ['F15_revenue_model', 'Revenue Model Clarity'],
@@ -1567,7 +1534,7 @@ function renderTierBreakdown(scores, analysis, agent) {
       ['F17_mcap_to_tam', 'MCap / TAM Ratio'],
       ['F18_saturation', 'Market Saturation'],
     ]},
-    { label: 'Community & Social (18%)', keys: [
+    { label: 'TIER 4 — COMMUNITY & SOCIAL (18%)', keys: [
       ['F19_holder_distribution', 'Holder Distribution'],
       ['F20_twitter_engagement', 'Twitter Engagement'],
       ['F21_follower_growth', 'Follower Growth'],
@@ -1608,7 +1575,7 @@ function renderForecast(horizon, data) {
     </div>`;
   }
   const prob = data.probability_up || 50;
-  const color = prob >= 60 ? '#16A34A' : prob >= 45 ? '#F59E0B' : '#EF4444';
+  const color = prob >= 60 ? '#168389' : prob >= 45 ? '#F59E0B' : '#EF4444';
   const rangeLow = data.range_low || 0;
   const rangeHigh = data.range_high || 0;
   const signLow = rangeLow >= 0 ? '+' : '';
@@ -1669,8 +1636,6 @@ document.querySelectorAll('.category-tab').forEach(btn => {
     document.querySelectorAll('.category-tab').forEach(b => b.classList.remove('active'));
     this.classList.add('active');
     state.category = this.dataset.category;
-    // "All" tab resets sort to market_cap
-    if (!state.category) state.sort = 'market_cap';
     state.page = 1;
     loadAgents();
   });
