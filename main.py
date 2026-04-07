@@ -29,6 +29,7 @@ from database import (
     get_trending_agents,
     get_trending_strip,
     init_db,
+    search_agents,
     update_agent_scores,
     upsert_agent,
 )
@@ -439,6 +440,50 @@ async def job_status(job_id: str):
 async def ecosystem_stats():
     stats = await get_stats()
     return stats
+
+
+@app.get("/api/search")
+async def search_endpoint(q: str = Query("", min_length=1)):
+    """Search agents by name or ticker, return top 10 matches."""
+    results = await search_agents(q, limit=10)
+    return {"query": q, "results": results, "count": len(results)}
+
+
+@app.get("/api/agent/{virtuals_id}/on-chain")
+async def agent_on_chain_signals(virtuals_id: str):
+    """On-chain signal data for an agent. Placeholder for future enrichment."""
+    agent = await get_agent_detail(virtuals_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    # Whale concentration: derive from holder data if available
+    holder_count = agent.get("holder_count", 0) or 0
+    top_10_conc = agent.get("top_10_concentration", 0) or 0
+    whale_concentration = {
+        "top_10_percent": top_10_conc,
+        "holder_count": holder_count,
+        "concentration_risk": (
+            "high" if top_10_conc > 80 else
+            "medium" if top_10_conc > 50 else
+            "low"
+        ) if top_10_conc > 0 else "unknown",
+    }
+
+    return {
+        "virtuals_id": virtuals_id,
+        "whale_concentration": whale_concentration,
+        "smart_money_flow": {
+            "status": "coming_soon",
+            "description": "Smart money wallet tracking — available in a future update",
+        },
+        "team_wallet_activity": {
+            "status": "coming_soon",
+            "description": "Creator/team wallet movement alerts — available in a future update",
+            "creator_wallet": agent.get("creator_wallet", ""),
+        },
+        "buy_sell_ratio": agent.get("buy_sell_ratio", 1.0),
+        "tx_count_24h": agent.get("tx_count_24h", 0),
+    }
 
 
 @app.get("/api/health")
