@@ -1,5 +1,5 @@
 """
-VirtualsIQ â Database layer
+VirtualsIQ — Database layer
 SQLite with aiosqlite for async access
 """
 
@@ -72,10 +72,15 @@ async def init_db():
                 scores_json TEXT DEFAULT '{}',
                 analysis_json TEXT DEFAULT '{}',
                 prediction_json TEXT DEFAULT '{}',
+                overview_json TEXT DEFAULT '{}',
                 first_mover INTEGER DEFAULT 0,
                 doxx_tier INTEGER DEFAULT 3,
 
+                last_analyzed TEXT,
                 last_scanned TEXT,
+                last_price_refresh TEXT,
+                last_holder_refresh TEXT,
+                last_description_refresh TEXT,
                 created_at TEXT DEFAULT (datetime('now')),
                 updated_at TEXT DEFAULT (datetime('now'))
             )
@@ -118,6 +123,19 @@ async def init_db():
         await db.execute("CREATE INDEX IF NOT EXISTS idx_score_history_agent ON score_history(agent_id)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_predictions_agent ON predictions(agent_id)")
 
+        # Migrate: add new columns if missing (safe for existing DBs)
+        for col, dtype, default in [
+            ("overview_json", "TEXT", "'{}'"),
+            ("last_analyzed", "TEXT", "NULL"),
+            ("last_price_refresh", "TEXT", "NULL"),
+            ("last_holder_refresh", "TEXT", "NULL"),
+            ("last_description_refresh", "TEXT", "NULL"),
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE agents ADD COLUMN {col} {dtype} DEFAULT {default}")
+            except Exception:
+                pass  # column already exists
+
         await db.commit()
     print("[DB] Schema initialized")
 
@@ -126,7 +144,7 @@ async def upsert_agent(agent: dict):
     """Insert or update an agent record."""
     # Serialize any dict/list values for JSON columns before passing to SQLite
     safe = dict(agent)
-    for f in ("scores_json", "analysis_json", "prediction_json"):
+    for f in ("scores_json", "analysis_json", "prediction_json", "overview_json"):
         if isinstance(safe.get(f), (dict, list)):
             safe[f] = json.dumps(safe[f])
     agent = safe
@@ -142,7 +160,7 @@ async def upsert_agent(agent: dict):
                 twitter_account_age, github_stars, github_commits_30d,
                 github_contributors, github_last_commit,
                 composite_score, tier_classification, scores_json,
-                analysis_json, prediction_json, first_mover, doxx_tier,
+                analysis_json, prediction_json, overview_json, first_mover, doxx_tier,
                 last_scanned, updated_at
             ) VALUES (
                 :virtuals_id, :name, :ticker, :contract_address, :status, :agent_type,
@@ -154,7 +172,7 @@ async def upsert_agent(agent: dict):
                 :twitter_account_age, :github_stars, :github_commits_30d,
                 :github_contributors, :github_last_commit,
                 :composite_score, :tier_classification, :scores_json,
-                :analysis_json, :prediction_json, :first_mover, :doxx_tier,
+                :analysis_json, :prediction_json, :overview_json, :first_mover, :doxx_tier,
                 :last_scanned, :updated_at
             )
             ON CONFLICT(virtuals_id) DO UPDATE SET
@@ -191,6 +209,7 @@ async def upsert_agent(agent: dict):
 async def update_agent_scores(virtuals_id: str, composite_score: float,
                                tier: str, scores_json: dict,
                                analysis_json: dict, prediction_json: dict,
+                               overview_json: dict,
                                first_mover: bool, doxx_tier: int):
     """Update intelligence scores for an agent and record history."""
     now = datetime.utcnow().isoformat()
@@ -198,15 +217,16 @@ async def update_agent_scores(virtuals_id: str, composite_score: float,
         await db.execute("""
             UPDATE agents SET
                 composite_score=?, tier_classification=?, scores_json=?,
-                analysis_json=?, prediction_json=?, first_mover=?, doxx_tier=?,
-                last_scanned=?, updated_at=?
+                analysis_json=?, prediction_json=?, overview_json=?,
+                first_mover=?, doxx_tier=?,
+                last_analyzed=?, last_scanned=?, updated_at=?
             WHERE virtuals_id=?
         """, (
             composite_score, tier,
             json.dumps(scores_json), json.dumps(analysis_json),
-            json.dumps(prediction_json),
+            json.dumps(prediction_json), json.dumps(overview_json),
             1 if first_mover else 0, doxx_tier,
-            now, now, virtuals_id
+            now, now, now, virtuals_id
         ))
 
         # Record score history snapshot
@@ -269,7 +289,9 @@ async def get_agents(
                        agent_type, image_url, market_cap, price_usd,
                        price_change_24h, volume_24h, holder_count,
                        composite_score, tier_classification, scores_json,
-                       first_mover, doxx_tier, created_at
+                       first_mover, doxx_tier, created_at, updated_at,
+                       linked_twitter, linked_website, linked_telegram,
+                       overview_json, last_analyzed
                 FROM agents {where_sql}
                 ORDER BY {order_sql}
                 LIMIT ? OFFSET ?""",
@@ -280,10 +302,11 @@ async def get_agents(
     agents = []
     for row in rows:
         d = dict(row)
-        try:
-            d["scores_json"] = json.loads(d.get("scores_json") or "{}")
-        except Exception:
-            d["scores_json"] = {}
+        for f in ("scores_json", "overview_json"):
+            try:
+                d[f] = json.loads(d.get(f) or "{}")
+            except Exception:
+                d[f] = {}
         agents.append(d)
 
     return {
@@ -308,7 +331,7 @@ async def get_agent_detail(virtuals_id: str) -> dict | None:
         return None
 
     d = dict(row)
-    for field in ("scores_json", "analysis_json", "prediction_json"):
+    for field in ("scores_json", "analysis_json", "prediction_json", "overview_json"):
         try:
             d[field] = json.loads(d.get(field) or "{}")
         except Exception:
@@ -357,10 +380,136 @@ async def get_trending_agents(feed: str, limit: int = 20) -> list:
     agents = []
     for row in rows:
         d = dict(row)
-        try:
-            d["scores_json"] = json.loads(d.get("scores_json") or "{}")
-        except Exception:
-            d["scores_json"] = {}
+        for f in ("scores_json", "overview_json"):
+            try:
+                d[f] = json.loads(d.get(f) or "{}")
+            except Exception:
+                d[f] = {}
+        agents.append(d)
+    return agents
+
+
+async def get_trending_strip() -> dict:
+    """Return data for the trending strip: top movers, new launches, score changes."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+
+        # Top 3 movers (biggest absolute 24h change)
+        async with db.execute("""
+            SELECT virtuals_id, name, ticker, image_url, price_change_24h,
+                   market_cap, composite_score
+            FROM agents WHERE price_change_24h IS NOT NULL
+            ORDER BY ABS(price_change_24h) DESC LIMIT 3
+        """) as cur:
+            movers = [dict(r) for r in await cur.fetchall()]
+
+        # Top 3 newest launches
+        async with db.execute("""
+            SELECT virtuals_id, name, ticker, image_url, price_change_24h,
+                   market_cap, composite_score, created_at
+            FROM agents ORDER BY created_at DESC LIMIT 3
+        """) as cur:
+            new_launches = [dict(r) for r in await cur.fetchall()]
+
+        # Top 3 score changes (agents with recent score history deltas)
+        async with db.execute("""
+            SELECT a.virtuals_id, a.name, a.ticker, a.image_url,
+                   a.composite_score, a.market_cap,
+                   (a.composite_score - COALESCE(
+                     (SELECT sh.composite_score FROM score_history sh
+                      WHERE sh.agent_id = a.virtuals_id
+                      ORDER BY sh.recorded_at DESC LIMIT 1 OFFSET 1), a.composite_score
+                   )) as score_delta
+            FROM agents a
+            WHERE a.composite_score > 0
+            ORDER BY ABS(a.composite_score - COALESCE(
+              (SELECT sh.composite_score FROM score_history sh
+               WHERE sh.agent_id = a.virtuals_id
+               ORDER BY sh.recorded_at DESC LIMIT 1 OFFSET 1), a.composite_score
+            )) DESC
+            LIMIT 3
+        """) as cur:
+            score_changes = [dict(r) for r in await cur.fetchall()]
+
+    return {
+        "movers": movers,
+        "new_launches": new_launches,
+        "score_changes": score_changes,
+    }
+
+
+async def get_category_summary(category: str) -> dict:
+    """Return summary data for a category landing page."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+
+        # Top 5 by VIQ
+        async with db.execute("""
+            SELECT virtuals_id, name, ticker, image_url, composite_score,
+                   market_cap, price_change_24h, holder_count
+            FROM agents WHERE agent_type = ?
+            ORDER BY composite_score DESC LIMIT 5
+        """, (category,)) as cur:
+            top_by_viq = [dict(r) for r in await cur.fetchall()]
+
+        # Biggest movers 24h
+        async with db.execute("""
+            SELECT virtuals_id, name, ticker, image_url, price_change_24h,
+                   market_cap, composite_score
+            FROM agents WHERE agent_type = ? AND price_change_24h IS NOT NULL
+            ORDER BY ABS(price_change_24h) DESC LIMIT 5
+        """, (category,)) as cur:
+            biggest_movers = [dict(r) for r in await cur.fetchall()]
+
+        # New launches
+        async with db.execute("""
+            SELECT virtuals_id, name, ticker, image_url, created_at,
+                   market_cap, composite_score
+            FROM agents WHERE agent_type = ?
+            ORDER BY created_at DESC LIMIT 5
+        """, (category,)) as cur:
+            new_launches = [dict(r) for r in await cur.fetchall()]
+
+        # Category stats
+        async with db.execute("""
+            SELECT COUNT(*) as total,
+                   AVG(composite_score) as avg_score,
+                   COALESCE(SUM(market_cap), 0) as total_mcap,
+                   COALESCE(SUM(volume_24h), 0) as total_volume
+            FROM agents WHERE agent_type = ?
+        """, (category,)) as cur:
+            stats = dict(await cur.fetchone())
+
+    return {
+        "category": category,
+        "stats": stats,
+        "top_by_viq": top_by_viq,
+        "biggest_movers": biggest_movers,
+        "new_launches": new_launches,
+    }
+
+
+async def get_agents_needing_reanalysis(limit: int = 10) -> list[dict]:
+    """Find agents that need re-analysis: never analyzed, status change, big MC move."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT * FROM agents
+            WHERE last_analyzed IS NULL
+               OR last_analyzed < datetime('now', '-7 days')
+            ORDER BY market_cap DESC
+            LIMIT ?
+        """, (limit,)) as cur:
+            rows = await cur.fetchall()
+
+    agents = []
+    for row in rows:
+        d = dict(row)
+        for field in ("scores_json", "analysis_json", "prediction_json", "overview_json"):
+            try:
+                d[field] = json.loads(d.get(field) or "{}")
+            except Exception:
+                d[field] = {}
         agents.append(d)
     return agents
 
@@ -408,7 +557,7 @@ async def get_all_agents() -> list[dict]:
     agents = []
     for row in rows:
         d = dict(row)
-        for field in ("scores_json", "analysis_json", "prediction_json"):
+        for field in ("scores_json", "analysis_json", "prediction_json", "overview_json"):
             try:
                 d[field] = json.loads(d.get(field) or "{}")
             except Exception:
@@ -435,7 +584,7 @@ UPSERT_COLS = [
     "twitter_account_age", "github_stars", "github_commits_30d",
     "github_contributors", "github_last_commit",
     "composite_score", "tier_classification", "scores_json",
-    "analysis_json", "prediction_json", "first_mover", "doxx_tier",
+    "analysis_json", "prediction_json", "overview_json", "first_mover", "doxx_tier",
     "last_scanned", "updated_at",
 ]
 
@@ -483,7 +632,6 @@ async def bulk_upsert_agents(agents: list[dict], batch_size: int = 500) -> int:
         batch_tuples = [_dict_to_tuple(a) for a in batch_dicts]
         batch_num = i // batch_size + 1
         try:
-            # Fresh connection per batch â a failed batch cannot corrupt subsequent ones
             async with aiosqlite.connect(DB_PATH) as db:
                 await db.execute("PRAGMA journal_mode=WAL")
                 await db.executemany(UPSERT_SQL, batch_tuples)
@@ -491,8 +639,7 @@ async def bulk_upsert_agents(agents: list[dict], batch_size: int = 500) -> int:
             stored += len(batch_tuples)
             logger.info(f"Batch {batch_num}: saved {len(batch_tuples)} agents (total so far: {stored})")
         except Exception as e:
-            logger.error(f"Batch {batch_num} executemany failed: {e!r} â retrying row-by-row")
-            # Fall back to one-by-one so a single bad row doesn't lose the whole batch
+            logger.error(f"Batch {batch_num} executemany failed: {e!r} - retrying row-by-row")
             for j, agent_dict in enumerate(batch_dicts):
                 try:
                     async with aiosqlite.connect(DB_PATH) as db:
@@ -521,7 +668,7 @@ async def bulk_score_agents() -> int:
     batch = []
     for row in rows:
         agent = dict(row)
-        for f in ("scores_json", "analysis_json", "prediction_json"):
+        for f in ("scores_json", "analysis_json", "prediction_json", "overview_json"):
             try:
                 agent[f] = json.loads(agent.get(f) or "{}")
             except Exception:
@@ -566,6 +713,7 @@ async def update_market_data(virtuals_id: str, data: dict):
                 tx_count_24h=?,
                 buy_sell_ratio=?,
                 market_cap=CASE WHEN ? > 0 THEN ? ELSE market_cap END,
+                last_price_refresh=?,
                 updated_at=?
             WHERE virtuals_id=?
         """, (
@@ -577,7 +725,29 @@ async def update_market_data(virtuals_id: str, data: dict):
             data.get("tx_count_24h", 0),
             data.get("buy_sell_ratio", 1.0),
             dex_mcap, dex_mcap,
-            now,
+            now, now,
             virtuals_id,
         ))
         await db.commit()
+
+
+async def update_holder_count(virtuals_id: str, holder_count: int):
+    """Update holder count only."""
+    now = datetime.utcnow().isoformat()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE agents SET holder_count=?, last_holder_refresh=?, updated_at=? WHERE virtuals_id=?",
+            (holder_count, now, now, virtuals_id)
+        )
+        await db.commit()
+
+
+async def get_top_agent_ids(limit: int = 50) -> list[str]:
+    """Return top N agent IDs by market cap for priority analysis."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT virtuals_id FROM agents ORDER BY market_cap DESC LIMIT ?",
+            (limit,)
+        ) as cur:
+            rows = await cur.fetchall()
+    return [row[0] for row in rows]
