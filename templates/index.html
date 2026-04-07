@@ -256,7 +256,7 @@
     /* ===== TABLE HEADER ===== */
     .table-header {
       display: grid;
-      grid-template-columns: 36px 1fr 92px 62px 52px;
+      grid-template-columns: 36px 1fr 110px 68px 58px;
       align-items: center;
       padding: 6px 16px;
       background: var(--bg-2);
@@ -269,6 +269,7 @@
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: var(--text-dim);
+      white-space: nowrap;
     }
     .th.sortable { cursor: pointer; user-select: none; }
     .th.sortable:hover { color: var(--text-muted); }
@@ -277,7 +278,7 @@
     /* ===== AGENT ROWS ===== */
     .agent-row {
       display: grid;
-      grid-template-columns: 36px 1fr 92px 62px 52px;
+      grid-template-columns: 36px 1fr 110px 68px 58px;
       align-items: center;
       padding: 10px 16px;
       border-bottom: 1px solid var(--border);
@@ -1179,9 +1180,8 @@ async function loadAgents() {
       const categoryLabel = a.agent_type || '';
       const statusLabel = a.status || 'Prototype';
       const vol  = a.volume_24h   ? 'VOL '  + fmtMcap(a.volume_24h)     : '';
-      const mc   = a.market_cap   ? 'MCAP ' + fmtMcap(a.market_cap)     : '';
       const hl   = a.holder_count ? 'HL '   + fmtCompact(a.holder_count) : '';
-      const metricLine = [vol, mc, hl].filter(Boolean).join('  ');
+      const metricLine = [vol, hl].filter(Boolean).join('  ');
       const priceStr = a.price ? '$' + parseFloat(a.price).toPrecision(4) : '—';
 
       return `<div class="agent-row" onclick="openModal('${a.virtuals_id}')">
@@ -1399,12 +1399,13 @@ function renderModal(agent) {
       </div>
     </div>
 
-    ${agent.linked_twitter || agent.linked_website || agent.linked_telegram ? `
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       ${agent.linked_twitter ? `<a href="${agent.linked_twitter}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none">𝕏 Twitter</a>` : ''}
       ${agent.linked_website ? `<a href="${agent.linked_website}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none">🌐 Website</a>` : ''}
       ${agent.linked_telegram ? `<a href="${agent.linked_telegram}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none">✈ Telegram</a>` : ''}
-    </div>` : ''}
+      <a href="https://app.virtuals.io/virtuals/${agent.virtuals_id}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none">🤖 Virtuals</a>
+      ${agent.contract_address ? `<a href="https://dexscreener.com/base/${agent.contract_address}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none">📊 DexScreener</a>` : ''}
+    </div>
   `;
 }
 
@@ -1508,6 +1509,10 @@ function _factorWhy(key, scores, analysis, agent) {
   return fn ? fn() : `Score ${v}/100`;
 }
 
+function labelFromKey(key) {
+  return key.replace(/^F\d+_/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
 function renderTierBreakdown(scores, analysis, agent) {
   const tiers = [
     { label: 'TIER 1 — FIRST MOVER (30%)', keys: [
@@ -1546,7 +1551,8 @@ function renderTierBreakdown(scores, analysis, agent) {
 
   return tiers.map(tier => `
     <div class="tier-header">${tier.label}</div>
-    ${tier.keys.map(([key, label]) => {
+    ${tier.keys.map(([key, _rawLabel]) => {
+      const label = labelFromKey(key);
       const v = scores[key] !== undefined ? Math.round(scores[key]) : 50;
       const color = scoreColor(v);
       const why = _factorWhy(key, scores, analysis, agent);
@@ -1637,6 +1643,8 @@ document.querySelectorAll('.category-tab').forEach(btn => {
     this.classList.add('active');
     state.category = this.dataset.category;
     state.page = 1;
+    if (!state.category) state.sort = 'market_cap';
+    state.pageSize = state.category ? 500 : 25;
     loadAgents();
   });
 });

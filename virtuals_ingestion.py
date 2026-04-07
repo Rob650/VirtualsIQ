@@ -120,7 +120,7 @@ def _parse_agent(item: dict) -> dict:
     )
 
     # Market data — use Virtuals API fields first, fall back to legacy names
-    market_cap = float(attrs.get("mcapInVirtual") or attrs.get("marketCap") or 0)
+    market_cap = float(attrs.get("marketCap") or attrs.get("mcapInVirtual") or 0)
     price_usd = float(attrs.get("currentPrice") or attrs.get("priceUsd") or 0)
 
     # Image
