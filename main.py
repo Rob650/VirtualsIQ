@@ -22,14 +22,25 @@ from database import (
     bulk_score_agents,
     get_agent_detail,
     get_agents,
+    get_category_summary,
     get_existing_ids,
     get_stats,
+    get_top_agent_ids,
     get_trending_agents,
+    get_trending_strip,
     init_db,
     update_agent_scores,
     upsert_agent,
 )
-from virtuals_ingestion import detect_new_agents, enrich_top_agents_dexscreener, fetch_dexscreener_data, get_api_total_count, preload_all_agents, scan_newest_agents
+from virtuals_ingestion import (
+    detect_new_agents,
+    enrich_top_agents_dexscreener,
+    fetch_dexscreener_data,
+    get_api_total_count,
+    preload_all_agents,
+    refresh_holder_counts,
+    scan_newest_agents,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -56,7 +67,6 @@ CAT_KEYWORDS = {
 
 
 def _infer_category(agent: dict) -> str:
-    """Infer a meaningful category from agent data if the API gives a generic one."""
     current = agent.get("agent_type", "")
     if current and current not in GENERIC_CATEGORIES:
         return current
@@ -75,17 +85,20 @@ def _infer_category(agent: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Enrichment state tracker (used by /api/status)
+# Enrichment state tracker
 # ---------------------------------------------------------------------------
 
 enrichment_state: dict = {
-    "status": "idle",   # idle | preloading | enriching | scoring | complete
+    "status": "idle",
     "agents_loaded": 0,
     "started_at": None,
     "completed_at": None,
     "api_total": 0,
     "last_new_scan": None,
     "new_agents_found": 0,
+    "last_price_refresh": None,
+    "last_holder_refresh": None,
+    "last_description_refresh": None,
 }
 
 # ---------------------------------------------------------------------------
@@ -120,24 +133,24 @@ async def _run_analysis_job(job_id: str, virtuals_id: str):
         if not agent:
             raise ValueError(f"Agent {virtuals_id} not found in database")
 
-        # Enrich with fresh DexScreener data
         if agent.get("contract_address"):
             dex = await fetch_dexscreener_data(agent["contract_address"])
             if dex:
                 agent.update(dex)
                 await upsert_agent(agent)
 
-        result = await analyze_agent(agent)
+        # Get top IDs for model selection
+        top_ids = set(await get_top_agent_ids(50))
+
+        result = await analyze_agent(agent, top_ids=top_ids)
         scores = result["scores"]
         analysis = result["analysis"]
+        overview = result.get("overview", {})
+        prediction_json = result.get("prediction", {})
 
-        prediction_json = analysis.get("prediction", {})
-
-        # Infer category from analysis if current is generic
+        # Infer category
         inferred_category = _infer_category(agent)
         if inferred_category != agent.get("agent_type"):
-            # Update the agent_type in the database
-            from database import get_db
             import aiosqlite
             async with aiosqlite.connect("virtualsiq.db") as db:
                 await db.execute(
@@ -145,7 +158,6 @@ async def _run_analysis_job(job_id: str, virtuals_id: str):
                     (inferred_category, virtuals_id)
                 )
                 await db.commit()
-            logger.info(f"Updated category for {virtuals_id}: {agent.get('agent_type')} -> {inferred_category}")
 
         await update_agent_scores(
             virtuals_id=virtuals_id,
@@ -154,6 +166,7 @@ async def _run_analysis_job(job_id: str, virtuals_id: str):
             scores_json=scores["scores"],
             analysis_json=analysis,
             prediction_json=prediction_json,
+            overview_json=overview,
             first_mover=scores["first_mover"],
             doxx_tier=int(analysis.get("team", {}).get("doxx_tier", 3)),
         )
@@ -169,12 +182,48 @@ async def _run_analysis_job(job_id: str, virtuals_id: str):
         jobs[job_id]["completed_at"] = datetime.utcnow().isoformat()
 
 
-async def _new_agent_scan_loop():
-    """Every 15 minutes: scan newest agents, upsert new ones, re-score if any found."""
+# ---------------------------------------------------------------------------
+# Tiered refresh loops
+# ---------------------------------------------------------------------------
+
+async def _price_refresh_loop():
+    """Tier 1: Price/MC/24h change every 3 minutes for top 100 agents."""
     while True:
         try:
-            await asyncio.sleep(15 * 60)  # 15 minute interval
-            logger.info("Starting 15-min new-agent scan...")
+            await asyncio.sleep(3 * 60)
+            logger.info("Price refresh: enriching top 100 via DexScreener...")
+            await enrich_top_agents_dexscreener(top_n=100)
+            enrichment_state["last_price_refresh"] = datetime.utcnow().isoformat()
+            logger.info("Price refresh complete")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"Price refresh error: {e}")
+            await asyncio.sleep(60)
+
+
+async def _holder_refresh_loop():
+    """Tier 2: Holder count every 30 minutes for top 100 agents."""
+    while True:
+        try:
+            await asyncio.sleep(30 * 60)
+            logger.info("Holder count refresh starting...")
+            await refresh_holder_counts(limit=100)
+            enrichment_state["last_holder_refresh"] = datetime.utcnow().isoformat()
+            logger.info("Holder count refresh complete")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"Holder refresh error: {e}")
+            await asyncio.sleep(300)
+
+
+async def _new_agent_scan_loop():
+    """Tier 3: New agent discovery every hour."""
+    while True:
+        try:
+            await asyncio.sleep(60 * 60)
+            logger.info("Hourly new-agent scan...")
             new_count = await scan_newest_agents(pages=5)
             enrichment_state["last_new_scan"] = datetime.utcnow().isoformat()
             enrichment_state["new_agents_found"] = new_count
@@ -186,26 +235,26 @@ async def _new_agent_scan_loop():
             break
         except Exception as e:
             logger.error(f"New-agent scan error: {e}")
-            await asyncio.sleep(300)  # retry in 5 min on error
+            await asyncio.sleep(300)
 
 
-async def _daily_scan_loop():
-    """Periodic background scan: fetch all agents to detect new launches and refresh market data."""
+async def _daily_refresh_loop():
+    """Tier 4: Description/team/socials full refresh every 24 hours."""
     while True:
         try:
-            await asyncio.sleep(24 * 3600)  # 24 hour interval
+            await asyncio.sleep(24 * 3600)
             logger.info("Starting daily full refresh...")
             count = await preload_all_agents()
-            logger.info(f"Daily Virtuals fetch complete: {count} agents refreshed, starting DexScreener enrichment...")
+            logger.info(f"Daily fetch: {count} agents refreshed, enriching DexScreener...")
             await enrich_top_agents_dexscreener(top_n=100)
             score_count = await bulk_score_agents()
             logger.info(f"Daily auto-scored {score_count} agents")
-            logger.info("Daily scan complete")
+            enrichment_state["last_description_refresh"] = datetime.utcnow().isoformat()
         except asyncio.CancelledError:
             break
         except Exception as e:
-            logger.error(f"Daily scan error: {e}")
-            await asyncio.sleep(3600)  # retry in 1h on error
+            logger.error(f"Daily refresh error: {e}")
+            await asyncio.sleep(3600)
 
 
 # ---------------------------------------------------------------------------
@@ -217,7 +266,6 @@ async def lifespan(app: FastAPI):
     logger.info("VirtualsIQ starting up...")
     await init_db()
 
-    # Preload ALL agents in background (don't block startup)
     async def _preload():
         enrichment_state["status"] = "preloading"
         enrichment_state["started_at"] = datetime.utcnow().isoformat()
@@ -229,11 +277,11 @@ async def lifespan(app: FastAPI):
         try:
             count = await preload_all_agents(on_batch=_on_batch)
             enrichment_state["agents_loaded"] = count
-            logger.info(f"Startup preload complete: {count} agents — dashboard is now live")
+            logger.info(f"Startup preload complete: {count} agents")
 
             enrichment_state["status"] = "enriching"
             await enrich_top_agents_dexscreener(top_n=100)
-            logger.info("DexScreener enrichment complete")
+            enrichment_state["last_price_refresh"] = datetime.utcnow().isoformat()
 
             enrichment_state["status"] = "scoring"
             score_count = await bulk_score_agents()
@@ -243,24 +291,24 @@ async def lifespan(app: FastAPI):
             enrichment_state["completed_at"] = datetime.utcnow().isoformat()
         except Exception as e:
             logger.error(f"Startup preload failed: {e}")
-            enrichment_state["status"] = "complete"  # unblock the UI
+            enrichment_state["status"] = "complete"
 
     preload_task = asyncio.create_task(_preload())
-    scan_task = asyncio.create_task(_daily_scan_loop())
+
+    # Tiered background loops
+    price_task = asyncio.create_task(_price_refresh_loop())
+    holder_task = asyncio.create_task(_holder_refresh_loop())
     new_agent_task = asyncio.create_task(_new_agent_scan_loop())
+    daily_task = asyncio.create_task(_daily_refresh_loop())
 
     yield
 
-    # Cleanup
-    preload_task.cancel()
-    scan_task.cancel()
-    new_agent_task.cancel()
-    try:
-        await preload_task
-        await scan_task
-        await new_agent_task
-    except asyncio.CancelledError:
-        pass
+    for task in [preload_task, price_task, holder_task, new_agent_task, daily_task]:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
     logger.info("VirtualsIQ shutdown complete")
 
 
@@ -271,7 +319,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="VirtualsIQ",
     description="AI-powered intelligence terminal for Virtuals Protocol",
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -285,6 +333,24 @@ templates = Jinja2Templates(directory="templates")
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.get("/agent/{virtuals_id}", response_class=HTMLResponse)
+async def agent_detail_page(request: Request, virtuals_id: str):
+    """Full detail page for an agent (not a modal)."""
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "detail_agent_id": virtuals_id,
+    })
+
+
+@app.get("/category/{category}", response_class=HTMLResponse)
+async def category_page(request: Request, category: str):
+    """Category landing page."""
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "category_page": category,
+    })
 
 
 @app.get("/api/agents")
@@ -330,6 +396,20 @@ async def trending_feed(feed: str, limit: int = Query(20, ge=1, le=50)):
     return {"feed": feed, "agents": agents}
 
 
+@app.get("/api/trending-strip")
+async def trending_strip():
+    """Top movers, new launches, score changes for homepage strip."""
+    data = await get_trending_strip()
+    return data
+
+
+@app.get("/api/category-summary/{category}")
+async def category_summary(category: str):
+    """Category landing page data."""
+    data = await get_category_summary(category)
+    return data
+
+
 @app.post("/api/analyze/{virtuals_id}")
 async def trigger_analysis(virtuals_id: str):
     agent = await get_agent_detail(virtuals_id)
@@ -337,7 +417,6 @@ async def trigger_analysis(virtuals_id: str):
         raise HTTPException(status_code=404, detail="Agent not found")
 
     job_id = create_job(virtuals_id)
-    # Use asyncio.create_task for proper async execution
     asyncio.create_task(_run_analysis_job(job_id, virtuals_id))
 
     return {
@@ -364,12 +443,11 @@ async def ecosystem_stats():
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "version": "1.0.0", "timestamp": datetime.utcnow().isoformat()}
+    return {"status": "ok", "version": "2.0.0", "timestamp": datetime.utcnow().isoformat()}
 
 
 @app.get("/api/sync/health")
 async def sync_health():
-    """Returns API vs DB coverage metrics and sync status."""
     stats = await get_stats()
     db_count = stats.get("total_agents", 0)
     api_total = enrichment_state.get("api_total", 0)
@@ -390,7 +468,6 @@ async def sync_health():
 
 @app.get("/api/status")
 async def system_status():
-    """Returns current enrichment pipeline status and agent count for frontend polling."""
     stats = await get_stats()
     return {
         **enrichment_state,
