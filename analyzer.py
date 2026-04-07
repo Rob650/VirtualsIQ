@@ -13,7 +13,7 @@ from scoring import calculate_composite_score
 
 logger = logging.getLogger(__name__)
 
-CLAUDE_MODEL = "claude-sonnet-4-20250514"
+CLAUDE_MODEL = "claude-haiku-4-5-20251001"
 
 # ---------------------------------------------------------------------------
 # Prompt templates (using .replace() to avoid KeyError with JSON curly braces)
@@ -224,7 +224,7 @@ async def analyze_agent(agent_data: dict) -> dict:
         }
 
     except Exception as e:
-        logger.error(f"Analysis failed for {agent_data.get('name')}: {e}")
+        logger.error(f"Analysis failed for {agent_data.get('name')}: {type(e).__name__}: {e}", exc_info=True)
         # Return neutral scores on failure
         score_result = calculate_composite_score(agent_data, {})
         return {
