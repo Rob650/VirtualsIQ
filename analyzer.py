@@ -281,8 +281,8 @@ def select_model(agent_data: dict, top_ids: set | None = None) -> str:
     return MODEL_HAIKU
 
 
-def should_reanalyze(agent_data: dict) -> bool:
-    """Check if agent needs re-analysis: never analyzed, status change, MC move >30%."""
+def should_reanalyze(agent_data: dict, prev_snapshot: dict | None = None) -> bool:
+    """Check if agent needs re-analysis: never analyzed, status change, MC move >30%, doxx tier change."""
     if not agent_data.get("last_analyzed"):
         return True
 
@@ -292,8 +292,29 @@ def should_reanalyze(agent_data: dict) -> bool:
     if days and days > 7:
         return True
 
-    # Check for big market cap move (would need historical data — skip for now)
-    # This gets triggered by the background loop checking score_history
+    if prev_snapshot:
+        # Status change (e.g. Prototype -> Sentient)
+        old_status = prev_snapshot.get("status")
+        new_status = agent_data.get("status")
+        if old_status and new_status and old_status != new_status:
+            logger.info(f"Re-analysis trigger: status change {old_status}->{new_status} for {agent_data.get('name')}")
+            return True
+
+        # Market cap moved >30% in 24h
+        old_mc = float(prev_snapshot.get("market_cap") or 0)
+        new_mc = float(agent_data.get("market_cap") or 0)
+        if old_mc > 0 and new_mc > 0:
+            pct_change = abs(new_mc - old_mc) / old_mc
+            if pct_change > 0.30:
+                logger.info(f"Re-analysis trigger: MC moved {pct_change:.0%} for {agent_data.get('name')}")
+                return True
+
+        # Doxx tier change
+        old_doxx = prev_snapshot.get("doxx_tier")
+        new_doxx = agent_data.get("doxx_tier")
+        if old_doxx is not None and new_doxx is not None and int(old_doxx) != int(new_doxx):
+            logger.info(f"Re-analysis trigger: doxx tier {old_doxx}->{new_doxx} for {agent_data.get('name')}")
+            return True
 
     return False
 
