@@ -663,9 +663,25 @@
     }
 
     .report-narrative {
-      color: var(--text-muted);
+      color: rgba(255,255,255,0.85);
       font-size: 14px;
-      line-height: 1.7;
+      line-height: 1.6;
+    }
+    .report-narrative p {
+      margin-bottom: 12px;
+      line-height: 1.6;
+    }
+    .report-narrative p:last-child {
+      margin-bottom: 0;
+    }
+    .report-section-sub {
+      font-size: 16px;
+      font-weight: 600;
+      color: #168389;
+      margin-top: 24px;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
     }
 
     .metrics-grid {
@@ -1408,6 +1424,15 @@ async function openModal(virtualsId) {
   }
 }
 
+function formatText(text) {
+  if (!text) return '';
+  return '<div class="report-narrative">' +
+    text.split('\n').filter(p => p.trim()).map(p =>
+      '<p>' + p + '</p>'
+    ).join('') +
+  '</div>';
+}
+
 function renderModal(agent) {
   state.currentAgent = agent;
 
@@ -1522,16 +1547,16 @@ function renderModal(agent) {
       <div class="report-section-title">AI Analyst Overview
         ${lastAnalyzed ? `<span style="font-size:10px;color:var(--text-dim);font-weight:400;margin-left:8px;font-family:var(--font-data)">Last analyzed: ${lastAnalyzed}</span>` : ''}
       </div>
-      ${overview.summary ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--teal);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">What it does</div><p class="report-narrative">${overview.summary}</p></div>` : ''}
-      ${teamData.team_summary ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--text-dim);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">Who is behind it</div><p class="report-narrative">${teamData.team_summary}</p></div>` : ''}
-      ${intelligenceNotes ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--text-dim);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">What is notable</div><p class="report-narrative">${intelligenceNotes}</p></div>` : ''}
-      ${(riskData.bear_case || (riskData.key_risks && riskData.key_risks.length)) ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--red);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">Risks to Monitor</div><p class="report-narrative">${riskData.bear_case || riskData.key_risks.join('. ')}</p></div>` : ''}
-      ${(productData.description || fmData.analysis) ? `<div style="margin-bottom:4px"><div style="font-size:10px;color:var(--text-dim);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">Market opportunity</div><p class="report-narrative">${productData.description || fmData.analysis}</p></div>` : ''}
+      ${overview.summary ? `<div style="margin-bottom:16px"><div class="report-section-sub">What It Does</div>${formatText(overview.summary)}</div>` : ''}
+      ${teamData.team_summary ? `<div style="margin-bottom:16px"><div class="report-section-sub">Who Is Behind It</div>${formatText(teamData.team_summary)}</div>` : ''}
+      ${intelligenceNotes ? `<div style="margin-bottom:16px"><div class="report-section-sub">What Is Notable</div>${formatText(intelligenceNotes)}</div>` : ''}
+      ${(riskData.bear_case || (riskData.key_risks && riskData.key_risks.length)) ? `<div style="margin-bottom:16px"><div class="report-section-sub" style="color:#ef4444">Risks to Monitor</div>${formatText(riskData.bear_case || riskData.key_risks.join('. '))}</div>` : ''}
+      ${(productData.description || fmData.analysis) ? `<div style="margin-bottom:4px"><div class="report-section-sub">Market Opportunity</div>${formatText(productData.description || fmData.analysis)}</div>` : ''}
     </div>
     ` : `
     <div>
       <div class="report-section-title">Overview</div>
-      <p class="report-narrative">${agent.biography || 'No biography available for this agent.'}</p>
+      ${formatText(agent.biography || 'No biography available for this agent.')}
       <p style="margin-top:12px;font-size:12px;color:var(--text-dim)">Full AI analysis not yet generated.</p>
     </div>
     `}
@@ -2148,16 +2173,16 @@ function buildAgentReportHTML(agent) {
       <div class="report-section-title">AI Analyst Overview
         ${lastAnalyzed ? `<span style="font-size:10px;color:var(--text-dim);font-weight:400;margin-left:8px;font-family:var(--font-data)">Last analyzed: ${lastAnalyzed}</span>` : ''}
       </div>
-      ${overview.summary ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--teal);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">What it does</div><p class="report-narrative">${overview.summary}</p></div>` : ''}
-      ${teamData.team_summary ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--text-dim);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">Who is behind it</div><p class="report-narrative">${teamData.team_summary}</p></div>` : ''}
-      ${intelligenceNotes ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--text-dim);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">What is notable</div><p class="report-narrative">${intelligenceNotes}</p></div>` : ''}
-      ${(riskData.bear_case || (riskData.key_risks && riskData.key_risks.length)) ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--red);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">Risks to Monitor</div><p class="report-narrative">${riskData.bear_case || riskData.key_risks.join('. ')}</p></div>` : ''}
-      ${(productData.description || fmData.analysis) ? `<div><div style="font-size:10px;color:var(--text-dim);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">Market opportunity</div><p class="report-narrative">${productData.description || fmData.analysis}</p></div>` : ''}
+      ${overview.summary ? `<div style="margin-bottom:16px"><div class="report-section-sub">What It Does</div>${formatText(overview.summary)}</div>` : ''}
+      ${teamData.team_summary ? `<div style="margin-bottom:16px"><div class="report-section-sub">Who Is Behind It</div>${formatText(teamData.team_summary)}</div>` : ''}
+      ${intelligenceNotes ? `<div style="margin-bottom:16px"><div class="report-section-sub">What Is Notable</div>${formatText(intelligenceNotes)}</div>` : ''}
+      ${(riskData.bear_case || (riskData.key_risks && riskData.key_risks.length)) ? `<div style="margin-bottom:16px"><div class="report-section-sub" style="color:#ef4444">Risks to Monitor</div>${formatText(riskData.bear_case || riskData.key_risks.join('. '))}</div>` : ''}
+      ${(productData.description || fmData.analysis) ? `<div style="margin-bottom:4px"><div class="report-section-sub">Market Opportunity</div>${formatText(productData.description || fmData.analysis)}</div>` : ''}
     </div>
     ` : `
     <div>
       <div class="report-section-title">Overview</div>
-      <p class="report-narrative">${agent.biography || 'No biography available for this agent.'}</p>
+      ${formatText(agent.biography || 'No biography available for this agent.')}
       <p style="margin-top:12px;font-size:12px;color:var(--text-dim)">AI analysis in progress — scores update automatically. Check back shortly.</p>
     </div>
     `}
