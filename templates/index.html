@@ -1445,15 +1445,17 @@ function renderModal(agent) {
   arc.style.strokeDashoffset = offset;
 
   const analysis = agent.analysis_json || {};
+  const overviewJson = agent.overview_json || {};
   const scores = agent.scores_json || {};
   const prediction = agent.prediction_json || {};
 
-  const hasAnalysis = Object.keys(analysis).length > 0;
-  const overview = analysis.overview || {};
-  const riskData = analysis.risk || {};
-  const teamData = analysis.team || {};
-  const productData = analysis.product || {};
+  const hasAnalysis = Object.keys(analysis).length > 0 || Object.keys(overviewJson).length > 0;
+  const overview = { summary: overviewJson.what_it_does || analysis.overview?.summary };
+  const riskData = { bear_case: overviewJson.risks_to_monitor || analysis.risk?.bear_case, key_risks: analysis.risk?.key_risks || [] };
+  const teamData = { team_summary: overviewJson.who_is_behind_it || analysis.team?.team_summary };
+  const productData = { description: overviewJson.market_opportunity || analysis.product?.description };
   const fmData = analysis.first_mover || {};
+  const intelligenceNotes = overviewJson.what_is_notable || analysis.intelligence_notes;
 
   // Phase 3: derive one_liner, top_helped, top_hurt from scores_json
   const factorScores = scores.scores || {};
@@ -1522,9 +1524,9 @@ function renderModal(agent) {
       </div>
       ${overview.summary ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--teal);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">What it does</div><p class="report-narrative">${overview.summary}</p></div>` : ''}
       ${teamData.team_summary ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--text-dim);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">Who is behind it</div><p class="report-narrative">${teamData.team_summary}</p></div>` : ''}
-      ${analysis.intelligence_notes ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--text-dim);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">What is notable</div><p class="report-narrative">${analysis.intelligence_notes}</p></div>` : ''}
+      ${intelligenceNotes ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--text-dim);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">What is notable</div><p class="report-narrative">${intelligenceNotes}</p></div>` : ''}
       ${(riskData.bear_case || (riskData.key_risks && riskData.key_risks.length)) ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--red);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">What is concerning</div><p class="report-narrative">${riskData.bear_case || riskData.key_risks.join('. ')}</p></div>` : ''}
-      ${(productData.description || fmData.analysis) ? `<div style="margin-bottom:4px"><div style="font-size:10px;color:var(--text-dim);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">Recent activity</div><p class="report-narrative">${productData.description || fmData.analysis}</p></div>` : ''}
+      ${(productData.description || fmData.analysis) ? `<div style="margin-bottom:4px"><div style="font-size:10px;color:var(--text-dim);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">Market opportunity</div><p class="report-narrative">${productData.description || fmData.analysis}</p></div>` : ''}
     </div>
     ` : `
     <div>
@@ -2070,15 +2072,17 @@ function buildAgentReportHTML(agent) {
   const color = scoreColor(score);
 
   const analysis   = agent.analysis_json || {};
+  const overviewJson = agent.overview_json || {};
   const scores     = agent.scores_json   || {};
   const prediction = agent.prediction_json || {};
 
-  const hasAnalysis  = Object.keys(analysis).length > 0;
-  const overview     = analysis.overview    || {};
-  const riskData     = analysis.risk        || {};
-  const teamData     = analysis.team        || {};
-  const productData  = analysis.product     || {};
+  const hasAnalysis  = Object.keys(analysis).length > 0 || Object.keys(overviewJson).length > 0;
+  const overview     = { summary: overviewJson.what_it_does || analysis.overview?.summary };
+  const riskData     = { bear_case: overviewJson.risks_to_monitor || analysis.risk?.bear_case, key_risks: analysis.risk?.key_risks || [] };
+  const teamData     = { team_summary: overviewJson.who_is_behind_it || analysis.team?.team_summary };
+  const productData  = { description: overviewJson.market_opportunity || analysis.product?.description };
   const fmData       = analysis.first_mover || {};
+  const intelligenceNotes = overviewJson.what_is_notable || analysis.intelligence_notes;
 
   const factorScores = scores.scores      || {};
   const tierScores   = scores.tier_scores || {};
@@ -2146,9 +2150,9 @@ function buildAgentReportHTML(agent) {
       </div>
       ${overview.summary ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--teal);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">What it does</div><p class="report-narrative">${overview.summary}</p></div>` : ''}
       ${teamData.team_summary ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--text-dim);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">Who is behind it</div><p class="report-narrative">${teamData.team_summary}</p></div>` : ''}
-      ${analysis.intelligence_notes ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--text-dim);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">What is notable</div><p class="report-narrative">${analysis.intelligence_notes}</p></div>` : ''}
+      ${intelligenceNotes ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--text-dim);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">What is notable</div><p class="report-narrative">${intelligenceNotes}</p></div>` : ''}
       ${(riskData.bear_case || (riskData.key_risks && riskData.key_risks.length)) ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--red);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">What is concerning</div><p class="report-narrative">${riskData.bear_case || riskData.key_risks.join('. ')}</p></div>` : ''}
-      ${(productData.description || fmData.analysis) ? `<div><div style="font-size:10px;color:var(--text-dim);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">Recent activity</div><p class="report-narrative">${productData.description || fmData.analysis}</p></div>` : ''}
+      ${(productData.description || fmData.analysis) ? `<div><div style="font-size:10px;color:var(--text-dim);font-weight:700;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase">Market opportunity</div><p class="report-narrative">${productData.description || fmData.analysis}</p></div>` : ''}
     </div>
     ` : `
     <div>
