@@ -186,10 +186,11 @@ async def _run_analysis_job(job_id: str, virtuals_id: str):
 
 async def _auto_analyze_all(force: bool = False):
     """
-    Startup background task: run AI analysis on agents that need it.
-    - Top 100 by market cap: full analyze_agent (Sonnet/Haiku per MC)
-    - Remaining: batch_triage in batches of 20
+    Background task: run AI analysis on agents that need it.
+    - Top 100 by market cap: full analyze_agent, 1 at a time with 3s sleep between
+    - Remaining: batch_triage in batches of 10, with 5s sleep between batches
     - Skips agents analyzed within 7 days unless force=True.
+    - Covers up to 50000 agents per run.
     """
     try:
         logger.info(f"Auto-analysis starting (force={force})...")
@@ -198,8 +199,8 @@ async def _auto_analyze_all(force: bool = False):
         top_ids_list = await get_top_agent_ids(100)
         top_ids_set = set(top_ids_list)
 
-        # Semaphore: max 5 concurrent full analyses to avoid API overload
-        sem = asyncio.Semaphore(5)
+        # Semaphore: 1 at a time — server stays responsive
+        sem = asyncio.Semaphore(1)
 
         async def _analyze_one(virtuals_id: str, force: bool = False):
             async with sem:
@@ -246,39 +247,44 @@ async def _auto_analyze_all(force: bool = False):
                         doxx_tier=int(analysis.get("team", {}).get("doxx_tier", 3)),
                     )
                     logger.info(f"Auto-analyzed {agent.get('name')}: score={scores['composite_score']}")
+                    await asyncio.sleep(3)
                 except Exception as e:
                     logger.error(f"Auto-analysis failed for {virtuals_id}: {e}")
 
-        # Full analysis for top 100 (concurrent, throttled)
-        tasks = [_analyze_one(vid, force=force) for vid in top_ids_list]
-        await asyncio.gather(*tasks)
+        # Full analysis for top 100, one at a time
+        for vid in top_ids_list:
+            await _analyze_one(vid, force=force)
         logger.info(f"Full analysis complete for top {len(top_ids_list)} agents")
 
-        # Batch triage for remaining unanalyzed agents
-        remaining = await get_agents_needing_reanalysis(limit=5000)
+        # Batch triage for remaining agents — up to 50000, batches of 10
+        remaining = await get_agents_needing_reanalysis(limit=50000)
         remaining = [a for a in remaining if str(a["virtuals_id"]) not in top_ids_set]
 
-        for i in range(0, len(remaining), 20):
-            batch = remaining[i:i + 20]
+        for i in range(0, len(remaining), 10):
+            batch = remaining[i:i + 10]
             try:
                 results = await batch_triage(batch)
                 for r in results:
                     vid = r["virtuals_id"]
                     s = r["scores"]
-                    await update_agent_scores(
-                        virtuals_id=vid,
-                        composite_score=s["composite_score"],
-                        tier=s["tier_classification"],
-                        scores_json=s["scores"],
-                        analysis_json=r["analysis"],
-                        prediction_json={},
-                        overview_json={},
-                        first_mover=s["first_mover"],
-                        doxx_tier=int(r["analysis"].get("team", {}).get("doxx_tier", 3)),
-                    )
-                logger.info(f"Batch triage: {min(i + 20, len(remaining))}/{len(remaining)} agents")
+                    try:
+                        await update_agent_scores(
+                            virtuals_id=vid,
+                            composite_score=s["composite_score"],
+                            tier=s["tier_classification"],
+                            scores_json=s["scores"],
+                            analysis_json=r["analysis"],
+                            prediction_json={},
+                            overview_json={},
+                            first_mover=s["first_mover"],
+                            doxx_tier=int(r["analysis"].get("team", {}).get("doxx_tier", 3)),
+                        )
+                    except Exception as e:
+                        logger.error(f"Score update failed for {vid}: {e}")
+                logger.info(f"Batch triage: {min(i + 10, len(remaining))}/{len(remaining)} agents")
             except Exception as e:
                 logger.error(f"Batch triage failed for batch {i}: {e}")
+            await asyncio.sleep(5)
 
         enrichment_state["status"] = "complete"
         logger.info("Auto-analysis complete for all agents")
@@ -394,8 +400,8 @@ async def lifespan(app: FastAPI):
             logger.info(f"Auto-scored {score_count} agents (on-chain only, AI analysis queued)")
 
             enrichment_state["completed_at"] = datetime.utcnow().isoformat()
-            # Auto-analysis on startup is DISABLED — use POST /api/admin/refresh-analysis to trigger manually
-            # asyncio.create_task(_auto_analyze_all())
+            # Kick off full AI analysis in background — throttled (1 at a time, 3s between)
+            asyncio.create_task(_auto_analyze_all())
         except Exception as e:
             logger.error(f"Startup preload failed: {e}")
             enrichment_state["status"] = "complete"
