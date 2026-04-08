@@ -342,7 +342,7 @@ async def analyze_agent(agent_data: dict, model: str = None, top_ids: set = None
 
         message = client.messages.create(
             model=chosen_model,
-            max_tokens=6000,
+            max_tokens=8192,
             system="You are a senior crypto research analyst at an institutional fund. Write thorough, data-driven due diligence reports of approximately 1000 words total. Reference specific data points, URLs, and metrics provided. Never use filler phrases. Every sentence must add new information.",
             messages=[{"role": "user", "content": prompt}]
         )
