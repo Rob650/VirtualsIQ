@@ -678,12 +678,13 @@
       font-size: 16px;
       font-weight: 600;
       color: #168389;
-      margin-top: 24px;
+      margin-top: 0;
       margin-bottom: 8px;
       padding-bottom: 8px;
       border-bottom: 1px solid rgba(255,255,255,0.1);
     }
-    .report-section-sub.risk { color: #ef4444; }
+    .report-section-sub.primary { font-size: 18px; }
+    .report-section-sub.risk { color: #168389; }
     .report-sub-card {
       padding: 14px 16px;
       border-radius: var(--radius-sm);
@@ -1556,10 +1557,10 @@ function renderModal(agent) {
       <div class="report-section-title">AI Analyst Overview
         ${lastAnalyzed ? `<span style="font-size:10px;color:var(--text-dim);font-weight:400;margin-left:8px;font-family:var(--font-data)">Last analyzed: ${lastAnalyzed}</span>` : ''}
       </div>
-      ${overview.summary ? `<div class="report-sub-card"><div class="report-section-sub" style="font-size:18px">What It Does</div>${formatText(overview.summary)}</div>` : ''}
+      ${overview.summary ? `<div class="report-sub-card"><div class="report-section-sub primary">What It Does</div>${formatText(overview.summary)}</div>` : ''}
       ${teamData.team_summary ? `<div class="report-sub-card"><div class="report-section-sub">Who Is Behind It</div>${formatText(teamData.team_summary)}</div>` : ''}
       ${intelligenceNotes ? `<div class="report-sub-card"><div class="report-section-sub">What Is Notable</div>${formatText(intelligenceNotes)}</div>` : ''}
-      ${(riskData.bear_case || (riskData.key_risks && riskData.key_risks.length)) ? `<div class="report-sub-card risk"><div class="report-section-sub risk">Risks to Monitor</div>${formatText(riskData.bear_case || riskData.key_risks.join('. '))}</div>` : ''}
+      ${(riskData.bear_case || (riskData.key_risks && riskData.key_risks.length)) ? `<div class="report-sub-card risk"><div class="report-section-sub risk">Risks to Monitor</div>${formatText(riskData.bear_case || riskData.key_risks.join('\n'))}</div>` : ''}
       ${(productData.description || fmData.analysis) ? `<div class="report-sub-card"><div class="report-section-sub">Market Opportunity</div>${formatText(productData.description || fmData.analysis)}</div>` : ''}
     </div>
     ` : `
@@ -2182,10 +2183,10 @@ function buildAgentReportHTML(agent) {
       <div class="report-section-title">AI Analyst Overview
         ${lastAnalyzed ? `<span style="font-size:10px;color:var(--text-dim);font-weight:400;margin-left:8px;font-family:var(--font-data)">Last analyzed: ${lastAnalyzed}</span>` : ''}
       </div>
-      ${overview.summary ? `<div class="report-sub-card"><div class="report-section-sub" style="font-size:18px">What It Does</div>${formatText(overview.summary)}</div>` : ''}
+      ${overview.summary ? `<div class="report-sub-card"><div class="report-section-sub primary">What It Does</div>${formatText(overview.summary)}</div>` : ''}
       ${teamData.team_summary ? `<div class="report-sub-card"><div class="report-section-sub">Who Is Behind It</div>${formatText(teamData.team_summary)}</div>` : ''}
       ${intelligenceNotes ? `<div class="report-sub-card"><div class="report-section-sub">What Is Notable</div>${formatText(intelligenceNotes)}</div>` : ''}
-      ${(riskData.bear_case || (riskData.key_risks && riskData.key_risks.length)) ? `<div class="report-sub-card risk"><div class="report-section-sub risk">Risks to Monitor</div>${formatText(riskData.bear_case || riskData.key_risks.join('. '))}</div>` : ''}
+      ${(riskData.bear_case || (riskData.key_risks && riskData.key_risks.length)) ? `<div class="report-sub-card risk"><div class="report-section-sub risk">Risks to Monitor</div>${formatText(riskData.bear_case || riskData.key_risks.join('\n'))}</div>` : ''}
       ${(productData.description || fmData.analysis) ? `<div class="report-sub-card"><div class="report-section-sub">Market Opportunity</div>${formatText(productData.description || fmData.analysis)}</div>` : ''}
     </div>
     ` : `
