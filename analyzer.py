@@ -1,6 +1,6 @@
 """
 VirtualsIQ — Claude AI Analysis Layer
-Produces structured 5-section deep reports and scoring data for Virtuals Protocol agents.
+Produces structured 5-section deep-dive reports and scoring data for Virtuals Protocol agents.
 """
 
 import json
@@ -62,12 +62,12 @@ async def _fetch_twitter_bio(twitter_url: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# 5-Section Deep Report Prompt (~1000 words total across 5 sections)
+# Deep-Dive Analysis Prompt (~1000 words per report)
 # ---------------------------------------------------------------------------
 
-FIVE_SECTION_PROMPT = """You are VirtualsIQ, a senior intelligence analyst specializing in AI agent ecosystems on Virtuals Protocol. Your job is to produce comprehensive, deeply researched analysis reports that investors and researchers rely on to make informed decisions. Each section must be substantive and approximately 200 words — five sections totaling roughly 1,000 words. Be thorough, specific, and analytical. Vague, generic, or padded responses are unacceptable.
+FIVE_SECTION_PROMPT = """You are a senior crypto research analyst writing institutional-grade due diligence reports for a hedge fund. Your reports are thorough, specific, data-driven, and approximately 1000 words. Vague or generic language is unacceptable. Every claim must be grounded in the data provided or explicitly flagged as unverifiable.
 
-Analyze this AI agent and return a structured deep report in exactly 5 sections.
+Analyze this AI agent from Virtuals Protocol and return a structured deep-dive report in exactly 5 sections.
 
 === PROJECT DATA ===
 Name: AGENT_NAME
@@ -95,18 +95,20 @@ Virtuals Protocol Page: https://app.virtuals.io/virtuals/AGENT_VIRTUAL_ID
 AGENT_EXTRA_CONTEXT
 
 === INSTRUCTIONS ===
-Return ONLY valid JSON with exactly this structure (no markdown, no code blocks):
+Return ONLY valid JSON with exactly this structure (no markdown, no code blocks).
+
+Each of the 5 text sections must be 2-3 detailed paragraphs (200 words minimum per section). Reference the specific data points provided above — cite actual numbers, URLs, holder counts, volume figures, and market cap. Do not write generic filler. Every paragraph must add analytical value a fund manager could act on.
 
 {
-  "what_it_does": "~200 words. Provide a comprehensive explanation of what this agent does at the product and technical level. Cover: what specific tasks it performs, which platforms or integrations it operates within, who its primary users are (retail traders, developers, content creators, etc.), what problem it solves that existing tools do not, and how it differs from a simple chatbot or generic AI assistant. Describe the agent's core loop — how a user interacts with it, what inputs it takes, and what outputs or actions it produces. If the agent is live, describe observable behavior from the website or social content. If it is pre-product, explain what has been promised versus what is verifiable. Call out any technical architecture details such as on-chain components, oracle usage, autonomous execution, or memory systems. Be concrete: name the integrations, describe the workflows, and give examples of the agent in action where evidence exists.",
+  "what_it_does": "PARAGRAPH 1: Describe the agent's core function in precise technical terms — what it does, how it works, and what underlying technology or protocol it leverages. Name the specific capabilities visible from the website content or biography. PARAGRAPH 2: Identify the target user segment and specific use case this agent addresses. Explain how its workflow differs from a general-purpose LLM or chatbot and what proprietary value it creates. Cite any specific features, integrations, or APIs mentioned in the data. PARAGRAPH 3: Assess the product completeness based on status (AGENT_STATUS) and available evidence. If the product is live, describe what is actually deployed. If pre-product, explain the gap between claimed capability and what is verifiable today.",
 
-  "who_is_behind_it": "~200 words. Provide a thorough examination of the team or individual behind this agent. Cover: whether the team is fully anonymous, pseudonymous, or publicly identified — and what that specific level of anonymity means for accountability and trust. Identify any verifiable credentials, past projects, or GitHub activity that can be confirmed independently. If names or handles are public, search for their prior work and note any successes, failures, or patterns. Examine wallet behavior if a contract address is available: are wallets concentrated, are there signs of insider allocation, early dumping, or wash trading? Describe any discrepancies between claimed identity and what can actually be verified. Note the size of the team if knowable, whether there is evidence of a developer actively maintaining the project, and whether the social presence suggests a solo operator versus an organized team. If the team is anonymous, explain exactly what due diligence an investor cannot perform as a result, and what that implies for the risk profile of holding this token.",
+  "who_is_behind_it": "PARAGRAPH 1: Describe everything known or inferable about the team — named founders, social handles, organizational structure, and any verifiable credentials or prior projects. If the team is anonymous, state that explicitly and cross-reference against the Twitter URL (AGENT_TWITTER) and website (AGENT_WEBSITE) for any identifying information. PARAGRAPH 2: Analyze on-chain and operational behavior as a proxy for team credibility — holder concentration, liquidity provision decisions, launch mechanics, and whether the project's stated roadmap aligns with on-chain activity. Reference specific data: AGENT_HOLDERS holders, liquidity of $AGENT_LIQUIDITY, buy/sell ratio of AGENT_BSR. PARAGRAPH 3: Provide a frank assessment of team risk. Anonymous teams on Virtuals Protocol are common but not uniform in risk — distinguish between pseudonymous builders with track records versus fully anonymous with no verifiable history. State what due diligence steps a fund would need to take before deploying capital.",
 
-  "what_is_notable": "~200 words. Identify and deeply analyze the most compelling and independently verifiable strengths of this agent. Do not include hype or unverifiable claims — every point must be grounded in evidence from the data provided. Cover: genuine first-mover advantages with specifics about when the agent launched relative to competitors in the same niche, confirmed partnerships naming the specific counterparties and their credibility, measurable product traction such as user counts, API call volumes, or revenue figures, unique technical moats such as proprietary training data, on-chain execution capabilities, or exclusive integrations that competitors cannot easily replicate. Analyze the quality of the community: is holder growth organic or does it appear incentivized? Is the buy/sell ratio indicative of genuine demand or wash trading? Highlight any standout metrics — if holders are growing week-over-week, if volume is high relative to market cap, or if engagement rate substantially exceeds niche benchmarks. Quantify wherever possible: percentages, dollar figures, relative comparisons. Explain why each strength is durable rather than temporary.",
+  "what_is_notable": "PARAGRAPH 1: Identify the single most compelling differentiator this agent has — whether that is a genuine first-mover position in its category (AGENT_CATEGORY), a confirmed technical moat, a verifiable partnership, or standout on-chain metrics. Cite the specific data that supports this claim. Do not include unverifiable hype. PARAGRAPH 2: Analyze the market traction evidence available. Discuss holder count (AGENT_HOLDERS), trading volume ($AGENT_VOL 24h), market cap ($AGENT_MCAP), and buy/sell ratio (AGENT_BSR) in the context of comparable Virtuals Protocol agents. Flag whether these metrics suggest genuine organic interest or manufactured activity. PARAGRAPH 3: If notable partnerships, integrations, or ecosystem positioning are referenced in the website content or biography, analyze their significance. If none exist, identify what strategic advantages this project has that are defensible without partnerships — and assess how durable those advantages are against well-funded competitors entering the same niche.",
 
-  "what_is_concerning": "~200 words. NEVER EMPTY. Provide a candid, specific, and deeply analytical risk assessment of the most material concerns for this agent. Every project has risks — your job is to surface the most significant ones with evidence and specifics. Consider and address as many of the following as the data supports: team anonymity and what accountability is absent, thin liquidity and what that means for exit risk at various position sizes, low 24h volume relative to market cap and what it implies about real demand, concentrated holder distribution and specific concentration percentages if available, absence of a shipped product and the gap between roadmap and reality, lack of GitHub activity or any verifiable development, suspicious buy/sell patterns suggesting manipulation or insider activity, saturation in this specific vertical with named competitors already ahead, regulatory exposure for the specific use case, dependency on Virtuals Protocol itself as a single point of failure, and any inconsistencies between what is claimed on the website versus what is actually verifiable. Rank the risks by severity and explain specifically how each could materially harm a token holder.",
+  "what_is_concerning": "PARAGRAPH 1: Lead with the most material risk identified from the quantitative data. Assess liquidity ($AGENT_LIQUIDITY) — if under $50K this represents significant slippage risk for any meaningful position. Assess volume ($AGENT_VOL) — if under $10K/day the market is illiquid. Assess holder distribution (AGENT_HOLDERS holders) — if under 200 holders the project is highly concentrated and vulnerable to coordinated selling. Assess buy/sell ratio (AGENT_BSR) — ratios above 1.5 signal speculative momentum; below 0.7 signal sustained distribution. PARAGRAPH 2: Assess product and execution risk. If the agent is pre-product or vaporware, calculate the funding gap between current market cap ($AGENT_MCAP) and what a working product in this category actually costs to build. If the product is live, assess whether the technical moat is defensible or easily replicated. Identify specific execution risks: team bandwidth, dependency on Virtuals Protocol infrastructure, regulatory exposure of the use case. PARAGRAPH 3: Assess market and competitive risk. How saturated is the AGENT_CATEGORY vertical on Virtuals Protocol and across the broader AI agent ecosystem? Name the most direct competitors and explain how this agent differentiates. Flag any red flags in the biography or website content — inconsistencies, overstatements, missing information that should be present for a legitimate project at this stage.",
 
-  "recent_activity": "~200 words. Provide a detailed account of what has changed for this agent in the past 7 days, drawing directly from the data provided. Cover price movement with exact magnitude and direction, noting whether it outperformed or underperformed the broader Virtuals ecosystem. Analyze holder count changes: if holders grew, assess whether the rate is organic or anomalous; if holders declined, identify whether it correlates with price or suggests a loss of confidence. Report on any new announcements, partnerships, product launches, or development updates visible from social content or website changes. Assess social activity: has posting frequency increased or decreased, are engagement levels rising or falling, and what is the sentiment of recent content? If the data shows silence — no price movement, no new holders, no announcements — state that explicitly and analyze what silence means for a project at this stage: is it normal consolidation, a sign of abandonment, or consistent with a project that does not rely on hype cycles? Draw a conclusion about whether the recent trajectory is positive, negative, or neutral, and what near-term catalysts or risks are worth monitoring.",
+  "recent_activity": "PARAGRAPH 1: Analyze the 24-hour price action in context. A AGENT_CHANGE% move with $AGENT_VOL volume and $AGENT_MCAP market cap implies a specific volume-to-mcap ratio — calculate it and assess whether the price move is credible or potentially manipulated. Cross-reference with buy/sell ratio (AGENT_BSR) to determine whether buying or selling pressure drove the move. PARAGRAPH 2: Assess social and development activity signals. If a Twitter URL (AGENT_TWITTER) is provided, note whether the account appears active or dormant based on bio content. If a website (AGENT_WEBSITE) is provided, assess whether the website content reflects recent updates or appears stale. If GitHub data is available, comment on commit frequency and contributor count — no recent commits for a product claiming active development is a significant warning sign. PARAGRAPH 3: Provide a synthesis of recent trajectory. Based on all available signals — price, volume, holders, social activity, product status — characterize whether this project is in an accumulation phase, distribution phase, stagnation, or active growth. Explain what a material change in any one of these indicators would signal about the project's health.",
 
   "scoring_data": {
     "first_mover": {
@@ -115,76 +117,76 @@ Return ONLY valid JSON with exactly this structure (no markdown, no code blocks)
       "cross_chain_original": true,
       "days_ahead_of_competitor": 60,
       "defensibility_score": 50,
-      "analysis": "Brief moat analysis"
+      "analysis": "Specific moat analysis referencing the category and competitors"
     },
     "team": {
       "doxx_tier": 3,
       "doxx_description": "Anonymous / Social Presence / Full Doxx",
-      "team_summary": "Who is behind this",
+      "team_summary": "Who is behind this and what is verifiable",
       "track_record_score": 50,
       "wallet_behavior_score": 50,
       "red_flags": []
     },
     "product": {
       "status": "live|beta|testnet|pre-product|vaporware",
-      "description": "What has shipped",
+      "description": "What has actually shipped",
       "partnership_score": 50,
-      "technical_moat": "Technical advantages",
+      "technical_moat": "Specific technical advantages or lack thereof",
       "red_flags": []
     },
     "market": {
       "tam_score": 50,
-      "tam_description": "Niche-specific TAM, NOT generic AI market size",
+      "tam_description": "Niche-specific TAM — e.g. AI trading bots on Base L2, NOT generic AI market",
       "comparables_score": 50,
       "revenue_model_score": 50,
       "current_revenue_score": 50,
       "mcap_tam_ratio": 0.001,
       "saturation_score": 50,
-      "saturation_description": "How saturated is this vertical"
+      "saturation_description": "Specific assessment of vertical saturation"
     },
     "community": {
       "depth_score": 50,
       "organic_score": 50,
       "smart_money_score": 50,
       "follower_growth_score": 50,
-      "community_analysis": "Community quality assessment"
+      "community_analysis": "Specific community quality assessment with data"
     },
     "risk": {
       "overall_risk": "low|medium|high|extreme",
-      "key_risks": ["specific risk 1", "specific risk 2"],
-      "bull_case": "What needs to go right",
-      "bear_case": "What could go wrong"
+      "key_risks": ["specific risk 1 with data", "specific risk 2 with data"],
+      "bull_case": "Specific conditions required for upside with metrics",
+      "bear_case": "Specific failure modes with data-backed reasoning"
     },
     "technical": {
       "open_source": false,
       "audit_status": "audited|unaudited|unknown"
     },
     "swot": {
-      "strengths": ["specific strength"],
-      "weaknesses": ["specific weakness"],
-      "opportunities": ["specific opportunity"],
-      "threats": ["specific threat"]
+      "strengths": ["specific strength backed by data"],
+      "weaknesses": ["specific weakness backed by data"],
+      "opportunities": ["specific opportunity with market context"],
+      "threats": ["specific threat with named competitors or risks"]
     }
   }
 }
 
 CRITICAL RULES:
-1. Each of the 5 overview sections must be approximately 200 words — substantive, specific, and analytical. The total report should be roughly 1,000 words. Padding with filler is as bad as being too short.
-2. "what_is_concerning" is NEVER empty. There is ALWAYS something material to flag. If the agent looks clean, dig deeper: concentration risk, market saturation, execution risk, dependency risk, regulatory exposure.
-3. Never invent facts. If data is unknown, say "Cannot be verified" — then explain what that absence specifically implies for risk or credibility.
-4. Every score must reflect actual data — not defaults. Anonymous team = doxx_tier 3, low trust scores. Low volume = low liquidity scores. No GitHub = low technical scores.
-5. TAM must be niche-specific (e.g. "AI trading bots on Base L2", "AI-generated music NFTs"), NOT generic "AI market is $XXX trillion" platitudes.
-6. Specific data flags: volume < $10K = liquidity warning; holders < 100 = concentration risk; buy/sell ratio > 1.5 = momentum buy pressure; < 0.7 = sustained selling pressure.
-7. Every sentence in all 5 sections must carry specific, verifiable information. Avoid phrases like "this is an exciting project" or "the team is working hard."
-8. Scoring values must span the full 0-100 range based on evidence — do NOT default everything to 50. A project with no product should score 10-20 on product status. A fully doxxed team with track record scores 70-90 on team trust."""
+1. All 5 text sections combined must total approximately 1000 words. Each section is 200+ words minimum.
+2. "what_is_concerning" is NEVER empty. Flag real risks with specific numbers from the data provided.
+3. Never invent facts. If data is missing, write "Cannot be verified" and explain what that absence implies for risk.
+4. Every score must reflect actual data — not defaults. Anonymous team = doxx_tier 3, low trust scores. Volume < $10K = 10-20 on liquidity scores. No GitHub = 10-20 on technical scores.
+5. TAM must be niche-specific (e.g. "AI trading bots on Base L2"), NEVER "the AI market is $XXX trillion".
+6. Data thresholds: volume < $10K = liquidity warning; holders < 100 = extreme concentration risk; holders < 500 = high concentration risk; buy/sell ratio > 1.5 = momentum buying; < 0.7 = sustained selling pressure; liquidity < $50K = illiquid.
+7. Scores must span the full 0-100 range based on evidence. Do NOT default everything to 50.
+8. Reference specific URLs, numbers, and identifiers from the data throughout all 5 sections."""
 
 
-BATCH_TRIAGE_PROMPT = """You are VirtualsIQ. Perform rapid triage analysis of these AI agents from Virtuals Protocol.
+BATCH_TRIAGE_PROMPT = """You are a senior crypto research analyst performing rapid triage on AI agents from Virtuals Protocol for a hedge fund screening process.
 
 AGENTS:
 AGENTS_LIST
 
-For each agent, return a JSON array with lightweight assessments. Return ONLY valid JSON array:
+For each agent, return a JSON array with assessments. Return ONLY valid JSON array:
 [
   {
     "virtuals_id": "id",
@@ -197,11 +199,11 @@ For each agent, return a JSON array with lightweight assessments. Return ONLY va
   }
 ]
 
-Be concise. Focus on what differentiates each agent."""
+Score based on actual data. Do not default everything to 50. Focus on differentiation between agents."""
 
 
 def _build_prompt(agent: dict, website_content: str = "", twitter_bio: str = "") -> str:
-    """Build the 5-section deep report prompt."""
+    """Build the deep-dive analysis prompt."""
     prompt = FIVE_SECTION_PROMPT
     prompt = prompt.replace("AGENT_NAME", str(agent.get("name", "Unknown")))
     prompt = prompt.replace("AGENT_TICKER", str(agent.get("ticker", "N/A")))
@@ -315,7 +317,7 @@ async def analyze_agent(agent_data: dict, model: str = None, top_ids: set = None
     """
     Full analysis for a single agent.
     1. Fetch website + Twitter context
-    2. Call Claude for 5-section deep report + scoring data
+    2. Call Claude for 5-section deep-dive report + scoring data
     3. Calculate composite scores
     Returns combined result.
     """
@@ -341,6 +343,7 @@ async def analyze_agent(agent_data: dict, model: str = None, top_ids: set = None
         message = client.messages.create(
             model=chosen_model,
             max_tokens=6000,
+            system="You are a senior crypto research analyst writing institutional-grade due diligence reports for a hedge fund. Your reports are thorough, specific, data-driven, and approximately 1000 words.",
             messages=[{"role": "user", "content": prompt}]
         )
 
@@ -350,7 +353,7 @@ async def analyze_agent(agent_data: dict, model: str = None, top_ids: set = None
         if not parsed:
             parsed = {}
 
-        # Extract the 5-section deep report
+        # Extract the 5-section overview
         overview = {
             "what_it_does": parsed.get("what_it_does", ""),
             "who_is_behind_it": parsed.get("who_is_behind_it", ""),
@@ -359,15 +362,17 @@ async def analyze_agent(agent_data: dict, model: str = None, top_ids: set = None
             "recent_activity": parsed.get("recent_activity", ""),
         }
 
-        # Extract scoring data
+        # Extract scoring data (no prediction)
         scoring_data = parsed.get("scoring_data", {})
 
         # Calculate composite scores using scoring data + on-chain data
         score_result = calculate_composite_score(agent_data, scoring_data)
 
+        ai_analysis = scoring_data
+
         return {
             "overview": overview,
-            "analysis": scoring_data,
+            "analysis": ai_analysis,
             "scores": score_result,
         }
 
