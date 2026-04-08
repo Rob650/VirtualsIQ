@@ -665,23 +665,35 @@
     .report-narrative {
       color: rgba(255,255,255,0.85);
       font-size: 14px;
-      line-height: 1.6;
+      line-height: 1.8;
     }
     .report-narrative p {
       margin-bottom: 12px;
-      line-height: 1.6;
+      line-height: 1.8;
     }
     .report-narrative p:last-child {
       margin-bottom: 0;
     }
     .report-section-sub {
-      font-size: 16px;
-      font-weight: 600;
+      font-size: 11px;
+      font-weight: 700;
       color: #168389;
-      margin-top: 24px;
-      margin-bottom: 8px;
-      padding-bottom: 8px;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 10px;
+    }
+    .report-section-sub.risk { color: #ef4444; }
+    .report-sub-card {
+      padding: 14px 16px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-2);
+      margin-bottom: 10px;
+    }
+    .report-sub-card:last-child { margin-bottom: 0; }
+    .report-sub-card.risk {
+      border-color: rgba(239,68,68,0.25);
+      background: rgba(239,68,68,0.04);
     }
 
     .metrics-grid {
@@ -1427,21 +1439,8 @@ async function openModal(virtualsId) {
 function formatText(text) {
   if (!text) return '';
   return '<div class="report-narrative">' +
-    text.split('\n').filter(p => p.trim()).map(p =>
-      '<p>' + p + '</p>'
-    ).join('') +
+    text.split('\n').filter(p => p.trim()).map(p => '<p>' + p + '</p>').join('') +
   '</div>';
-}
-
-
-    function formatText(text) {
-      if (!text) return '';
-      return text.split('\n').filter(function(p) { return p.trim(); }).map(function(p) { return '<p style="margin-bottom:12px;line-height:1.7;color:rgba(255,255,255,0.85)">' + p + '</p>'; }).join('');
-    }
-
-function formatText(text) {
-  if (!text) return '';
-  return text.split('\n').filter(function(p) { return p.trim(); }).map(function(p) { return '<p style="margin-bottom:12px;line-height:1.7;color:rgba(255,255,255,0.85)">' + p + '</p>'; }).join('');
 }
 
 function renderModal(agent) {
@@ -1558,11 +1557,11 @@ function renderModal(agent) {
       <div class="report-section-title">AI Analyst Overview
         ${lastAnalyzed ? `<span style="font-size:10px;color:var(--text-dim);font-weight:400;margin-left:8px;font-family:var(--font-data)">Last analyzed: ${lastAnalyzed}</span>` : ''}
       </div>
-      ${overview.summary ? `<div style="margin-bottom:16px"><div class="report-section-sub" style="font-size:18px;font-weight:600;color:#168389;margin-top:24px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.1)">What It Does</div>${formatText(overview.summary)}</div>` : ''}
-      ${teamData.team_summary ? `<div style="margin-bottom:16px"><div class="report-section-sub" style="font-size:16px;font-weight:600;color:#168389;margin-top:24px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.1)">Who Is Behind It</div>${formatText(teamData.team_summary)}</div>` : ''}
-      ${intelligenceNotes ? `<div style="margin-bottom:16px"><div class="report-section-sub" style="font-size:16px;font-weight:600;color:#168389;margin-top:24px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.1)">What Is Notable</div>${formatText(intelligenceNotes)}</div>` : ''}
-      ${(riskData.bear_case || (riskData.key_risks && riskData.key_risks.length)) ? `<div style="margin-bottom:16px"><div class="report-section-sub" style="color:#ef4444" style="font-size:16px;font-weight:600;color:#168389;margin-top:24px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.1)">Risks to Monitor</div>${formatText(riskData.bear_case || riskData.key_risks.join('. '))}</div>` : ''}
-      ${(productData.description || fmData.analysis) ? `<div style="margin-bottom:4px"><div class="report-section-sub" style="font-size:16px;font-weight:600;color:#168389;margin-top:24px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.1)">Market Opportunity</div>${formatText(productData.description || fmData.analysis)}</div>` : ''}
+      ${overview.summary ? `<div class="report-sub-card"><div class="report-section-sub">What It Does</div>${formatText(overview.summary)}</div>` : ''}
+      ${teamData.team_summary ? `<div class="report-sub-card"><div class="report-section-sub">Who Is Behind It</div>${formatText(teamData.team_summary)}</div>` : ''}
+      ${intelligenceNotes ? `<div class="report-sub-card"><div class="report-section-sub">What Is Notable</div>${formatText(intelligenceNotes)}</div>` : ''}
+      ${(riskData.bear_case || (riskData.key_risks && riskData.key_risks.length)) ? `<div class="report-sub-card risk"><div class="report-section-sub risk">Risks to Monitor</div>${formatText(riskData.bear_case || riskData.key_risks.join('. '))}</div>` : ''}
+      ${(productData.description || fmData.analysis) ? `<div class="report-sub-card"><div class="report-section-sub">Market Opportunity</div>${formatText(productData.description || fmData.analysis)}</div>` : ''}
     </div>
     ` : `
     <div>
@@ -2184,11 +2183,11 @@ function buildAgentReportHTML(agent) {
       <div class="report-section-title">AI Analyst Overview
         ${lastAnalyzed ? `<span style="font-size:10px;color:var(--text-dim);font-weight:400;margin-left:8px;font-family:var(--font-data)">Last analyzed: ${lastAnalyzed}</span>` : ''}
       </div>
-      ${overview.summary ? `<div style="margin-bottom:16px"><div class="report-section-sub" style="font-size:18px;font-weight:600;color:#168389;margin-top:24px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.1)">What It Does</div>${formatText(overview.summary)}</div>` : ''}
-      ${teamData.team_summary ? `<div style="margin-bottom:16px"><div class="report-section-sub" style="font-size:16px;font-weight:600;color:#168389;margin-top:24px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.1)">Who Is Behind It</div>${formatText(teamData.team_summary)}</div>` : ''}
-      ${intelligenceNotes ? `<div style="margin-bottom:16px"><div class="report-section-sub" style="font-size:16px;font-weight:600;color:#168389;margin-top:24px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.1)">What Is Notable</div>${formatText(intelligenceNotes)}</div>` : ''}
-      ${(riskData.bear_case || (riskData.key_risks && riskData.key_risks.length)) ? `<div style="margin-bottom:16px"><div class="report-section-sub" style="color:#ef4444" style="font-size:16px;font-weight:600;color:#168389;margin-top:24px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.1)">Risks to Monitor</div>${formatText(riskData.bear_case || riskData.key_risks.join('. '))}</div>` : ''}
-      ${(productData.description || fmData.analysis) ? `<div style="margin-bottom:4px"><div class="report-section-sub" style="font-size:16px;font-weight:600;color:#168389;margin-top:24px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.1)">Market Opportunity</div>${formatText(productData.description || fmData.analysis)}</div>` : ''}
+      ${overview.summary ? `<div class="report-sub-card"><div class="report-section-sub">What It Does</div>${formatText(overview.summary)}</div>` : ''}
+      ${teamData.team_summary ? `<div class="report-sub-card"><div class="report-section-sub">Who Is Behind It</div>${formatText(teamData.team_summary)}</div>` : ''}
+      ${intelligenceNotes ? `<div class="report-sub-card"><div class="report-section-sub">What Is Notable</div>${formatText(intelligenceNotes)}</div>` : ''}
+      ${(riskData.bear_case || (riskData.key_risks && riskData.key_risks.length)) ? `<div class="report-sub-card risk"><div class="report-section-sub risk">Risks to Monitor</div>${formatText(riskData.bear_case || riskData.key_risks.join('. '))}</div>` : ''}
+      ${(productData.description || fmData.analysis) ? `<div class="report-sub-card"><div class="report-section-sub">Market Opportunity</div>${formatText(productData.description || fmData.analysis)}</div>` : ''}
     </div>
     ` : `
     <div>
