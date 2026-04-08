@@ -262,11 +262,18 @@ async def _auto_analyze_all(force: bool = False):
 
         for i in range(0, len(remaining), 10):
             batch = remaining[i:i + 10]
+            batch_by_vid = {str(a.get("virtuals_id", "")): a for a in batch}
             try:
                 results = await batch_triage(batch)
                 for r in results:
                     vid = r["virtuals_id"]
                     s = r["scores"]
+                    agent_data = batch_by_vid.get(vid, {})
+                    key_risks = r["analysis"].get("risk", {}).get("key_risks", [])
+                    basic_overview = {
+                        "what_it_does": agent_data.get("biography", ""),
+                        "risks_to_monitor": " ".join(key_risks) if key_risks else "",
+                    }
                     try:
                         await update_agent_scores(
                             virtuals_id=vid,
@@ -275,7 +282,7 @@ async def _auto_analyze_all(force: bool = False):
                             scores_json=s["scores"],
                             analysis_json=r["analysis"],
                             prediction_json={},
-                            overview_json={},
+                            overview_json=basic_overview,
                             first_mover=s["first_mover"],
                             doxx_tier=int(r["analysis"].get("team", {}).get("doxx_tier", 3)),
                         )
