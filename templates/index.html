@@ -675,12 +675,13 @@
       margin-bottom: 0;
     }
     .report-section-sub {
-      font-size: 11px;
-      font-weight: 700;
+      font-size: 16px;
+      font-weight: 600;
       color: #168389;
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
-      margin-bottom: 10px;
+      margin-top: 24px;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
     }
     .report-section-sub.risk { color: #ef4444; }
     .report-sub-card {
@@ -1438,9 +1439,7 @@ async function openModal(virtualsId) {
 
 function formatText(text) {
   if (!text) return '';
-  return '<div class="report-narrative">' +
-    text.split('\n').filter(p => p.trim()).map(p => '<p>' + p + '</p>').join('') +
-  '</div>';
+  return text.split('\n').filter(p => p.trim()).map(p => '<p style="margin-bottom:12px;line-height:1.7;color:rgba(255,255,255,0.85)">' + p + '</p>').join('');
 }
 
 function renderModal(agent) {
@@ -1557,7 +1556,7 @@ function renderModal(agent) {
       <div class="report-section-title">AI Analyst Overview
         ${lastAnalyzed ? `<span style="font-size:10px;color:var(--text-dim);font-weight:400;margin-left:8px;font-family:var(--font-data)">Last analyzed: ${lastAnalyzed}</span>` : ''}
       </div>
-      ${overview.summary ? `<div class="report-sub-card"><div class="report-section-sub">What It Does</div>${formatText(overview.summary)}</div>` : ''}
+      ${overview.summary ? `<div class="report-sub-card"><div class="report-section-sub" style="font-size:18px">What It Does</div>${formatText(overview.summary)}</div>` : ''}
       ${teamData.team_summary ? `<div class="report-sub-card"><div class="report-section-sub">Who Is Behind It</div>${formatText(teamData.team_summary)}</div>` : ''}
       ${intelligenceNotes ? `<div class="report-sub-card"><div class="report-section-sub">What Is Notable</div>${formatText(intelligenceNotes)}</div>` : ''}
       ${(riskData.bear_case || (riskData.key_risks && riskData.key_risks.length)) ? `<div class="report-sub-card risk"><div class="report-section-sub risk">Risks to Monitor</div>${formatText(riskData.bear_case || riskData.key_risks.join('. '))}</div>` : ''}
@@ -2183,7 +2182,7 @@ function buildAgentReportHTML(agent) {
       <div class="report-section-title">AI Analyst Overview
         ${lastAnalyzed ? `<span style="font-size:10px;color:var(--text-dim);font-weight:400;margin-left:8px;font-family:var(--font-data)">Last analyzed: ${lastAnalyzed}</span>` : ''}
       </div>
-      ${overview.summary ? `<div class="report-sub-card"><div class="report-section-sub">What It Does</div>${formatText(overview.summary)}</div>` : ''}
+      ${overview.summary ? `<div class="report-sub-card"><div class="report-section-sub" style="font-size:18px">What It Does</div>${formatText(overview.summary)}</div>` : ''}
       ${teamData.team_summary ? `<div class="report-sub-card"><div class="report-section-sub">Who Is Behind It</div>${formatText(teamData.team_summary)}</div>` : ''}
       ${intelligenceNotes ? `<div class="report-sub-card"><div class="report-section-sub">What Is Notable</div>${formatText(intelligenceNotes)}</div>` : ''}
       ${(riskData.bear_case || (riskData.key_risks && riskData.key_risks.length)) ? `<div class="report-sub-card risk"><div class="report-section-sub risk">Risks to Monitor</div>${formatText(riskData.bear_case || riskData.key_risks.join('. '))}</div>` : ''}
