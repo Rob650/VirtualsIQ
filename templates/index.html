@@ -1450,7 +1450,7 @@ function renderModal(agent) {
   const prediction = agent.prediction_json || {};
 
   const hasAnalysis = Object.keys(analysis).length > 0 || Object.keys(overviewJson).length > 0;
-  const overview = { summary: overviewJson.what_it_does || analysis.overview?.summary };
+  const overview = { summary: overviewJson.what_it_does || analysis.overview?.summary || agent.biography };
   const riskData = { bear_case: overviewJson.risks_to_monitor || analysis.risk?.bear_case, key_risks: analysis.risk?.key_risks || [] };
   const teamData = { team_summary: overviewJson.who_is_behind_it || analysis.team?.team_summary };
   const productData = { description: overviewJson.market_opportunity || analysis.product?.description };
@@ -2077,7 +2077,7 @@ function buildAgentReportHTML(agent) {
   const prediction = agent.prediction_json || {};
 
   const hasAnalysis  = Object.keys(analysis).length > 0 || Object.keys(overviewJson).length > 0;
-  const overview     = { summary: overviewJson.what_it_does || analysis.overview?.summary };
+  const overview     = { summary: overviewJson.what_it_does || analysis.overview?.summary || agent.biography };
   const riskData     = { bear_case: overviewJson.risks_to_monitor || analysis.risk?.bear_case, key_risks: analysis.risk?.key_risks || [] };
   const teamData     = { team_summary: overviewJson.who_is_behind_it || analysis.team?.team_summary };
   const productData  = { description: overviewJson.market_opportunity || analysis.product?.description };
