@@ -97,7 +97,7 @@ AGENT_EXTRA_CONTEXT
 === INSTRUCTIONS ===
 Return ONLY valid JSON with exactly this structure (no markdown, no code blocks).
 
-WORD COUNT TARGETS: what_it_does=400-500 words | who_is_behind_it=150-200 words | what_is_notable=150-200 words | risks_to_monitor=80-100 words | recent_activity=80-100 words
+WORD COUNT TARGETS: what_it_does=400-500 words | who_is_behind_it=150-200 words | what_is_notable=150-200 words | risks_to_monitor=80-100 words | market_opportunity=150-200 words
 
 {
   "what_it_does": "This is the most important section — spend 400-500 words here. Cover ALL of the following:\n\nPARAGRAPH 1 — Core product: What does this agent actually do? Describe the product or service in detail. What problem does it solve? Who is the target user? What makes the interaction model unique compared to a generic chatbot or LLM? If a website URL (AGENT_WEBSITE) is provided and website content is available, describe what the site shows — features, demos, pricing, use cases, integrations. If website content mentions a tech stack, describe it.\n\nPARAGRAPH 2 — Twitter presence: The agent's Twitter is AGENT_TWITTER. Based on the Twitter bio content provided, describe what the account posts about, what personality or tone it projects, what topics it engages with, and any links or handles mentioned in the bio. If the bio references a Linktree, personal site, or Discord, describe what those destinations suggest about the project's community and scope. Note any follower count signals if present.\n\nPARAGRAPH 3 — How it works: Describe the technology or mechanism behind the agent as specifically as possible. What platform or infrastructure does it run on? Does it use any specific AI models, APIs, blockchains, or data sources mentioned anywhere in the data? How does the $AGENT_TICKER token connect to the agent's operation — is it a governance token, access key, revenue share, or pure speculation?\n\nPARAGRAPH 4 — Product status and roadmap: Is this agent currently live and usable? What is the evidence — website demo, Twitter activity, Virtuals Protocol status (AGENT_STATUS)? If it is pre-launch, what has the team said about the timeline? What would a user actually experience if they interacted with this agent today?",
@@ -108,7 +108,7 @@ WORD COUNT TARGETS: what_it_does=400-500 words | who_is_behind_it=150-200 words 
 
   "risks_to_monitor": "1 paragraph, 80-100 words. Note the 2-3 most important risks briefly and factually — no catastrophizing, no dwelling. Focus on FUNDAMENTAL risks: team anonymity if present, pre-launch product risk, market saturation in the AGENT_CATEGORY vertical, or missing documentation. You may mention thin liquidity ($AGENT_LIQUIDITY) or low volume ($AGENT_VOL) in a single clause if they are genuinely severe (under $50K liquidity or under $5K volume). Frame each risk as something to watch, and end with what positive development would resolve it.",
 
-  "recent_activity": "1 paragraph, 80-100 words. Summarize recent momentum based on available signals: AGENT_CHANGE% price move, any Twitter bio updates or website changes suggesting recent announcements, any new partnerships or product updates visible in the data. Keep on-chain metrics (volume, buy/sell ratio) to a single brief clause at most — the focus is on product and community developments. What should followers watch for in the next 1-2 weeks as the key indicator of whether this project is gaining real traction?",
+  "market_opportunity": "1-2 paragraphs, 150-200 words. Paint the bull case for the broader market this project operates in, then anchor the project within it. Cover: (1) The macro narrative — what is the total addressable market for this category (AGENT_CATEGORY) within crypto and beyond? Name the specific verticals (e.g. AI agent infrastructure, Web3 influencer marketing, autonomous DeFi). Reference real market trends or growth signals if visible in the website or Twitter content. (2) Key competitors and comparables — who else is building in this space on Virtuals Protocol or adjacent ecosystems? How does AGENT_NAME differentiate or outposition them? Name specific projects or categories if possible. (3) Where does this project fit in the opportunity — early entrant with room to grow, or late to a crowded market? What would success look like at 10x or 100x the current traction? Keep the tone bullish and forward-looking, grounded in specific details from the data.",
 
   "scoring_data": {
     "first_mover": {
@@ -357,7 +357,7 @@ async def analyze_agent(agent_data: dict, model: str = None, top_ids: set = None
             "who_is_behind_it": parsed.get("who_is_behind_it", ""),
             "what_is_notable": parsed.get("what_is_notable", ""),
             "risks_to_monitor": parsed.get("risks_to_monitor", ""),
-            "recent_activity": parsed.get("recent_activity", ""),
+            "market_opportunity": parsed.get("market_opportunity", ""),
         }
 
         # Extract scoring data (no prediction)
