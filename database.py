@@ -941,6 +941,27 @@ async def update_agent_category(virtuals_id: str, agent_type: str):
         await db.commit()
 
 
+async def get_agents_with_ip_mirror_overview() -> list:
+    """Return all agents whose overview_json contains 'ip mirror' text (case-insensitive)."""
+    async with _db() as db:
+        rows = await db.fetch_all(
+            """SELECT virtuals_id, name, agent_type, overview_json
+               FROM agents
+               WHERE overview_json IS NOT NULL
+                 AND overview_json != '{}'
+                 AND LOWER(overview_json) LIKE '%ip mirror%'"""
+        )
+    result = []
+    for row in rows:
+        d = dict(row)
+        try:
+            d["overview_json"] = json.loads(d["overview_json"]) if isinstance(d["overview_json"], str) else d["overview_json"]
+        except Exception:
+            d["overview_json"] = {}
+        result.append(d)
+    return result
+
+
 async def get_agents_for_backfill() -> list:
     """Return agents with generic/missing categories for backfill."""
     async with _db() as db:

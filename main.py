@@ -7,6 +7,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -26,6 +27,7 @@ from database import (
     get_agents,
     get_agents_for_backfill,
     get_agents_needing_reanalysis,
+    get_agents_with_ip_mirror_overview,
     get_category_summary,
     get_existing_ids,
     get_stats,
@@ -736,3 +738,105 @@ async def trigger_preload():
 
     asyncio.create_task(_do_preload())
     return {"status": "queued", "message": "Full preload of all Virtuals agents triggered in background"}
+
+
+# ---------------------------------------------------------------------------
+# IP Mirror text fix helpers
+# ---------------------------------------------------------------------------
+
+def _fix_ip_mirror_text(text: str, category: str) -> str:
+    """
+    Replace IP Mirror boilerplate in AI-generated report text with the agent's
+    actual category. Handles all case variants (IP Mirror, Ip Mirror, etc.).
+    """
+    # Pattern 1 (what_it_does / market_opportunity first sentence):
+    # "is an IP Mirror agent — a Virtuals Protocol construct that mirrors
+    #  intellectual property, creating a tokenized representation of a brand,
+    #  character, or concept on-chain"
+    text = re.sub(
+        r"is an? IP[\s\u00a0]+[Mm]irror agent\s*[—–-]+\s*a Virtuals Protocol construct "
+        r"that mirrors intellectual property,\s*creating a tokenized representation "
+        r"of a brand,\s*character,\s*or concept on-chain",
+        f"is a {category} agent on the Virtuals Protocol",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    # Pattern 2 (what_it_does body):
+    # "with its Ip Mirror classification indicating a specific functional role
+    #  within the value chain — whether as a consumer-facing AI persona, a
+    #  protocol utility layer, or a DeFi-integrated intelligence system"
+    text = re.sub(
+        r"with its IP[\s\u00a0]+[Mm]irror classification indicating a specific functional "
+        r"role within the value chain\s*[—–-]+\s*whether as a consumer-facing AI persona,\s*"
+        r"a protocol utility layer,\s*or a DeFi-integrated intelligence system",
+        f"with its {category} classification indicating a specific functional role "
+        r"within the value chain",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    # Pattern 3 (market_opportunity):
+    # "positioning as an IP Mirror agent — a Virtuals Protocol construct that
+    #  mirrors intellectual property, creating a tokenized representation of a
+    #  brand, character, or concept on-chain gives it exposure to both IP
+    #  monetization and AI automation trends"
+    text = re.sub(
+        r"positioning as an? IP[\s\u00a0]+[Mm]irror agent\s*[—–-]+\s*a Virtuals Protocol "
+        r"construct that mirrors intellectual property,\s*creating a tokenized "
+        r"representation of a brand,\s*character,\s*or concept on-chain gives it "
+        r"exposure to both IP monetization and AI automation trends",
+        f"positioning as a {category} agent gives it exposure to AI automation trends",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    # Fallback: catch any remaining "IP Mirror" / "Ip Mirror" / "ip mirror" variants
+    text = re.sub(r"\bIP[\s\u00a0]+[Mm]irror\b", category, text, flags=re.IGNORECASE)
+
+    return text
+
+
+@app.post("/api/admin/fix-report-categories")
+async def fix_report_categories():
+    """
+    For every agent whose overview_json contains 'IP mirror' text, replace the
+    boilerplate IP-mirror phrasing with the agent's actual category (agent_type).
+    Runs synchronously and returns counts — call this once after deploy.
+    """
+    from database import update_overview_only
+
+    agents = await get_agents_with_ip_mirror_overview()
+    updated = 0
+    skipped = 0
+    errors: list[dict] = []
+
+    for agent in agents:
+        ov = agent.get("overview_json")
+        if not ov or not isinstance(ov, dict):
+            skipped += 1
+            continue
+
+        category = (agent.get("agent_type") or "Other").strip()
+        if not category or category in {"", "IP", "Ip Mirror", "IP Mirror", "Ip_Mirror"}:
+            # Category itself is still wrong — skip, don't corrupt further
+            skipped += 1
+            continue
+
+        try:
+            fixed = {
+                key: _fix_ip_mirror_text(val, category) if isinstance(val, str) else val
+                for key, val in ov.items()
+            }
+            await update_overview_only(agent["virtuals_id"], fixed)
+            updated += 1
+        except Exception as exc:
+            errors.append({"virtuals_id": agent["virtuals_id"], "error": str(exc)})
+
+    return {
+        "status": "ok",
+        "total_found": len(agents),
+        "updated": updated,
+        "skipped": skipped,
+        "errors": errors[:20],
+    }
