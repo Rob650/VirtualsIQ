@@ -1557,11 +1557,11 @@ function renderModal(agent) {
       <div class="report-section-title">AI Analyst Overview
         ${lastAnalyzed ? `<span style="font-size:10px;color:var(--text-dim);font-weight:400;margin-left:8px;font-family:var(--font-data)">Last analyzed: ${lastAnalyzed}</span>` : ''}
       </div>
-      ${overview.summary ? `<div class="report-sub-card"><div class="report-section-sub primary">What It Does</div>${formatText(overview.summary)}</div>` : ''}
-      ${teamData.team_summary ? `<div class="report-sub-card"><div class="report-section-sub">Who Is Behind It</div>${formatText(teamData.team_summary)}</div>` : ''}
-      ${intelligenceNotes ? `<div class="report-sub-card"><div class="report-section-sub">What Is Notable</div>${formatText(intelligenceNotes)}</div>` : ''}
-      ${(riskData.bear_case || (riskData.key_risks && riskData.key_risks.length)) ? `<div class="report-sub-card risk"><div class="report-section-sub risk">Risks to Monitor</div>${formatText(riskData.bear_case || riskData.key_risks.join('\n'))}</div>` : ''}
-      ${(productData.description || fmData.analysis) ? `<div class="report-sub-card"><div class="report-section-sub">Market Opportunity</div>${formatText(productData.description || fmData.analysis)}</div>` : ''}
+      <div class="report-sub-card"><div class="report-section-sub primary">What It Does</div>${formatText(overview.summary || 'Analysis in progress.')}</div>
+      <div class="report-sub-card"><div class="report-section-sub">Who Is Behind It</div>${formatText(teamData.team_summary || 'Analysis in progress.')}</div>
+      <div class="report-sub-card"><div class="report-section-sub">What Is Notable</div>${formatText(intelligenceNotes || 'Analysis in progress.')}</div>
+      <div class="report-sub-card risk"><div class="report-section-sub risk">Risks to Monitor</div>${formatText(riskData.bear_case || (riskData.key_risks && riskData.key_risks.join('\n')) || 'Analysis in progress.')}</div>
+      <div class="report-sub-card"><div class="report-section-sub">Market Opportunity</div>${formatText(productData.description || fmData.analysis || 'Analysis in progress.')}</div>
     </div>
     ` : `
     <div>
@@ -2183,11 +2183,11 @@ function buildAgentReportHTML(agent) {
       <div class="report-section-title">AI Analyst Overview
         ${lastAnalyzed ? `<span style="font-size:10px;color:var(--text-dim);font-weight:400;margin-left:8px;font-family:var(--font-data)">Last analyzed: ${lastAnalyzed}</span>` : ''}
       </div>
-      ${overview.summary ? `<div class="report-sub-card"><div class="report-section-sub primary">What It Does</div>${formatText(overview.summary)}</div>` : ''}
-      ${teamData.team_summary ? `<div class="report-sub-card"><div class="report-section-sub">Who Is Behind It</div>${formatText(teamData.team_summary)}</div>` : ''}
-      ${intelligenceNotes ? `<div class="report-sub-card"><div class="report-section-sub">What Is Notable</div>${formatText(intelligenceNotes)}</div>` : ''}
-      ${(riskData.bear_case || (riskData.key_risks && riskData.key_risks.length)) ? `<div class="report-sub-card risk"><div class="report-section-sub risk">Risks to Monitor</div>${formatText(riskData.bear_case || riskData.key_risks.join('\n'))}</div>` : ''}
-      ${(productData.description || fmData.analysis) ? `<div class="report-sub-card"><div class="report-section-sub">Market Opportunity</div>${formatText(productData.description || fmData.analysis)}</div>` : ''}
+      <div class="report-sub-card"><div class="report-section-sub primary">What It Does</div>${formatText(overview.summary || 'Analysis in progress.')}</div>
+      <div class="report-sub-card"><div class="report-section-sub">Who Is Behind It</div>${formatText(teamData.team_summary || 'Analysis in progress.')}</div>
+      <div class="report-sub-card"><div class="report-section-sub">What Is Notable</div>${formatText(intelligenceNotes || 'Analysis in progress.')}</div>
+      <div class="report-sub-card risk"><div class="report-section-sub risk">Risks to Monitor</div>${formatText(riskData.bear_case || (riskData.key_risks && riskData.key_risks.join('\n')) || 'Analysis in progress.')}</div>
+      <div class="report-sub-card"><div class="report-section-sub">Market Opportunity</div>${formatText(productData.description || fmData.analysis || 'Analysis in progress.')}</div>
     </div>
     ` : `
     <div>
