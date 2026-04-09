@@ -778,6 +778,17 @@ async def update_market_data(virtuals_id: str, data: dict):
         await db.commit()
 
 
+async def update_overview_only(virtuals_id: str, overview_json: dict):
+    """Write a pre-generated overview_json without touching any other fields."""
+    now = datetime.utcnow().isoformat()
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE agents SET overview_json=?, last_analyzed=?, updated_at=? WHERE virtuals_id=?",
+            (json.dumps(overview_json), now, now, virtuals_id)
+        )
+        await db.commit()
+
+
 async def update_holder_count(virtuals_id: str, holder_count: int):
     """Update holder count only."""
     now = datetime.utcnow().isoformat()

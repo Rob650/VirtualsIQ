@@ -639,6 +639,24 @@ async def system_status():
     }
 
 
+@app.post("/api/admin/write-overview")
+async def write_overview(payload: dict):
+    """
+    Direct-write pre-generated overview_json for an agent.
+    Accepts {virtuals_id: str, overview_json: dict}.
+    """
+    virtuals_id = str(payload.get("virtuals_id", "")).strip()
+    overview_json = payload.get("overview_json", {})
+    if not virtuals_id or not overview_json:
+        raise HTTPException(status_code=400, detail="virtuals_id and overview_json required")
+    agent = await get_agent_detail(virtuals_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail=f"Agent {virtuals_id} not found")
+    from database import update_overview_only
+    await update_overview_only(virtuals_id, overview_json)
+    return {"status": "ok", "virtuals_id": virtuals_id, "agent": agent.get("name")}
+
+
 @app.post("/api/admin/refresh-analysis")
 async def admin_refresh_analysis(force: bool = Query(False)):
     """
