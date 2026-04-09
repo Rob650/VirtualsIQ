@@ -49,11 +49,50 @@ AGENT_TYPE_MAP = {
 }
 
 
-def normalize_agent_type(raw: str) -> str:
+# Raw Virtuals internal type codes that carry no user-facing meaning
+_RAW_VIRTUALS_CODES = {
+    "acp_launch", "ip mirror", "ip_mirror", "x_launch", "functional",
+    "acp launch", "ipmirror",
+}
+
+# Keyword → category mapping used when the raw type is not in AGENT_TYPE_MAP
+_KW_CATS = [
+    ("DeFi",          ["defi","swap","lend","yield","liquidity","amm","vault","stake","borrow","dex","pool","bridge","finance"]),
+    ("Trading",       ["trade","signal","bot","alpha","snipe","copy","arbitrage","hedge","leverage","margin"]),
+    ("Gaming",        ["game","play","quest","battle","arena","rpg","metaverse","world","land"]),
+    ("Social",        ["social","chat","community","dao","governance","vote","forum","message","friend","connect"]),
+    ("Entertainment", ["entertainment","music","art","meme","fun","comedy","video","stream","creator","content"]),
+    ("Infra",         ["infra","protocol","sdk","api","oracle","node","chain","layer","bridge","index","analytics"]),
+    ("NFT",           ["nft","collectible","pfp","mint","collection","generative"]),
+    ("Info",          ["info","news","research","learn","education","wiki","guide","report","insight","intelligence"]),
+]
+
+
+def _infer_type_from_text(text: str) -> str:
+    t = text.lower()
+    for cat, kws in _KW_CATS:
+        if any(kw in t for kw in kws):
+            return cat
+    return "Other"
+
+
+def normalize_agent_type(raw: str, name: str = "", biography: str = "") -> str:
     if not raw:
-        return "Information"
-    key = raw.lower().strip()
-    return AGENT_TYPE_MAP.get(key, raw.title())
+        key = ""
+    else:
+        key = raw.lower().strip()
+
+    # If it maps cleanly, use the map
+    if key in AGENT_TYPE_MAP:
+        return AGENT_TYPE_MAP[key]
+
+    # If it's a raw internal Virtuals code, infer from name + biography
+    if key in _RAW_VIRTUALS_CODES or not raw:
+        text = f"{name} {biography}"
+        return _infer_type_from_text(text)
+
+    # Fallback: title-case the raw value (handles human-readable types we don't explicitly map)
+    return raw.title()
 
 
 async def _fetch_page(
@@ -100,10 +139,11 @@ def _parse_agent(item: dict) -> dict:
     status_code = attrs.get("status") or 4
     status = STATUS_MAP.get(status_code, "Prototype")
 
+    biography = attrs.get("description") or attrs.get("bio") or attrs.get("biography") or ""
     category = attrs.get("category") or attrs.get("agentType") or attrs.get("role") or ""
     if isinstance(category, dict):
         category = category.get("name") or ""
-    agent_type = normalize_agent_type(category)
+    agent_type = normalize_agent_type(category, name=name, biography=biography)
 
     socials = attrs.get("socials") or {}
     if isinstance(socials, list):
@@ -134,7 +174,6 @@ def _parse_agent(item: dict) -> dict:
     created_at_raw = attrs.get("createdAt") or ""
     _creator_wallet = attrs.get("walletAddress") or attrs.get("creatorWallet") or ""
     creator_wallet = _creator_wallet if isinstance(_creator_wallet, str) else ""
-    biography = attrs.get("description") or attrs.get("bio") or attrs.get("biography") or ""
 
     return {
         "virtuals_id": virtual_id,
