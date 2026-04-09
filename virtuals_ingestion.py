@@ -7,10 +7,9 @@ import asyncio
 import logging
 from datetime import datetime
 
-import aiosqlite
 import httpx
 
-from database import upsert_agent, get_existing_ids, bulk_upsert_agents, update_market_data, DB_PATH
+from database import upsert_agent, get_existing_ids, bulk_upsert_agents, update_market_data, update_holder_count, _db, DB_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -373,15 +372,13 @@ async def preload_all_agents(on_batch=None):
 
 async def enrich_top_agents_dexscreener(top_n: int = 100):
     """Enrich the top N agents (by market cap) with DexScreener market data."""
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute(
+    async with _db() as db:
+        rows = await db.fetch_all(
             """SELECT virtuals_id, contract_address FROM agents
                WHERE contract_address IS NOT NULL AND contract_address != ''
                ORDER BY market_cap DESC LIMIT ?""",
             (top_n,)
-        ) as cur:
-            rows = [dict(r) for r in await cur.fetchall()]
+        )
 
     if not rows:
         logger.info("No agents with contract addresses found for DexScreener enrichment")
@@ -407,15 +404,11 @@ async def enrich_top_agents_dexscreener(top_n: int = 100):
 
 async def refresh_holder_counts(limit: int = 100):
     """Refresh holder counts for top agents by re-fetching from Virtuals API."""
-    from database import update_holder_count
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute(
-            """SELECT virtuals_id FROM agents
-               ORDER BY market_cap DESC LIMIT ?""",
+    async with _db() as db:
+        rows = await db.fetch_all(
+            "SELECT virtuals_id FROM agents ORDER BY market_cap DESC LIMIT ?",
             (limit,)
-        ) as cur:
-            rows = [dict(r) for r in await cur.fetchall()]
+        )
 
     if not rows:
         return 0
