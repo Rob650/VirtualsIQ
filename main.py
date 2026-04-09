@@ -12,7 +12,6 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional
 
-import aiosqlite
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
 from pydantic import BaseModel
 from fastapi.responses import HTMLResponse
@@ -25,6 +24,7 @@ from database import (
     bulk_score_agents,
     get_agent_detail,
     get_agents,
+    get_agents_for_backfill,
     get_agents_needing_reanalysis,
     get_category_summary,
     get_existing_ids,
@@ -34,6 +34,7 @@ from database import (
     get_trending_strip,
     init_db,
     search_agents,
+    update_agent_category,
     update_agent_scores,
     upsert_agent,
 )
@@ -156,13 +157,7 @@ async def _run_analysis_job(job_id: str, virtuals_id: str):
         # Infer category
         inferred_category = _infer_category(agent)
         if inferred_category != agent.get("agent_type"):
-            import aiosqlite
-            async with aiosqlite.connect("virtualsiq.db") as db:
-                await db.execute(
-                    "UPDATE agents SET agent_type=? WHERE virtuals_id=?",
-                    (inferred_category, virtuals_id)
-                )
-                await db.commit()
+            await update_agent_category(virtuals_id, inferred_category)
 
         await update_agent_scores(
             virtuals_id=virtuals_id,
@@ -230,13 +225,7 @@ async def _auto_analyze_all(force: bool = False):
 
                     inferred_category = _infer_category(agent)
                     if inferred_category != agent.get("agent_type"):
-                        import aiosqlite
-                        async with aiosqlite.connect("virtualsiq.db") as db:
-                            await db.execute(
-                                "UPDATE agents SET agent_type=? WHERE virtuals_id=?",
-                                (inferred_category, virtuals_id)
-                            )
-                            await db.commit()
+                        await update_agent_category(virtuals_id, inferred_category)
 
                     await update_agent_scores(
                         virtuals_id=virtuals_id,
@@ -712,32 +701,16 @@ async def admin_refresh_analysis(force: bool = Query(False)):
 @app.post("/api/admin/backfill-categories")
 async def backfill_categories():
     """Infer and fill agent_type for agents that have a generic/missing category."""
-    async with aiosqlite.connect("virtualsiq.db") as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute(
-            """SELECT virtuals_id, name, biography, agent_type FROM agents
-               WHERE agent_type IS NULL OR agent_type = ''
-                  OR agent_type IN ('Unknown', 'IP', 'Information',
-                                    'Acp_Launch', 'Ip Mirror', 'X_Launch',
-                                    'Functional', 'Ip_Mirror', 'ACP_LAUNCH')"""
-        ) as cur:
-            rows = [dict(r) for r in await cur.fetchall()]
+    rows = await get_agents_for_backfill()
 
     updated = 0
-    MEANINGFUL_CATS = set(CAT_KEYWORDS.keys())  # DeFi, Gaming, Social, Trading, etc.
-    async with aiosqlite.connect("virtualsiq.db") as db:
-        for agent in rows:
-            # Force keyword re-inference by clearing the current type so _infer_category
-            # doesn't short-circuit on raw Virtuals codes like 'Acp_Launch'
-            agent_for_inference = {**agent, "agent_type": ""}
-            new_cat = _infer_category(agent_for_inference)
-            if new_cat and new_cat in MEANINGFUL_CATS:
-                await db.execute(
-                    "UPDATE agents SET agent_type = ? WHERE virtuals_id = ?",
-                    (new_cat, agent["virtuals_id"]),
-                )
-                updated += 1
-        await db.commit()
+    MEANINGFUL_CATS = set(CAT_KEYWORDS.keys())
+    for agent in rows:
+        agent_for_inference = {**agent, "agent_type": ""}
+        new_cat = _infer_category(agent_for_inference)
+        if new_cat and new_cat in MEANINGFUL_CATS:
+            await update_agent_category(agent["virtuals_id"], new_cat)
+            updated += 1
 
     return {"status": "ok", "updated": updated, "total_checked": len(rows)}
 
