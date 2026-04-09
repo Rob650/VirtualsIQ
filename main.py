@@ -270,9 +270,29 @@ async def _auto_analyze_all(force: bool = False):
                     s = r["scores"]
                     agent_data = batch_by_vid.get(vid, {})
                     key_risks = r["analysis"].get("risk", {}).get("key_risks", [])
+                    team_data = r["analysis"].get("team", {})
+                    market_data = r["analysis"].get("market", {})
+                    doxx_tier = int(team_data.get("doxx_tier", 3))
+                    doxx_label = {1: "fully doxxed", 2: "social presence only", 3: "anonymous"}.get(doxx_tier, "anonymous")
                     basic_overview = {
                         "what_it_does": agent_data.get("biography", ""),
-                        "risks_to_monitor": " ".join(key_risks) if key_risks else "",
+                        "who_is_behind_it": team_data.get("team_summary", "") or (
+                            f"The team is {doxx_label}. Track record score: {team_data.get('track_record_score', 'N/A')}/100. "
+                            "Full team details will be available after deep-dive analysis."
+                        ),
+                        "what_is_notable": (
+                            f"Market cap: ${agent_data.get('market_cap', 0):,.0f}. "
+                            f"Holders: {agent_data.get('holder_count', 0):,}. "
+                            f"Category: {agent_data.get('agent_type', 'Unknown')}. "
+                            "Full intelligence notes will be available after deep-dive analysis."
+                        ),
+                        "risks_to_monitor": " ".join(key_risks) if key_risks else (
+                            r["analysis"].get("risk", {}).get("bear_case", "")
+                        ),
+                        "market_opportunity": market_data.get("tam_description", "") or (
+                            f"Operating in the {agent_data.get('agent_type', 'AI agent')} vertical on Virtuals Protocol. "
+                            "Full market analysis will be available after deep-dive analysis."
+                        ),
                     }
                     try:
                         await update_agent_scores(
