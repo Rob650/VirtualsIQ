@@ -426,15 +426,18 @@ async def lifespan(app: FastAPI):
             enrichment_state["last_price_refresh"] = datetime.utcnow().isoformat()
 
             enrichment_state["status"] = "scoring"
-            score_count = await bulk_score_agents()
-            logger.info(f"Auto-scored {score_count} agents (on-chain only, AI analysis queued)")
+            try:
+                score_count = await bulk_score_agents()
+                logger.info(f"Auto-scored {score_count} agents (on-chain only, AI analysis queued)")
+            except Exception as score_err:
+                logger.error(f"bulk_score_agents failed: {score_err}", exc_info=True)
 
             enrichment_state["completed_at"] = datetime.utcnow().isoformat()
             # Kick off full AI analysis in background — throttled (1 at a time, 3s between)
             asyncio.create_task(_auto_analyze_all())
         except Exception as e:
-            logger.error(f"Startup preload failed: {e}")
-            enrichment_state["status"] = "complete"
+            logger.error(f"Startup preload failed: {e}", exc_info=True)
+            enrichment_state["status"] = "error"
 
     preload_task = asyncio.create_task(_preload())
 
@@ -736,3 +739,21 @@ async def trigger_preload():
 
     asyncio.create_task(_do_preload())
     return {"status": "queued", "message": "Full preload of all Virtuals agents triggered in background"}
+
+
+@app.post("/api/admin/rescore-all")
+async def admin_rescore_all():
+    """Trigger bulk re-scoring of all agents from on-chain data (no AI calls)."""
+    async def _do_rescore():
+        prev_status = enrichment_state.get("status")
+        enrichment_state["status"] = "scoring"
+        try:
+            count = await bulk_score_agents()
+            logger.info(f"Manual rescore complete: {count} agents scored")
+        except Exception as e:
+            logger.error(f"Manual rescore failed: {e}", exc_info=True)
+        finally:
+            enrichment_state["status"] = prev_status or "complete"
+
+    asyncio.create_task(_do_rescore())
+    return {"status": "queued", "message": "Bulk re-scoring of all agents triggered in background"}
