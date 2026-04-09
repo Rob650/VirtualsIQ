@@ -23,11 +23,13 @@ from analyzer import analyze_agent, batch_triage
 from database import (
     bulk_score_agents,
     get_agent_detail,
+    get_agent_holders,
     get_agents,
     get_agents_for_backfill,
     get_agents_needing_reanalysis,
     get_category_summary,
     get_existing_ids,
+    get_holders_last_updated,
     get_stats,
     get_top_agent_ids,
     get_trending_agents,
@@ -37,6 +39,7 @@ from database import (
     update_agent_category,
     update_agent_scores,
     upsert_agent,
+    upsert_agent_holders,
 )
 from virtuals_ingestion import (
     detect_new_agents,
@@ -629,6 +632,95 @@ async def agent_on_chain_signals(virtuals_id: str):
         "buy_sell_ratio": agent.get("buy_sell_ratio", 1.0),
         "tx_count_24h": agent.get("tx_count_24h", 0),
     }
+
+
+@app.get("/api/agent/{virtuals_id}/holders")
+async def agent_holders(virtuals_id: str):
+    """Smart Money: top token holders for an agent, fetched from Moralis and cached."""
+    import httpx
+    from datetime import timedelta
+
+    agent = await get_agent_detail(virtuals_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    contract_address = agent.get("contract_address", "")
+    moralis_key = os.environ.get("MORALIS_API_KEY", "")
+
+    # Check cache — refresh at most once per hour
+    last_updated = await get_holders_last_updated(virtuals_id)
+    cache_valid = False
+    if last_updated:
+        try:
+            age = datetime.utcnow() - datetime.fromisoformat(last_updated)
+            cache_valid = age < timedelta(hours=1)
+        except Exception:
+            cache_valid = False
+
+    if cache_valid:
+        holders = await get_agent_holders(virtuals_id)
+        return {"virtuals_id": virtuals_id, "holders": holders, "source": "cache", "contract_address": contract_address}
+
+    # No Moralis key — return graceful fallback
+    if not moralis_key or not contract_address:
+        cached = await get_agent_holders(virtuals_id)
+        return {
+            "virtuals_id": virtuals_id,
+            "holders": cached,
+            "source": "no_api_key" if not moralis_key else "no_contract",
+            "contract_address": contract_address,
+            "message": "Connect Moralis API for live holder data" if not moralis_key else "No token contract address available",
+        }
+
+    # Fetch from Moralis
+    try:
+        url = f"https://deep-index.moralis.io/api/v2.2/erc20/{contract_address}/owners"
+        params = {"chain": "0x2105", "limit": 20, "order": "DESC"}
+        headers = {"X-API-Key": moralis_key, "accept": "application/json"}
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(url, params=params, headers=headers)
+            resp.raise_for_status()
+            data = resp.json()
+
+        raw_holders = data.get("result", [])
+        market_cap = agent.get("market_cap", 0) or 0
+
+        holders = []
+        for i, h in enumerate(raw_holders[:20]):
+            balance = float(h.get("balance_formatted", h.get("balance", 0)) or 0)
+            percentage = float(h.get("percentage_relative_to_total_supply", 0) or 0)
+            balance_usd = float(h.get("usd_value", 0) or 0)
+            if balance_usd == 0 and market_cap > 0 and percentage > 0:
+                balance_usd = market_cap * percentage / 100
+
+            labels = []
+            if i < 10:
+                labels.append("top10")
+            if balance_usd > 500_000:
+                labels.append("whale")
+
+            holders.append({
+                "wallet_address": h.get("owner_address", ""),
+                "balance": balance,
+                "balance_usd": balance_usd,
+                "percentage": percentage,
+                "rank": i + 1,
+                "labels": labels,
+            })
+
+        await upsert_agent_holders(virtuals_id, holders)
+        return {"virtuals_id": virtuals_id, "holders": holders, "source": "moralis", "contract_address": contract_address}
+
+    except Exception as e:
+        logger.warning(f"[Holders] Moralis fetch failed for {virtuals_id}: {e}")
+        cached = await get_agent_holders(virtuals_id)
+        return {
+            "virtuals_id": virtuals_id,
+            "holders": cached,
+            "source": "cache_fallback",
+            "contract_address": contract_address,
+            "message": "Live data temporarily unavailable",
+        }
 
 
 @app.get("/api/health")

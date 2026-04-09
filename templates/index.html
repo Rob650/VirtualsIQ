@@ -1432,9 +1432,65 @@ async function openModal(virtualsId) {
     if (!res.ok) throw new Error('Agent not found');
     const agent = await res.json();
     renderModal(agent);
+    loadHolders(virtualsId);
   } catch(e) {
     document.getElementById('modal-body').innerHTML =
       `<div style="text-align:center;padding:48px;color:var(--red)">Failed to load agent data.</div>`;
+  }
+}
+
+async function loadHolders(virtualsId) {
+  const el = document.getElementById('holders-list');
+  if (!el) return;
+  try {
+    const res = await fetch(`/api/agent/${virtualsId}/holders`);
+    if (!res.ok) throw new Error('fetch failed');
+    const data = await res.json();
+    const holders = data.holders || [];
+    if (!holders.length) {
+      el.innerHTML = data.message
+        ? `<div style="padding:10px;background:rgba(22,131,137,0.06);border:1px solid rgba(22,131,137,0.15);border-radius:6px;color:var(--text-dim)">${data.message}</div>`
+        : `<div style="color:var(--text-dim)">No holder data available.</div>`;
+      return;
+    }
+    const badgeStyle = {
+      top10: 'background:rgba(22,131,137,0.15);color:#168389;border:1px solid rgba(22,131,137,0.3)',
+      whale: 'background:rgba(139,92,246,0.15);color:#8b5cf6;border:1px solid rgba(139,92,246,0.3)',
+    };
+    el.innerHTML = `
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:11px">
+          <thead>
+            <tr style="color:var(--text-dim);border-bottom:1px solid var(--border)">
+              <th style="text-align:left;padding:6px 8px;font-weight:600">#</th>
+              <th style="text-align:left;padding:6px 8px;font-weight:600">Wallet</th>
+              <th style="text-align:right;padding:6px 8px;font-weight:600">% Supply</th>
+              <th style="text-align:right;padding:6px 8px;font-weight:600">Value (USD)</th>
+              <th style="text-align:left;padding:6px 8px;font-weight:600">Tags</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${holders.map(h => {
+              const addr = h.wallet_address || '';
+              const short = addr.length > 10 ? addr.slice(0,6)+'...'+addr.slice(-4) : addr;
+              const pct = parseFloat(h.percentage || 0).toFixed(2);
+              const usd = h.balance_usd > 0 ? '$' + (h.balance_usd >= 1e6 ? (h.balance_usd/1e6).toFixed(2)+'M' : h.balance_usd >= 1e3 ? (h.balance_usd/1e3).toFixed(1)+'K' : Math.round(h.balance_usd).toLocaleString()) : '—';
+              const badges = (h.labels||[]).map(l => `<span style="display:inline-block;padding:1px 5px;border-radius:3px;font-size:10px;font-weight:600;margin-right:3px;${badgeStyle[l]||'background:rgba(100,100,100,0.1);color:var(--text-dim);border:1px solid var(--border)'}">${l}</span>`).join('');
+              return `<tr style="border-bottom:1px solid var(--border);transition:background 0.1s" onmouseover="this.style.background='rgba(22,131,137,0.04)'" onmouseout="this.style.background=''">
+                <td style="padding:6px 8px;color:var(--text-dim)">${h.rank}</td>
+                <td style="padding:6px 8px;font-family:var(--font-data);color:var(--text-muted)">${short}</td>
+                <td style="padding:6px 8px;text-align:right;color:var(--text)">${pct}%</td>
+                <td style="padding:6px 8px;text-align:right;color:var(--green-dark);font-family:var(--font-data)">${usd}</td>
+                <td style="padding:6px 8px">${badges}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+        ${data.source === 'no_api_key' ? `<div style="margin-top:8px;font-size:10px;color:var(--text-dim)">${data.message || 'Connect Moralis API for live data'}</div>` : ''}
+      </div>`;
+  } catch(e) {
+    const el2 = document.getElementById('holders-list');
+    if (el2) el2.innerHTML = `<div style="color:var(--text-dim)">Holder data unavailable.</div>`;
   }
 }
 
@@ -1601,6 +1657,11 @@ function renderModal(agent) {
         <iframe src="https://dexscreener.com/base/${agent.contract_address}?embed=1&theme=light&trades=0&info=0" loading="lazy" allowfullscreen></iframe>
       </div>
     </div>` : ''}
+
+    <div id="smart-money-section">
+      <div class="report-section-title">Smart Money — Top Holders</div>
+      <div id="holders-list" style="font-size:12px;color:var(--text-dim);padding:12px 0">Loading holder data...</div>
+    </div>
 
     <div>
       <div class="report-section-title">VIQ Intelligence Report</div>
@@ -2227,6 +2288,11 @@ function buildAgentReportHTML(agent) {
         <iframe src="https://dexscreener.com/base/${agent.contract_address}?embed=1&theme=light&trades=0&info=0" loading="lazy" allowfullscreen></iframe>
       </div>
     </div>` : ''}
+
+    <div id="smart-money-section">
+      <div class="report-section-title">Smart Money — Top Holders</div>
+      <div id="holders-list" style="font-size:12px;color:var(--text-dim);padding:12px 0">Loading holder data...</div>
+    </div>
 
     <div>
       <div class="report-section-title">VIQ Intelligence Report</div>

@@ -274,6 +274,21 @@ async def init_db():
                 )
             """)
 
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS agent_holders (
+                    id BIGSERIAL PRIMARY KEY,
+                    virtuals_id TEXT NOT NULL,
+                    wallet_address TEXT NOT NULL,
+                    balance DOUBLE PRECISION DEFAULT 0,
+                    balance_usd DOUBLE PRECISION DEFAULT 0,
+                    percentage DOUBLE PRECISION DEFAULT 0,
+                    rank INTEGER DEFAULT 0,
+                    labels JSONB DEFAULT '[]',
+                    last_updated TEXT,
+                    UNIQUE(virtuals_id, wallet_address)
+                )
+            """)
+
             # Indexes
             for idx_sql in [
                 "CREATE INDEX IF NOT EXISTS idx_agents_market_cap ON agents(market_cap DESC)",
@@ -334,6 +349,21 @@ async def init_db():
                     actual_return REAL,
                     resolved_at TEXT,
                     FOREIGN KEY (agent_id) REFERENCES agents(virtuals_id)
+                )
+            """)
+
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS agent_holders (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    virtuals_id TEXT NOT NULL,
+                    wallet_address TEXT NOT NULL,
+                    balance REAL DEFAULT 0,
+                    balance_usd REAL DEFAULT 0,
+                    percentage REAL DEFAULT 0,
+                    rank INTEGER DEFAULT 0,
+                    labels TEXT DEFAULT '[]',
+                    last_updated TEXT,
+                    UNIQUE(virtuals_id, wallet_address)
                 )
             """)
 
@@ -952,3 +982,73 @@ async def get_agents_for_backfill() -> list:
                                     'Functional', 'Ip_Mirror', 'ACP_LAUNCH')"""
         )
     return rows
+
+
+# ── Smart Money / Holder Snapshots ────────────────────────────────────────────
+
+async def get_agent_holders(virtuals_id: str) -> list:
+    """Return cached holder list for an agent, or empty list if none."""
+    async with _db() as db:
+        rows = await db.fetch_all(
+            "SELECT wallet_address, balance, balance_usd, percentage, rank, labels, last_updated FROM agent_holders WHERE virtuals_id=? ORDER BY rank ASC",
+            (virtuals_id,)
+        )
+    result = []
+    for r in rows:
+        labels = r.get("labels") or "[]"
+        if isinstance(labels, str):
+            try:
+                labels = json.loads(labels)
+            except Exception:
+                labels = []
+        result.append({
+            "wallet_address": r["wallet_address"],
+            "balance": r.get("balance", 0),
+            "balance_usd": r.get("balance_usd", 0),
+            "percentage": r.get("percentage", 0),
+            "rank": r.get("rank", 0),
+            "labels": labels,
+            "last_updated": r.get("last_updated"),
+        })
+    return result
+
+
+async def get_holders_last_updated(virtuals_id: str):
+    """Return the last_updated timestamp for holder data, or None."""
+    async with _db() as db:
+        val = await db.fetch_val(
+            "SELECT MAX(last_updated) FROM agent_holders WHERE virtuals_id=?",
+            (virtuals_id,)
+        )
+    return val
+
+
+async def upsert_agent_holders(virtuals_id: str, holders: list):
+    """Store/replace holder snapshot for an agent."""
+    now = datetime.utcnow().isoformat()
+    async with _db() as db:
+        # Clear existing holders for this agent before inserting fresh set
+        await db.execute("DELETE FROM agent_holders WHERE virtuals_id=?", (virtuals_id,))
+        for h in holders:
+            labels = json.dumps(h.get("labels", []))
+            await db.execute(
+                """INSERT INTO agent_holders
+                   (virtuals_id, wallet_address, balance, balance_usd, percentage, rank, labels, last_updated)
+                   VALUES (?,?,?,?,?,?,?,?)
+                   ON CONFLICT(virtuals_id, wallet_address) DO UPDATE SET
+                     balance=excluded.balance, balance_usd=excluded.balance_usd,
+                     percentage=excluded.percentage, rank=excluded.rank,
+                     labels=excluded.labels, last_updated=excluded.last_updated
+                """,
+                (
+                    virtuals_id,
+                    h.get("wallet_address", ""),
+                    h.get("balance", 0),
+                    h.get("balance_usd", 0),
+                    h.get("percentage", 0),
+                    h.get("rank", 0),
+                    labels,
+                    now,
+                )
+            )
+        await db.commit()
