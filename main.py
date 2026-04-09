@@ -716,7 +716,10 @@ async def backfill_categories():
         db.row_factory = aiosqlite.Row
         async with db.execute(
             """SELECT virtuals_id, name, biography, agent_type FROM agents
-               WHERE agent_type IS NULL OR agent_type = '' OR agent_type IN ('Unknown', 'IP', 'Information')"""
+               WHERE agent_type IS NULL OR agent_type = ''
+                  OR agent_type IN ('Unknown', 'IP', 'Information',
+                                    'Acp_Launch', 'Ip Mirror', 'X_Launch',
+                                    'Functional', 'Ip_Mirror', 'ACP_LAUNCH')"""
         ) as cur:
             rows = [dict(r) for r in await cur.fetchall()]
 
