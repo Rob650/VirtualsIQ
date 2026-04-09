@@ -539,12 +539,17 @@ def _is_dead_agent(agent: dict) -> bool:
     if mcap > 0 and mcap < 5_000:
         return True
 
-    if holders > 0 and holders < 50 and mcap > 0 and mcap < 10_000:
+    # Tiny holder count with zero volume = dead regardless of mcap
+    if holders > 0 and holders < 100 and vol == 0:
+        return True
+
+    # Low holders + low volume + low mcap
+    if holders < 500 and vol < 5_000 and mcap > 0 and mcap < 500_000:
         return True
 
     creation_date = agent.get("creation_date") or agent.get("first_seen")
     days = _days_since(creation_date)
-    if days is not None and days > 90 and vol > 0 and vol < 1_000:
+    if days is not None and days > 90 and vol >= 0 and vol < 1_000:
         return True
 
     holder_change = _safe(agent.get("holder_count_change_24h"), None)
@@ -554,18 +559,41 @@ def _is_dead_agent(agent: dict) -> bool:
     return False
 
 
+def _is_weak_agent(agent: dict) -> bool:
+    """Return True if agent has weak on-chain metrics (OR conditions)."""
+    holders = _safe(agent.get("holder_count"), 0)
+    mcap = _safe(agent.get("market_cap"), 0)
+    vol = _safe(agent.get("volume_24h"), 0)
+    return (
+        (holders > 0 and holders < 2_000) or
+        vol < 20_000 or
+        (mcap > 0 and mcap < 2_000_000)
+    )
+
+
 def _is_strong_investment(agent: dict) -> bool:
     """Return True if agent meets ALL strong investment criteria."""
     holders = _safe(agent.get("holder_count"), 0)
     mcap = _safe(agent.get("market_cap"), 0)
     vol = _safe(agent.get("volume_24h"), 0)
-    holder_change = _safe(agent.get("holder_count_change_24h"), 0)
 
     return (
-        holders >= 2_000 and
-        mcap >= 5_000_000 and
-        vol >= 20_000 and
-        holder_change >= 0
+        holders >= 5_000 and
+        mcap >= 10_000_000 and
+        vol >= 50_000
+    )
+
+
+def _is_elite_investment(agent: dict) -> bool:
+    """Return True if agent meets ALL elite investment criteria."""
+    holders = _safe(agent.get("holder_count"), 0)
+    mcap = _safe(agent.get("market_cap"), 0)
+    vol = _safe(agent.get("volume_24h"), 0)
+
+    return (
+        holders >= 20_000 and
+        mcap >= 50_000_000 and
+        vol >= 200_000
     )
 
 
@@ -738,13 +766,19 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
     # Step 1: widen distribution (1.5x deviation from 50)
     composite = _widen_distribution(composite)
 
-    # Step 2: apply dead/scam filter OR strong investment boost
+    # Step 2: apply dead/weak filters OR investment boosts
     dead_flagged = _is_dead_agent(agent_data)
+    weak_flagged = _is_weak_agent(agent_data) if not dead_flagged else False
     strong_flagged = _is_strong_investment(agent_data)
+    elite_flagged = _is_elite_investment(agent_data)
     if dead_flagged:
-        composite = min(round(composite * 0.3, 1), 25.0)
+        composite = min(round(composite * 0.3, 1), 15.0)
+    elif weak_flagged:
+        composite = min(round(composite * 0.5, 1), 35.0)
+    elif elite_flagged:
+        composite = min(round(composite * 1.5, 1), 100.0)
     elif strong_flagged:
-        composite = min(round(composite * 1.2, 1), 100.0)
+        composite = min(round(composite * 1.3, 1), 100.0)
 
     # Step 3: final clamp 5-100
     composite = _clamp(round(composite, 1), 5.0, 100.0)
@@ -812,7 +846,9 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
     scores["_top_hurt"] = top_hurt
     scores["_doxx_tier_detail"] = doxx_detail
     scores["_dead_flagged"] = dead_flagged
+    scores["_weak_flagged"] = weak_flagged
     scores["_strong_flagged"] = strong_flagged
+    scores["_elite_flagged"] = elite_flagged
     scores["_factors_scored"] = factors_scored
 
     return {
@@ -827,7 +863,9 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
         "top_hurt": top_hurt,
         "doxx_tier_detail": doxx_detail,
         "dead_flagged": dead_flagged,
+        "weak_flagged": weak_flagged,
         "strong_flagged": strong_flagged,
+        "elite_flagged": elite_flagged,
         "factors_scored": factors_scored,
     }
 
