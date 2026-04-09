@@ -4,14 +4,17 @@ Bloomberg Terminal for the Virtuals Protocol ecosystem
 """
 
 import asyncio
+import json
 import logging
 import os
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import Optional
+from typing import Any, Dict, Optional
 
+import aiosqlite
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
+from pydantic import BaseModel
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -703,3 +706,75 @@ async def admin_refresh_analysis(force: bool = Query(False)):
         "force": force,
         "message": f"Analysis {'(forced, all agents)' if force else '(stale only, >7 days)'} queued",
     }
+
+
+class OverviewRequest(BaseModel):
+    virtuals_id: str
+    overview_json: Dict[str, Any]
+
+
+@app.post("/api/admin/write-overview")
+async def write_overview(req: OverviewRequest):
+    """Write / update the overview_json blob for a single agent."""
+    async with aiosqlite.connect("virtualsiq.db") as db:
+        await db.execute(
+            "UPDATE agents SET overview_json = ? WHERE virtuals_id = ?",
+            (json.dumps(req.overview_json), req.virtuals_id),
+        )
+        await db.commit()
+        async with db.execute(
+            "SELECT changes()"
+        ) as cur:
+            rows_changed = (await cur.fetchone())[0]
+    if rows_changed == 0:
+        raise HTTPException(status_code=404, detail=f"Agent {req.virtuals_id} not found")
+    return {"status": "ok", "virtuals_id": req.virtuals_id}
+
+
+@app.post("/api/admin/backfill-categories")
+async def backfill_categories():
+    """Infer and fill agent_type for agents that have a generic/missing category."""
+    async with aiosqlite.connect("virtualsiq.db") as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT virtuals_id, name, biography, agent_type FROM agents
+               WHERE agent_type IS NULL OR agent_type = '' OR agent_type IN ('Unknown', 'IP', 'Information')"""
+        ) as cur:
+            rows = [dict(r) for r in await cur.fetchall()]
+
+    updated = 0
+    async with aiosqlite.connect("virtualsiq.db") as db:
+        for agent in rows:
+            new_cat = _infer_category(agent)
+            if new_cat and new_cat not in GENERIC_CATEGORIES:
+                await db.execute(
+                    "UPDATE agents SET agent_type = ? WHERE virtuals_id = ?",
+                    (new_cat, agent["virtuals_id"]),
+                )
+                updated += 1
+        await db.commit()
+
+    return {"status": "ok", "updated": updated, "total_checked": len(rows)}
+
+
+@app.post("/api/admin/trigger-preload")
+async def trigger_preload():
+    """Trigger a full re-sync of all agents from the Virtuals Protocol API."""
+    status = enrichment_state.get("status")
+    if status == "preloading":
+        return {"status": "already_running", "message": "Preload already in progress"}
+
+    async def _do_preload():
+        enrichment_state["status"] = "preloading"
+        try:
+            count = await preload_all_agents()
+            enrichment_state["status"] = "complete"
+            enrichment_state["completed_at"] = datetime.utcnow().isoformat()
+            enrichment_state["last_preload_count"] = count
+            logger.info(f"Triggered preload complete: {count} agents")
+        except Exception as e:
+            logger.error(f"Triggered preload failed: {e}")
+            enrichment_state["status"] = "error"
+
+    asyncio.create_task(_do_preload())
+    return {"status": "queued", "message": "Full preload of all Virtuals agents triggered in background"}
