@@ -724,10 +724,14 @@ async def backfill_categories():
             rows = [dict(r) for r in await cur.fetchall()]
 
     updated = 0
+    MEANINGFUL_CATS = set(CAT_KEYWORDS.keys())  # DeFi, Gaming, Social, Trading, etc.
     async with aiosqlite.connect("virtualsiq.db") as db:
         for agent in rows:
-            new_cat = _infer_category(agent)
-            if new_cat and new_cat not in GENERIC_CATEGORIES:
+            # Force keyword re-inference by clearing the current type so _infer_category
+            # doesn't short-circuit on raw Virtuals codes like 'Acp_Launch'
+            agent_for_inference = {**agent, "agent_type": ""}
+            new_cat = _infer_category(agent_for_inference)
+            if new_cat and new_cat in MEANINGFUL_CATS:
                 await db.execute(
                     "UPDATE agents SET agent_type = ? WHERE virtuals_id = ?",
                     (new_cat, agent["virtuals_id"]),
