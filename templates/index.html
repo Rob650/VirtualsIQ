@@ -1484,13 +1484,13 @@ function renderModal(agent) {
   const scores = agent.scores_json || {};
   const prediction = agent.prediction_json || {};
 
-  const hasAnalysis = Object.keys(analysis).length > 0 || Object.keys(overviewJson).length > 0;
-  const overview = { summary: overviewJson.what_it_does || analysis.overview?.summary || agent.biography };
-  const riskData = { bear_case: overviewJson.risks_to_monitor || analysis.risk?.bear_case, key_risks: analysis.risk?.key_risks || [] };
-  const teamData = { team_summary: overviewJson.who_is_behind_it || analysis.team?.team_summary };
-  const productData = { description: overviewJson.market_opportunity || analysis.product?.description };
+  const hasAnalysis = Object.keys(analysis).length > 0 || Object.keys(overviewJson).length > 0 || !!agent.last_analyzed;
+  const overview = { summary: overviewJson.what_it_does || analysis.overview?.what_it_does || analysis.overview?.summary || agent.biography };
+  const riskData = { bear_case: overviewJson.risks_to_monitor || analysis.overview?.risks_to_monitor || analysis.risk?.bear_case, key_risks: analysis.risk?.key_risks || [] };
+  const teamData = { team_summary: overviewJson.who_is_behind_it || analysis.overview?.who_is_behind_it || analysis.team?.team_summary };
+  const productData = { description: overviewJson.market_opportunity || analysis.overview?.market_opportunity || analysis.product?.description };
   const fmData = analysis.first_mover || {};
-  const intelligenceNotes = overviewJson.what_is_notable || analysis.intelligence_notes;
+  const intelligenceNotes = overviewJson.what_is_notable || analysis.overview?.what_is_notable || analysis.intelligence_notes;
 
   // Phase 3: derive one_liner, top_helped, top_hurt from scores_json
   const factorScores = scores.scores || Object.fromEntries(Object.entries(scores).filter(([k]) => /^F\d+_/.test(k))) || {};
@@ -2111,15 +2111,15 @@ function buildAgentReportHTML(agent) {
   const scores     = agent.scores_json   || {};
   const prediction = agent.prediction_json || {};
 
-  const hasAnalysis  = Object.keys(analysis).length > 0 || Object.keys(overviewJson).length > 0;
-  const overview     = { summary: overviewJson.what_it_does || analysis.overview?.summary || agent.biography };
-  const riskData     = { bear_case: overviewJson.risks_to_monitor || analysis.risk?.bear_case, key_risks: analysis.risk?.key_risks || [] };
-  const teamData     = { team_summary: overviewJson.who_is_behind_it || analysis.team?.team_summary };
-  const productData  = { description: overviewJson.market_opportunity || analysis.product?.description };
+  const hasAnalysis  = Object.keys(analysis).length > 0 || Object.keys(overviewJson).length > 0 || !!agent.last_analyzed;
+  const overview     = { summary: overviewJson.what_it_does || analysis.overview?.what_it_does || analysis.overview?.summary || agent.biography };
+  const riskData     = { bear_case: overviewJson.risks_to_monitor || analysis.overview?.risks_to_monitor || analysis.risk?.bear_case, key_risks: analysis.risk?.key_risks || [] };
+  const teamData     = { team_summary: overviewJson.who_is_behind_it || analysis.overview?.who_is_behind_it || analysis.team?.team_summary };
+  const productData  = { description: overviewJson.market_opportunity || analysis.overview?.market_opportunity || analysis.product?.description };
   const fmData       = analysis.first_mover || {};
-  const intelligenceNotes = overviewJson.what_is_notable || analysis.intelligence_notes;
+  const intelligenceNotes = overviewJson.what_is_notable || analysis.overview?.what_is_notable || analysis.intelligence_notes;
 
-  const factorScores = scores.scores      || {};
+  const factorScores = scores.scores || Object.fromEntries(Object.entries(scores).filter(([k]) => /^F\d+_/.test(k))) || {};
   const tierScores   = scores.tier_scores || scores._tier_scores || {};
 
   const FACTOR_LABELS = {
