@@ -10,7 +10,7 @@ import os
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Optional
 
 import aiosqlite
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
@@ -707,28 +707,6 @@ async def admin_refresh_analysis(force: bool = Query(False)):
         "message": f"Analysis {'(forced, all agents)' if force else '(stale only, >7 days)'} queued",
     }
 
-
-class OverviewRequest(BaseModel):
-    virtuals_id: str
-    overview_json: Dict[str, Any]
-
-
-@app.post("/api/admin/write-overview")
-async def write_overview(req: OverviewRequest):
-    """Write / update the overview_json blob for a single agent."""
-    async with aiosqlite.connect("virtualsiq.db") as db:
-        await db.execute(
-            "UPDATE agents SET overview_json = ? WHERE virtuals_id = ?",
-            (json.dumps(req.overview_json), req.virtuals_id),
-        )
-        await db.commit()
-        async with db.execute(
-            "SELECT changes()"
-        ) as cur:
-            rows_changed = (await cur.fetchone())[0]
-    if rows_changed == 0:
-        raise HTTPException(status_code=404, detail=f"Agent {req.virtuals_id} not found")
-    return {"status": "ok", "virtuals_id": req.virtuals_id}
 
 
 @app.post("/api/admin/backfill-categories")
