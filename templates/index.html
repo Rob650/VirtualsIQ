@@ -663,7 +663,7 @@
     }
 
     .report-narrative {
-      color: rgba(255,255,255,0.85);
+      color: #168389;
       font-size: 14px;
       line-height: 1.8;
     }
@@ -1440,7 +1440,7 @@ async function openModal(virtualsId) {
 
 function formatText(text) {
   if (!text) return '';
-  return text.split('\n').filter(p => p.trim()).map(p => '<p style="margin-bottom:12px;line-height:1.7;color:rgba(255,255,255,0.85)">' + p + '</p>').join('');
+  return text.split('\n').filter(p => p.trim()).map(p => '<p style="margin-bottom:12px;line-height:1.7;color:#168389">' + p + '</p>').join('');
 }
 
 function renderModal(agent) {
@@ -1493,8 +1493,8 @@ function renderModal(agent) {
   const intelligenceNotes = overviewJson.what_is_notable || analysis.intelligence_notes;
 
   // Phase 3: derive one_liner, top_helped, top_hurt from scores_json
-  const factorScores = scores.scores || {};
-  const tierScores = scores.tier_scores || {};
+  const factorScores = scores.scores || Object.fromEntries(Object.entries(scores).filter(([k]) => /^F\d+_/.test(k))) || {};
+  const tierScores = scores.tier_scores || scores._tier_scores || {};
   const FACTOR_LABELS = {
     F1_category_uniqueness:'Category Uniqueness', F2_approach_novelty:'Approach Novelty',
     F3_cross_chain_originality:'Cross-Chain Original', F4_timing_advantage:'Timing Advantage',
@@ -2120,7 +2120,7 @@ function buildAgentReportHTML(agent) {
   const intelligenceNotes = overviewJson.what_is_notable || analysis.intelligence_notes;
 
   const factorScores = scores.scores      || {};
-  const tierScores   = scores.tier_scores || {};
+  const tierScores   = scores.tier_scores || scores._tier_scores || {};
 
   const FACTOR_LABELS = {
     F1_category_uniqueness:'Category Uniqueness', F2_approach_novelty:'Approach Novelty',
