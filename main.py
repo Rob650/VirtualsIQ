@@ -37,6 +37,7 @@ from database import (
 from virtuals_ingestion import (
     detect_new_agents,
     enrich_top_agents_dexscreener,
+    fetch_all_agents,
     fetch_dexscreener_data,
     get_api_total_count,
     preload_all_agents,
@@ -54,7 +55,7 @@ logger = logging.getLogger(__name__)
 # Category inference helpers
 # ---------------------------------------------------------------------------
 
-GENERIC_CATEGORIES = {"IP", "Unknown", "", None}
+GENERIC_CATEGORIES = {"IP", "IP MIRROR", "Ip Mirror", "Unknown", "", None}
 
 CAT_KEYWORDS = {
     "DeFi": ["defi", "swap", "lend", "yield", "liquidity", "amm", "vault", "stake", "borrow", "finance", "dex", "pool", "bridge"],
@@ -703,3 +704,23 @@ async def admin_refresh_analysis(force: bool = Query(False)):
         "force": force,
         "message": f"Analysis {'(forced, all agents)' if force else '(stale only, >7 days)'} queued",
     }
+
+
+@app.post("/api/admin/backfill-categories")
+async def admin_backfill_categories():
+    """
+    Re-fetch all agents from Virtuals API and update agent_type from the 'role' field.
+    Fixes agents incorrectly labeled 'Ip Mirror'.
+    """
+    async def _do_backfill():
+        logger.info("Starting category backfill from Virtuals API...")
+        agents = await fetch_all_agents()
+        if not agents:
+            logger.error("Category backfill: no agents fetched")
+            return
+        from database import bulk_upsert_agents
+        stored = await bulk_upsert_agents(agents)
+        logger.info(f"Category backfill complete: {stored} agents updated")
+
+    asyncio.create_task(_do_backfill())
+    return {"status": "queued", "message": "Category backfill queued — re-fetching all agents from Virtuals API"}
