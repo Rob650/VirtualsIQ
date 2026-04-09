@@ -6,14 +6,16 @@ Tier 2 — Traction / Team & Execution (28%)
 Tier 3 — On-chain / Value Pool (24%)
 Tier 4 — Narrative / Community (18%)
 
-Missing data defaults to 50 (neutral), never penalized.
+Missing data: factors with NO data return None and are SKIPPED.
+Remaining factors are re-weighted proportionally so the composite
+reflects real signal only — never averaged down by absent data.
 """
 
 import math
 from datetime import datetime
 
 
-NEUTRAL = 50.0  # Default score when data is absent
+NEUTRAL = 50.0  # Score when data IS present but is genuinely average
 
 TIER_LABELS = {
     "first_mover": "Foundation",
@@ -119,37 +121,37 @@ def _days_since(date_str: str | None) -> float | None:
 # Tier 1 — Foundation / First Mover (30%)
 # ---------------------------------------------------------------------------
 
-def _f1_category_uniqueness(agent: dict, ai: dict) -> float:
+def _f1_category_uniqueness(agent: dict, ai: dict) -> float | None:
     v = ai.get("first_mover", {}).get("category_unique")
     if v is True:
         return 100.0
     if v is False:
         return 20.0
-    return NEUTRAL
+    return None  # no AI data — skip this factor
 
 
-def _f2_approach_novelty(agent: dict, ai: dict) -> float:
+def _f2_approach_novelty(agent: dict, ai: dict) -> float | None:
     v = ai.get("first_mover", {}).get("approach_novel")
     if v is True:
         return 90.0
     if v is False:
         return 30.0
-    return NEUTRAL
+    return None
 
 
-def _f3_cross_chain_originality(agent: dict, ai: dict) -> float:
+def _f3_cross_chain_originality(agent: dict, ai: dict) -> float | None:
     v = ai.get("first_mover", {}).get("cross_chain_original")
     if v is True:
         return 85.0
     if v is False:
         return 35.0
-    return NEUTRAL
+    return None
 
 
-def _f4_timing_advantage(agent: dict, ai: dict) -> float:
+def _f4_timing_advantage(agent: dict, ai: dict) -> float | None:
     days = ai.get("first_mover", {}).get("days_ahead_of_competitor")
     if days is None:
-        return NEUTRAL
+        return None
     days = float(days)
     if days > 180:
         return 100.0
@@ -162,16 +164,18 @@ def _f4_timing_advantage(agent: dict, ai: dict) -> float:
     return 20.0
 
 
-def _f5_defensibility(agent: dict, ai: dict) -> float:
+def _f5_defensibility(agent: dict, ai: dict) -> float | None:
     v = ai.get("first_mover", {}).get("defensibility_score")
     if v is not None:
         return _clamp(float(v))
     github = _safe(agent.get("github_stars"), 0)
-    if github > 500:
-        return 80.0
-    if github > 100:
-        return 60.0
-    return NEUTRAL
+    if github > 0:
+        if github > 500:
+            return 80.0
+        if github > 100:
+            return 60.0
+        return 40.0
+    return None  # no AI and no github data
 
 
 # ---------------------------------------------------------------------------
@@ -182,11 +186,6 @@ def score_doxx_tier2(agent: dict) -> dict:
     """
     Dynamic Tier 2 (Social) doxx scoring.
     Returns a detailed sub-score object 0-100 with component breakdown.
-    Evaluates:
-      - Twitter/X account age (older = better)
-      - Follower quality (ratio of real vs bot followers)
-      - Engagement authenticity (real replies vs spam)
-      - Whether the account existed BEFORE the project launched
     """
     twitter_age = _safe(agent.get("twitter_account_age"), 0)
     followers = _safe(agent.get("twitter_followers"), 0)
@@ -196,11 +195,11 @@ def score_doxx_tier2(agent: dict) -> dict:
     components = {}
 
     # 1. Account age sub-score (0-25)
-    if twitter_age > 730:      # 2+ years
+    if twitter_age > 730:
         age_score = 25.0
-    elif twitter_age > 365:    # 1+ year
+    elif twitter_age > 365:
         age_score = 20.0
-    elif twitter_age > 180:    # 6+ months
+    elif twitter_age > 180:
         age_score = 14.0
     elif twitter_age > 30:
         age_score = 8.0
@@ -221,41 +220,40 @@ def score_doxx_tier2(agent: dict) -> dict:
         fq_score = 6.0
     else:
         fq_score = 1.0
-    # Penalize suspicious follower/engagement ratio
     if followers > 1000 and engagement > 15.0:
-        fq_score = max(0, fq_score - 8.0)  # likely bot followers
+        fq_score = max(0, fq_score - 8.0)
     components["follower_quality"] = round(fq_score, 1)
 
     # 3. Engagement authenticity sub-score (0-25)
     if 1.0 <= engagement <= 5.0:
-        eng_score = 25.0  # healthy organic range
+        eng_score = 25.0
     elif 0.5 <= engagement <= 8.0:
-        eng_score = 18.0  # acceptable
+        eng_score = 18.0
     elif 0.1 <= engagement < 0.5:
-        eng_score = 10.0  # low but present
+        eng_score = 10.0
     elif engagement > 15.0:
-        eng_score = 3.0   # suspiciously high — bot activity
+        eng_score = 3.0
     elif engagement > 8.0:
-        eng_score = 8.0   # elevated but not extreme
+        eng_score = 8.0
     else:
-        eng_score = 2.0   # zero or near-zero
+        eng_score = 2.0
     components["engagement_authenticity"] = round(eng_score, 1)
 
     # 4. Pre-project existence sub-score (0-25)
-    pre_score = 12.5  # neutral default
+    pre_score = 12.5
     if creation_date and twitter_age > 0:
         project_days = _days_since(creation_date)
         if project_days:
             if twitter_age > project_days + 180:
-                pre_score = 25.0   # account far predates project — very credible
+                pre_score = 25.0
             elif twitter_age > project_days + 90:
-                pre_score = 22.0   # account predates project — credible
+                pre_score = 22.0
             elif twitter_age > project_days:
-                pre_score = 16.0   # existed before but not by much
+                pre_score = 16.0
             elif twitter_age > project_days - 30:
-                pre_score = 10.0   # created around project launch
+                pre_score = 10.0
             else:
-                pre_score = 3.0    # created after project launch — suspicious
+                pre_score = 3.0
     components["pre_project_existence"] = round(pre_score, 1)
 
     total = _clamp(age_score + fq_score + eng_score + pre_score)
@@ -270,26 +268,24 @@ def score_doxx_tier2(agent: dict) -> dict:
 
 
 def _f6_doxx_tier(agent: dict, ai: dict) -> float:
-    """Dynamic doxx scoring with deeper Tier 2 analysis."""
+    """Dynamic doxx scoring — always returns a value (defaults to anonymous=20)."""
     tier = int(agent.get("doxx_tier") or ai.get("team", {}).get("doxx_tier") or 3)
 
     if tier == 1:
         base = 100.0
     elif tier == 2:
-        # Use the dedicated Tier 2 scorer
         tier2_result = score_doxx_tier2(agent)
         base = tier2_result["total_score"]
     else:
         base = 20.0
 
-    # Penalize for team red flags
     team = ai.get("team", {})
     if team.get("red_flags") and len(team["red_flags"]) > 0:
         base = max(0, base - len(team["red_flags"]) * 10)
     return _clamp(base)
 
 
-def _f7_track_record(agent: dict, ai: dict) -> float:
+def _f7_track_record(agent: dict, ai: dict) -> float | None:
     v = ai.get("team", {}).get("track_record_score")
     if v is not None:
         score = _clamp(float(v))
@@ -297,15 +293,15 @@ def _f7_track_record(agent: dict, ai: dict) -> float:
         if tier == 3:
             score = min(score, 40.0)
         return score
-    return NEUTRAL
+    return None
 
 
-def _f8_code_activity(agent: dict, ai: dict) -> float:
+def _f8_code_activity(agent: dict, ai: dict) -> float | None:
     stars = _safe(agent.get("github_stars"), 0)
     commits = _safe(agent.get("github_commits_30d"), 0)
     contributors = _safe(agent.get("github_contributors"), 0)
     if stars == 0 and commits == 0:
-        return NEUTRAL
+        return None  # no github data at all
     score = 0.0
     score += min(stars / 10, 30)
     score += min(commits / 2, 40)
@@ -313,11 +309,11 @@ def _f8_code_activity(agent: dict, ai: dict) -> float:
     return _clamp(score)
 
 
-def _f9_shipping_cadence(agent: dict, ai: dict) -> float:
+def _f9_shipping_cadence(agent: dict, ai: dict) -> float | None:
     last_commit = agent.get("github_last_commit")
     days = _days_since(last_commit)
     if days is None:
-        return NEUTRAL
+        return None
     if days <= 7:
         return 100.0
     if days <= 30:
@@ -329,7 +325,7 @@ def _f9_shipping_cadence(agent: dict, ai: dict) -> float:
     return 10.0
 
 
-def _f10_product_status(agent: dict, ai: dict) -> float:
+def _f10_product_status(agent: dict, ai: dict) -> float | None:
     status_map = {
         "live": 100.0, "production": 100.0,
         "beta": 70.0, "mainnet_beta": 70.0,
@@ -342,10 +338,10 @@ def _f10_product_status(agent: dict, ai: dict) -> float:
         return status_map[v]
     if agent.get("status") == "Sentient":
         return 80.0
-    return NEUTRAL
+    return None  # no AI data and not Sentient
 
 
-def _f11_partnerships(agent: dict, ai: dict) -> float:
+def _f11_partnerships(agent: dict, ai: dict) -> float | None:
     v = ai.get("product", {}).get("partnership_score")
     if v is not None:
         score = _clamp(float(v))
@@ -355,12 +351,12 @@ def _f11_partnerships(agent: dict, ai: dict) -> float:
         if product.get("red_flags") and len(product["red_flags"]) > 0:
             score = max(0, score - len(product["red_flags"]) * 8)
         return score
-    return NEUTRAL
+    return None
 
 
-def _f12_wallet_behavior(agent: dict, ai: dict) -> float:
+def _f12_wallet_behavior(agent: dict, ai: dict) -> float | None:
     v = ai.get("team", {}).get("wallet_behavior_score")
-    return _clamp(float(v)) if v is not None else NEUTRAL
+    return _clamp(float(v)) if v is not None else None
 
 
 # ---------------------------------------------------------------------------
@@ -368,10 +364,10 @@ def _f12_wallet_behavior(agent: dict, ai: dict) -> float:
 # ---------------------------------------------------------------------------
 
 def _f13_tam(agent: dict, ai: dict) -> float:
+    """Always returns a value — uses AI score or vertical-specific TAM."""
     v = ai.get("market", {}).get("tam_score")
     if v is not None:
         return _clamp(float(v))
-    # Compute from vertical-specific TAM size
     tam = _get_category_tam(agent, ai)
     if tam >= 80_000_000_000:
         return 95.0
@@ -386,17 +382,18 @@ def _f13_tam(agent: dict, ai: dict) -> float:
     return 55.0
 
 
-def _f14_real_world_comparables(agent: dict, ai: dict) -> float:
+def _f14_real_world_comparables(agent: dict, ai: dict) -> float | None:
     v = ai.get("market", {}).get("comparables_score")
-    return _clamp(float(v)) if v is not None else NEUTRAL
+    return _clamp(float(v)) if v is not None else None
 
 
-def _f15_revenue_model(agent: dict, ai: dict) -> float:
+def _f15_revenue_model(agent: dict, ai: dict) -> float | None:
     v = ai.get("market", {}).get("revenue_model_score")
-    return _clamp(float(v)) if v is not None else NEUTRAL
+    return _clamp(float(v)) if v is not None else None
 
 
 def _f16_current_revenue(agent: dict, ai: dict) -> float:
+    """Always returns a value based on on-chain market data."""
     v = ai.get("market", {}).get("current_revenue_score")
     if v is not None:
         return _clamp(float(v))
@@ -423,7 +420,7 @@ def _f16_current_revenue(agent: dict, ai: dict) -> float:
     return 20.0
 
 
-def _f17_mcap_to_tam(agent: dict, ai: dict) -> float:
+def _f17_mcap_to_tam(agent: dict, ai: dict) -> float | None:
     v = ai.get("market", {}).get("mcap_tam_ratio")
     if v is not None:
         ratio = float(v)
@@ -440,43 +437,43 @@ def _f17_mcap_to_tam(agent: dict, ai: dict) -> float:
     if mcap > 0:
         tam = _get_category_tam(agent, ai)
         ratio = mcap / tam
-        if ratio < 0.0001:   # < 0.01% of vertical TAM
+        if ratio < 0.0001:
             return 95.0
-        if ratio < 0.001:    # < 0.1% of vertical TAM
+        if ratio < 0.001:
             return 80.0
-        if ratio < 0.01:     # < 1% of vertical TAM
+        if ratio < 0.01:
             return 65.0
-        if ratio < 0.05:     # < 5% of vertical TAM
+        if ratio < 0.05:
             return 45.0
-        if ratio < 0.1:      # < 10% of vertical TAM
+        if ratio < 0.1:
             return 30.0
         return 15.0
-    return NEUTRAL
+    return None  # no market cap and no AI data
 
 
-def _f18_saturation(agent: dict, ai: dict) -> float:
+def _f18_saturation(agent: dict, ai: dict) -> float | None:
     v = ai.get("market", {}).get("saturation_score")
-    return _clamp(float(v)) if v is not None else NEUTRAL
+    return _clamp(float(v)) if v is not None else None
 
 
 # ---------------------------------------------------------------------------
 # Tier 4 — Narrative / Community (18%)
 # ---------------------------------------------------------------------------
 
-def _f19_holder_distribution(agent: dict, ai: dict) -> float:
+def _f19_holder_distribution(agent: dict, ai: dict) -> float | None:
     holders = _safe(agent.get("holder_count"), 0)
-    top10 = _safe(agent.get("top_10_concentration"), 100)
     if holders == 0:
-        return NEUTRAL
+        return None  # no holder data
+    top10 = _safe(agent.get("top_10_concentration"), 100)
     holder_score = min(math.log10(max(holders, 1)) * 10, 60)
     concentration_score = max(0, 40 - top10 / 2.5)
     return _clamp(holder_score + concentration_score)
 
 
-def _f20_twitter_engagement(agent: dict, ai: dict) -> float:
+def _f20_twitter_engagement(agent: dict, ai: dict) -> float | None:
     rate = _safe(agent.get("twitter_engagement_rate"), -1)
     if rate < 0:
-        return NEUTRAL
+        return None  # no engagement data
     if rate >= 5.0:
         return 95.0
     if rate >= 2.0:
@@ -488,7 +485,7 @@ def _f20_twitter_engagement(agent: dict, ai: dict) -> float:
     return 20.0
 
 
-def _f21_follower_growth(agent: dict, ai: dict) -> float:
+def _f21_follower_growth(agent: dict, ai: dict) -> float | None:
     v = ai.get("community", {}).get("follower_growth_score")
     if v is not None:
         return _clamp(float(v))
@@ -501,30 +498,32 @@ def _f21_follower_growth(agent: dict, ai: dict) -> float:
         return 50.0
     if followers > 100:
         return 30.0
-    return 15.0
+    return None  # no follower data and no AI data
 
 
-def _f22_community_depth(agent: dict, ai: dict) -> float:
+def _f22_community_depth(agent: dict, ai: dict) -> float | None:
     v = ai.get("community", {}).get("depth_score")
-    return _clamp(float(v)) if v is not None else NEUTRAL
+    return _clamp(float(v)) if v is not None else None
 
 
-def _f23_organic_signals(agent: dict, ai: dict) -> float:
+def _f23_organic_signals(agent: dict, ai: dict) -> float | None:
     v = ai.get("community", {}).get("organic_score")
-    return _clamp(float(v)) if v is not None else NEUTRAL
+    return _clamp(float(v)) if v is not None else None
 
 
-def _f24_smart_money(agent: dict, ai: dict) -> float:
+def _f24_smart_money(agent: dict, ai: dict) -> float | None:
     v = ai.get("community", {}).get("smart_money_score")
     if v is not None:
         return _clamp(float(v))
     bsr = _safe(agent.get("buy_sell_ratio"), 1.0)
     vol = _safe(agent.get("volume_24h"), 0)
-    if bsr > 1.5 and vol > 100_000:
-        return 80.0
-    if bsr > 1.2:
-        return 60.0
-    return NEUTRAL
+    if vol > 0:
+        if bsr > 1.5 and vol > 100_000:
+            return 80.0
+        if bsr > 1.2:
+            return 60.0
+        return 40.0
+    return None  # no volume data at all
 
 
 # ---------------------------------------------------------------------------
@@ -537,21 +536,17 @@ def _is_dead_agent(agent: dict) -> bool:
     mcap = _safe(agent.get("market_cap"), 0)
     vol = _safe(agent.get("volume_24h"), 0)
 
-    # Market cap under $5K regardless of age
     if mcap > 0 and mcap < 5_000:
         return True
 
-    # Less than 50 holders AND market cap under $10K
     if holders > 0 and holders < 50 and mcap > 0 and mcap < 10_000:
         return True
 
-    # Over 90 days old with less than $1K daily volume
     creation_date = agent.get("creation_date") or agent.get("first_seen")
     days = _days_since(creation_date)
     if days is not None and days > 90 and vol > 0 and vol < 1_000:
         return True
 
-    # Holder count declining AND volume under $500/day
     holder_change = _safe(agent.get("holder_count_change_24h"), None)
     if holder_change is not None and holder_change < 0 and vol < 500:
         return True
@@ -570,7 +565,7 @@ def _is_strong_investment(agent: dict) -> bool:
         holders >= 2_000 and
         mcap >= 5_000_000 and
         vol >= 20_000 and
-        holder_change >= 0  # stable or growing
+        holder_change >= 0
     )
 
 
@@ -644,7 +639,6 @@ def _build_one_liner(tier_scores: dict, agent_data: dict) -> str:
 
     if parts:
         return ", ".join(parts)
-    # All moderate
     best = TIER_LABELS.get(sorted_tiers[0][0], sorted_tiers[0][0])
     worst = TIER_LABELS.get(sorted_tiers[-1][0], sorted_tiers[-1][0])
     return f"Balanced profile, strongest in {best}, watch {worst}"
@@ -654,44 +648,76 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
     """
     Run all 24 factors and return composite score with breakdown.
 
+    Factors with no data return None and are skipped; the remaining
+    factors are re-weighted proportionally so the composite reflects
+    only real signal.
+
     Returns:
         {
             "composite_score": float,
             "tier_classification": str,
-            "scores": {factor_name: float, ...},
+            "scores": {factor_name: float|None, ...},
             "tier_scores": {tier_name: float, ...},
             "first_mover": bool,
             "score_narrative": str,
             "one_liner": str,
-            "top_helped": [{"factor": str, "score": float, "label": str}, ...],
-            "top_hurt": [{"factor": str, "score": float, "label": str}, ...],
+            "top_helped": [...],
+            "top_hurt": [...],
             "doxx_tier_detail": {...},
+            "dead_flagged": bool,
+            "strong_flagged": bool,
+            "factors_scored": int,
         }
     """
     scores = {}
     weighted_sum = 0.0
+    total_weight = 0.0
     factor_details = []
 
     for fn, weight, name, _tier in FACTORS:
         try:
             raw = fn(agent_data, ai_analysis)
         except Exception:
-            raw = NEUTRAL
+            raw = None
+
+        if raw is None:
+            # No data — skip this factor entirely
+            scores[name] = None
+            factor_details.append({
+                "factor": name,
+                "label": FACTOR_LABELS.get(name, name),
+                "score": None,
+                "weight": weight,
+                "tier": _tier,
+                "contribution": 0.0,
+                "skipped": True,
+            })
+            continue
+
         score = _clamp(raw)
         scores[name] = round(score, 1)
-        # Track contribution = (score - 50) * weight (deviation from neutral)
-        contribution = (score - NEUTRAL) * weight
+        weighted_sum += score * weight
+        total_weight += weight
         factor_details.append({
             "factor": name,
             "label": FACTOR_LABELS.get(name, name),
             "score": round(score, 1),
             "weight": weight,
             "tier": _tier,
-            "contribution": round(contribution, 2),
+            "contribution": 0.0,  # filled in after normalization
+            "skipped": False,
         })
-        weighted_sum += score * weight
 
-    composite = _clamp(round(weighted_sum, 1))
+    # Renormalize: composite = weighted_avg of included factors
+    if total_weight > 0:
+        composite = _clamp(round(weighted_sum / total_weight, 1))
+    else:
+        composite = NEUTRAL
+
+    # Back-fill contributions now that we have the composite
+    for fd in factor_details:
+        if not fd["skipped"]:
+            fd["contribution"] = round((fd["score"] - NEUTRAL) * (fd["weight"] / total_weight), 2)
 
     # SWOT-based adjustment
     swot = ai_analysis.get("swot", {})
@@ -712,7 +738,7 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
     # Step 1: widen distribution (1.5x deviation from 50)
     composite = _widen_distribution(composite)
 
-    # Step 2: apply dead/scam filter OR strong investment boost (mutually exclusive)
+    # Step 2: apply dead/scam filter OR strong investment boost
     dead_flagged = _is_dead_agent(agent_data)
     strong_flagged = _is_strong_investment(agent_data)
     if dead_flagged:
@@ -725,24 +751,27 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
 
     tier = _classify_tier(composite)
 
-    # Tier-level rollups
-    tier_buckets = {"first_mover": [], "team": [], "value": [], "community": []}
+    # Tier-level rollups — average of non-skipped factors per tier
+    tier_buckets: dict[str, list[float]] = {"first_mover": [], "team": [], "value": [], "community": []}
     for fn, weight, name, tier_name in FACTORS:
-        tier_buckets[tier_name].append(scores[name])
+        s = scores.get(name)
+        if s is not None:
+            tier_buckets[tier_name].append(s)
 
     tier_scores = {
         k: round(sum(v) / len(v), 1) if v else NEUTRAL
         for k, v in tier_buckets.items()
     }
 
-    # First mover determination
+    # First mover determination (treat None as not first-mover)
     first_mover = (
-        scores.get("F1_category_uniqueness", NEUTRAL) >= 80 or
-        scores.get("F2_approach_novelty", NEUTRAL) >= 80
+        (scores.get("F1_category_uniqueness") or 0) >= 80 or
+        (scores.get("F2_approach_novelty") or 0) >= 80
     )
 
-    # Top 3 helped (highest positive contribution) and top 3 hurt (most negative)
-    sorted_by_contribution = sorted(factor_details, key=lambda x: x["contribution"], reverse=True)
+    # Top 3 helped / hurt (exclude skipped factors)
+    active_details = [fd for fd in factor_details if not fd["skipped"]]
+    sorted_by_contribution = sorted(active_details, key=lambda x: x["contribution"], reverse=True)
     top_helped = [
         {"factor": f["factor"], "score": f["score"], "label": f["label"]}
         for f in sorted_by_contribution[:3]
@@ -753,13 +782,10 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
         for f in sorted_by_contribution[-3:]
         if f["contribution"] < 0
     ]
-    # Reverse hurt so worst is first
     top_hurt.reverse()
 
-    # Plain English one-liner
     one_liner = _build_one_liner(tier_scores, agent_data)
 
-    # Doxx tier detail
     doxx_tier_val = int(agent_data.get("doxx_tier") or ai_analysis.get("team", {}).get("doxx_tier") or 3)
     doxx_reasons = {
         1: "Fully verified identity — public team with verifiable credentials",
@@ -773,15 +799,13 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
         "reason": doxx_reasons.get(doxx_tier_val, "Unknown"),
     }
 
-    # Build narrative
     narrative = _build_score_narrative(agent_data, ai_analysis, scores, composite, tier_scores)
 
-    # Compute dynamic Tier 2 doxx detail if applicable
     if doxx_tier_val == 2:
-        tier2_detail = score_doxx_tier2(agent_data)
-        doxx_detail["tier2_breakdown"] = tier2_detail
+        doxx_detail["tier2_breakdown"] = score_doxx_tier2(agent_data)
 
-    # Embed metadata into scores dict so it's available in scores_json on the frontend
+    factors_scored = sum(1 for v in scores.values() if v is not None)
+
     scores["_tier_scores"] = tier_scores
     scores["_one_liner"] = one_liner
     scores["_top_helped"] = top_helped
@@ -789,6 +813,7 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
     scores["_doxx_tier_detail"] = doxx_detail
     scores["_dead_flagged"] = dead_flagged
     scores["_strong_flagged"] = strong_flagged
+    scores["_factors_scored"] = factors_scored
 
     return {
         "composite_score": composite,
@@ -803,13 +828,13 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
         "doxx_tier_detail": doxx_detail,
         "dead_flagged": dead_flagged,
         "strong_flagged": strong_flagged,
+        "factors_scored": factors_scored,
     }
 
 
 def _build_score_narrative(agent_data: dict, ai_analysis: dict, scores: dict,
                            composite: float, tier_scores: dict) -> str:
     """Build a human-readable narrative explaining the score."""
-    name = agent_data.get("name", "This agent")
     parts = []
 
     team = ai_analysis.get("team", {})
