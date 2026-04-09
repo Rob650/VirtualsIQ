@@ -272,26 +272,37 @@ async def _auto_analyze_all(force: bool = False):
                     key_risks = r["analysis"].get("risk", {}).get("key_risks", [])
                     team_data = r["analysis"].get("team", {})
                     market_data = r["analysis"].get("market", {})
+                    product_info = r["analysis"].get("product", {})
                     doxx_tier = int(team_data.get("doxx_tier", 3))
-                    doxx_label = {1: "fully doxxed", 2: "social presence only", 3: "anonymous"}.get(doxx_tier, "anonymous")
+                    doxx_label = {1: "a fully doxxed team", 2: "a pseudonymous team with social presence", 3: "an anonymous team"}[doxx_tier]
+                    agent_name = agent_data.get("name", "This agent")
+                    agent_type = agent_data.get("agent_type") or "AI Agent"
+                    holder_count = agent_data.get("holder_count") or 0
+                    mcap = agent_data.get("market_cap") or 0
+                    product_status = product_info.get("status", "unknown")
                     basic_overview = {
                         "what_it_does": agent_data.get("biography", ""),
                         "who_is_behind_it": team_data.get("team_summary", "") or (
-                            f"The team is {doxx_label}. Track record score: {team_data.get('track_record_score', 'N/A')}/100. "
-                            "Full team details will be available after deep-dive analysis."
+                            f"{agent_name} is backed by {doxx_label}. "
+                            f"The project has {holder_count:,} token holders. "
+                            f"Full team background and credential analysis is pending a comprehensive deep-dive."
                         ),
                         "what_is_notable": (
-                            f"Market cap: ${agent_data.get('market_cap', 0):,.0f}. "
-                            f"Holders: {agent_data.get('holder_count', 0):,}. "
-                            f"Category: {agent_data.get('agent_type', 'Unknown')}. "
-                            "Full intelligence notes will be available after deep-dive analysis."
+                            f"Product status: {product_status}. "
+                            f"{agent_name} is active in the {agent_type} vertical on Virtuals Protocol"
+                            f"{f' with a market cap of ${mcap:,.0f}' if mcap else ''}. "
+                            f"Detailed intelligence notes including partnerships and milestones are pending full analysis."
                         ),
-                        "risks_to_monitor": " ".join(key_risks) if key_risks else (
-                            r["analysis"].get("risk", {}).get("bear_case", "")
+                        "risks_to_monitor": (
+                            ". ".join(key_risks) + "." if key_risks else
+                            r["analysis"].get("risk", {}).get("bear_case", "") or
+                            f"Risk factors for {agent_name} are pending full analysis. "
+                            f"Key areas to investigate include team transparency, liquidity depth, and product execution."
                         ),
                         "market_opportunity": market_data.get("tam_description", "") or (
-                            f"Operating in the {agent_data.get('agent_type', 'AI agent')} vertical on Virtuals Protocol. "
-                            "Full market analysis will be available after deep-dive analysis."
+                            f"{agent_name} operates in the {agent_type} vertical on Virtuals Protocol. "
+                            f"Full market opportunity analysis including TAM, competitive landscape, "
+                            f"and growth projections is pending a comprehensive research pass."
                         ),
                     }
                     try:
