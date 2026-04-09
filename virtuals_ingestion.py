@@ -34,8 +34,10 @@ STATUS_MAP = {
 }
 
 AGENT_TYPE_MAP = {
-    "trading": "Trading",
+    # Virtuals API 'role' field values (functional category)
+    "on_chain": "DeFi",
     "defi": "DeFi",
+    "trading": "Trading",
     "information": "Information",
     "entertainment": "Entertainment",
     "social": "Social",
@@ -46,6 +48,9 @@ AGENT_TYPE_MAP = {
     "security": "Security",
     "data": "Data",
     "governance": "Governance",
+    "productivity": "Productivity",
+    "waifu": "Entertainment",
+    "husbando": "Entertainment",
 }
 
 
@@ -100,10 +105,12 @@ def _parse_agent(item: dict) -> dict:
     status_code = attrs.get("status") or 4
     status = STATUS_MAP.get(status_code, "Prototype")
 
-    category = attrs.get("category") or attrs.get("agentType") or attrs.get("role") or ""
-    if isinstance(category, dict):
-        category = category.get("name") or ""
-    agent_type = normalize_agent_type(category)
+    # Use 'role' for functional category (e.g. INFORMATION, ON_CHAIN, ENTERTAINMENT).
+    # The 'category' field is the creation method (IP MIRROR, FUNCTIONAL, etc.) — not useful.
+    role = attrs.get("role") or attrs.get("agentType") or ""
+    if isinstance(role, dict):
+        role = role.get("name") or ""
+    agent_type = normalize_agent_type(role)
 
     socials = attrs.get("socials") or {}
     if isinstance(socials, list):
