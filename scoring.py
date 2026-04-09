@@ -51,6 +51,40 @@ FACTOR_LABELS = {
 
 
 # ---------------------------------------------------------------------------
+# TAM values by vertical (in USD)
+# ---------------------------------------------------------------------------
+
+TAM_BY_CATEGORY = {
+    "defi": 100_000_000_000,
+    "infrastructure": 80_000_000_000,
+    "gaming": 50_000_000_000,
+    "social": 30_000_000_000,
+    "community": 30_000_000_000,
+    "entertainment": 20_000_000_000,
+    "creative": 20_000_000_000,
+    "productivity": 15_000_000_000,
+    "tools": 15_000_000_000,
+    "other": 25_000_000_000,
+    "unknown": 25_000_000_000,
+}
+
+
+def _get_category_tam(agent: dict, ai: dict) -> float:
+    """Return TAM in dollars based on agent category/vertical."""
+    cat = (
+        agent.get("category") or
+        agent.get("agent_type") or
+        ai.get("category") or
+        "other"
+    )
+    cat = str(cat).lower().strip()
+    for key, tam in TAM_BY_CATEGORY.items():
+        if key in cat:
+            return float(tam)
+    return float(TAM_BY_CATEGORY["other"])
+
+
+# ---------------------------------------------------------------------------
 # Helper utilities
 # ---------------------------------------------------------------------------
 
@@ -335,7 +369,21 @@ def _f12_wallet_behavior(agent: dict, ai: dict) -> float:
 
 def _f13_tam(agent: dict, ai: dict) -> float:
     v = ai.get("market", {}).get("tam_score")
-    return _clamp(float(v)) if v is not None else NEUTRAL
+    if v is not None:
+        return _clamp(float(v))
+    # Compute from vertical-specific TAM size
+    tam = _get_category_tam(agent, ai)
+    if tam >= 80_000_000_000:
+        return 95.0
+    if tam >= 50_000_000_000:
+        return 85.0
+    if tam >= 30_000_000_000:
+        return 75.0
+    if tam >= 20_000_000_000:
+        return 65.0
+    if tam >= 15_000_000_000:
+        return 60.0
+    return 55.0
 
 
 def _f14_real_world_comparables(agent: dict, ai: dict) -> float:
@@ -390,15 +438,19 @@ def _f17_mcap_to_tam(agent: dict, ai: dict) -> float:
         return 15.0
     mcap = _safe(agent.get("market_cap"), 0)
     if mcap > 0:
-        if mcap < 100_000:
-            return 90.0
-        if mcap < 1_000_000:
-            return 78.0
-        if mcap < 10_000_000:
-            return 62.0
-        if mcap < 100_000_000:
-            return 42.0
-        return 22.0
+        tam = _get_category_tam(agent, ai)
+        ratio = mcap / tam
+        if ratio < 0.0001:   # < 0.01% of vertical TAM
+            return 95.0
+        if ratio < 0.001:    # < 0.1% of vertical TAM
+            return 80.0
+        if ratio < 0.01:     # < 1% of vertical TAM
+            return 65.0
+        if ratio < 0.05:     # < 5% of vertical TAM
+            return 45.0
+        if ratio < 0.1:      # < 10% of vertical TAM
+            return 30.0
+        return 15.0
     return NEUTRAL
 
 
@@ -473,6 +525,59 @@ def _f24_smart_money(agent: dict, ai: dict) -> float:
     if bsr > 1.2:
         return 60.0
     return NEUTRAL
+
+
+# ---------------------------------------------------------------------------
+# Score filters and distribution helpers
+# ---------------------------------------------------------------------------
+
+def _is_dead_agent(agent: dict) -> bool:
+    """Return True if agent meets ANY dead/scam criteria (binary flag)."""
+    holders = _safe(agent.get("holder_count"), 0)
+    mcap = _safe(agent.get("market_cap"), 0)
+    vol = _safe(agent.get("volume_24h"), 0)
+
+    # Market cap under $5K regardless of age
+    if mcap > 0 and mcap < 5_000:
+        return True
+
+    # Less than 50 holders AND market cap under $10K
+    if holders > 0 and holders < 50 and mcap > 0 and mcap < 10_000:
+        return True
+
+    # Over 90 days old with less than $1K daily volume
+    creation_date = agent.get("creation_date") or agent.get("first_seen")
+    days = _days_since(creation_date)
+    if days is not None and days > 90 and vol > 0 and vol < 1_000:
+        return True
+
+    # Holder count declining AND volume under $500/day
+    holder_change = _safe(agent.get("holder_count_change_24h"), None)
+    if holder_change is not None and holder_change < 0 and vol < 500:
+        return True
+
+    return False
+
+
+def _is_strong_investment(agent: dict) -> bool:
+    """Return True if agent meets ALL strong investment criteria."""
+    holders = _safe(agent.get("holder_count"), 0)
+    mcap = _safe(agent.get("market_cap"), 0)
+    vol = _safe(agent.get("volume_24h"), 0)
+    holder_change = _safe(agent.get("holder_count_change_24h"), 0)
+
+    return (
+        holders >= 2_000 and
+        mcap >= 5_000_000 and
+        vol >= 20_000 and
+        holder_change >= 0  # stable or growing
+    )
+
+
+def _widen_distribution(score: float) -> float:
+    """Multiply deviation from 50 by 1.5x, then clamp to 5-100."""
+    widened = 50.0 + (score - 50.0) * 1.5
+    return _clamp(widened, 5.0, 100.0)
 
 
 # ---------------------------------------------------------------------------
@@ -603,6 +708,21 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
     if tech.get("audit_status") == "audited":
         composite = _clamp(round(composite + 1.5, 1))
 
+    # ---- Post-processing pipeline ----
+    # Step 1: widen distribution (1.5x deviation from 50)
+    composite = _widen_distribution(composite)
+
+    # Step 2: apply dead/scam filter OR strong investment boost (mutually exclusive)
+    dead_flagged = _is_dead_agent(agent_data)
+    strong_flagged = _is_strong_investment(agent_data)
+    if dead_flagged:
+        composite = min(round(composite * 0.3, 1), 25.0)
+    elif strong_flagged:
+        composite = min(round(composite * 1.2, 1), 100.0)
+
+    # Step 3: final clamp 5-100
+    composite = _clamp(round(composite, 1), 5.0, 100.0)
+
     tier = _classify_tier(composite)
 
     # Tier-level rollups
@@ -667,6 +787,8 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
     scores["_top_helped"] = top_helped
     scores["_top_hurt"] = top_hurt
     scores["_doxx_tier_detail"] = doxx_detail
+    scores["_dead_flagged"] = dead_flagged
+    scores["_strong_flagged"] = strong_flagged
 
     return {
         "composite_score": composite,
@@ -679,6 +801,8 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
         "top_helped": top_helped,
         "top_hurt": top_hurt,
         "doxx_tier_detail": doxx_detail,
+        "dead_flagged": dead_flagged,
+        "strong_flagged": strong_flagged,
     }
 
 
