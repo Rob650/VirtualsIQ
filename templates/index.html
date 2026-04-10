@@ -1446,11 +1446,13 @@ async function loadHolders(virtualsId) {
     const res = await fetch(`/api/agent/${virtualsId}/holders`);
     if (!res.ok) throw new Error('fetch failed');
     const data = await res.json();
+    // Hide entire section if Moralis API key is not configured
+    if (data.source === 'no_api_key' || data.source === 'no_contract') return;
+    const section = document.getElementById('smart-money-section');
+    if (section) section.style.display = '';
     const holders = data.holders || [];
     if (!holders.length) {
-      el.innerHTML = data.message
-        ? `<div style="padding:10px;background:rgba(22,131,137,0.06);border:1px solid rgba(22,131,137,0.15);border-radius:6px;color:var(--text-dim)">${data.message}</div>`
-        : `<div style="color:var(--text-dim)">No holder data available.</div>`;
+      el.innerHTML = `<div style="color:var(--text-dim)">No holder data available.</div>`;
       return;
     }
     const badgeStyle = {
@@ -1549,8 +1551,12 @@ function renderModal(agent) {
   const intelligenceNotes = overviewJson.what_is_notable || analysis.overview?.what_is_notable || analysis.intelligence_notes;
 
   // Phase 3: derive one_liner, top_helped, top_hurt from scores_json
-  const factorScores = scores.scores || Object.fromEntries(Object.entries(scores).filter(([k]) => /^F\d+_/.test(k))) || {};
-  const tierScores = scores.tier_scores || scores._tier_scores || {};
+  const NEW_FACTOR_KEYS = ['F_idea_market_fit','F_moat','F_execution','F_holders','F_mcap','F_volume','F_efficiency','F_momentum'];
+  const factorScores = {};
+  NEW_FACTOR_KEYS.forEach(k => { if (scores[k] != null) factorScores[k] = scores[k]; });
+  // backward compat: also pick up legacy F1_…F24_ keys if present
+  Object.entries(scores).forEach(([k,v]) => { if (/^F\d+_/.test(k) && v != null) factorScores[k] = v; });
+  const tierScores = scores._tier_scores || scores.tier_scores || {};
   const FACTOR_LABELS = {
     F_idea_market_fit:'Idea × Market Fit', F_moat:'Moat / Defensibility',
     F_execution:'Execution Signals', F_holders:'Holder Count',
@@ -1649,8 +1655,8 @@ function renderModal(agent) {
         <div class="metric-tile"><div class="metric-tile-label">Holders</div><div class="metric-tile-value">${fmtNumber(agent.holder_count)}</div></div>
         <div class="metric-tile"><div class="metric-tile-label">Liquidity</div><div class="metric-tile-value">${fmtMcap(agent.liquidity_usd)}</div></div>
         <div class="metric-tile"><div class="metric-tile-label">Buy/Sell Ratio</div><div class="metric-tile-value ${parseFloat(agent.buy_sell_ratio||1)>=1?'green':'red'}">${parseFloat(agent.buy_sell_ratio||1).toFixed(2)}x</div></div>
-        <div class="metric-tile"><div class="metric-tile-label">Twitter Followers</div><div class="metric-tile-value">${fmtNumber(agent.twitter_followers)}</div></div>
-        <div class="metric-tile"><div class="metric-tile-label">GitHub Stars</div><div class="metric-tile-value">${fmtNumber(agent.github_stars)}</div></div>
+        ${agent.twitter_followers ? `<div class="metric-tile"><div class="metric-tile-label">Twitter Followers</div><div class="metric-tile-value">${fmtNumber(agent.twitter_followers)}</div></div>` : ''}
+        ${agent.github_stars ? `<div class="metric-tile"><div class="metric-tile-label">GitHub Stars</div><div class="metric-tile-value">${fmtNumber(agent.github_stars)}</div></div>` : ''}
       </div>
     </div>
 
@@ -1662,9 +1668,9 @@ function renderModal(agent) {
       </div>
     </div>` : ''}
 
-    <div id="smart-money-section">
+    <div id="smart-money-section" style="display:none">
       <div class="report-section-title">Smart Money — Top Holders</div>
-      <div id="holders-list" style="font-size:12px;color:var(--text-dim);padding:12px 0">Loading holder data...</div>
+      <div id="holders-list" style="font-size:12px;color:var(--text-dim);padding:12px 0"></div>
     </div>
 
     <div>
@@ -1674,6 +1680,7 @@ function renderModal(agent) {
       </div>
     </div>
 
+    ${(prediction['7d'] || prediction['30d'] || prediction['90d']) ? `
     <div>
       <div class="report-section-title">AI Forecast</div>
       <div class="forecast-grid">
@@ -1681,7 +1688,7 @@ function renderModal(agent) {
         ${renderForecast('30d', prediction['30d'])}
         ${renderForecast('90d', prediction['90d'])}
       </div>
-    </div>
+    </div>` : ''}
 
     ${agent.linked_twitter || agent.linked_website || agent.linked_telegram ? `
     <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1793,51 +1800,48 @@ function _factorWhy(key, scores, analysis, agent) {
 }
 
 function renderTierBreakdown(scores, analysis, agent) {
-  const tiers = [
-    { label: 'TIER 1 — FIRST MOVER (30%)', keys: [
-      ['F1_category_uniqueness', 'Category Uniqueness'],
-      ['F2_approach_novelty', 'Approach Novelty'],
-      ['F3_cross_chain_originality', 'Cross-Chain Original'],
-      ['F4_timing_advantage', 'Timing Advantage'],
-      ['F5_defensibility', 'Defensibility / Moat'],
+  // Real 4-tier, 8-factor structure matching scoring.py v4
+  const tierScores = scores._tier_scores || scores.tier_scores || {};
+  const factorReasons = scores._factor_reasons || {};
+
+  const REAL_TIERS = [
+    { key: 'idea',      label: 'IDEA × MARKET FIT', pct: '35%', factors: [
+      { key: 'F_idea_market_fit', label: 'Idea × Market Fit' },
     ]},
-    { label: 'TIER 2 — TEAM & EXECUTION (28%)', keys: [
-      ['F6_doxx_tier', 'Team Visibility'],
-      ['F7_track_record', 'Track Record'],
-      ['F8_code_activity', 'Code Activity'],
-      ['F9_shipping_cadence', 'Shipping Cadence'],
-      ['F10_product_status', 'Product Status'],
-      ['F11_partnerships', 'Partnerships'],
-      ['F12_wallet_behavior', 'Wallet Behavior'],
+    { key: 'market',    label: 'MARKET',             pct: '35%', factors: [
+      { key: 'F_holders',    label: 'Holder Count' },
+      { key: 'F_mcap',       label: 'Market Cap' },
+      { key: 'F_volume',     label: '24h Volume' },
+      { key: 'F_efficiency', label: 'Trading Efficiency' },
+      { key: 'F_momentum',   label: 'Holder Momentum' },
     ]},
-    { label: 'TIER 3 — VALUE POOL / TAM (24%)', keys: [
-      ['F13_tam', 'Total Addressable Market'],
-      ['F14_real_world_comparables', 'Real-World Comparables'],
-      ['F15_revenue_model', 'Revenue Model Clarity'],
-      ['F16_current_revenue', 'Current Revenue'],
-      ['F17_mcap_to_tam', 'MCap / TAM Ratio'],
-      ['F18_saturation', 'Market Saturation'],
+    { key: 'moat',      label: 'MOAT',               pct: '20%', factors: [
+      { key: 'F_moat',       label: 'Moat / Defensibility' },
     ]},
-    { label: 'TIER 4 — COMMUNITY & SOCIAL (18%)', keys: [
-      ['F19_holder_distribution', 'Holder Distribution'],
-      ['F20_twitter_engagement', 'Twitter Engagement'],
-      ['F21_follower_growth', 'Follower Growth'],
-      ['F22_community_depth', 'Community Depth'],
-      ['F23_organic_signals', 'Organic vs Paid'],
-      ['F24_smart_money', 'Smart Money'],
+    { key: 'execution', label: 'EXECUTION',          pct: '10%', factors: [
+      { key: 'F_execution',  label: 'Execution Signals' },
     ]},
   ];
 
-  return tiers.map(tier => `
-    <div class="tier-header">${tier.label}</div>
-    ${tier.keys.map(([key, label]) => {
-      const v = scores[key] !== undefined ? Math.round(scores[key]) : 50;
+  const rows = REAL_TIERS.map(tier => {
+    const presentFactors = tier.factors.filter(f => scores[f.key] != null);
+    if (!presentFactors.length) return '';
+
+    const ts = tierScores[tier.key];
+    const tsColor = ts != null ? scoreColor(Math.round(ts)) : 'var(--text-dim)';
+    const tsLabel = ts != null
+      ? ` — <span style="font-family:var(--font-data);color:${tsColor};font-weight:700">${Math.round(ts)}</span>`
+      : '';
+    const header = `<div class="tier-header">${tier.label} <span style="font-weight:400;color:var(--text-dim)">(${tier.pct})</span>${tsLabel}</div>`;
+
+    const factorRows = presentFactors.map(f => {
+      const v = Math.round(scores[f.key]);
       const color = scoreColor(v);
-      const why = _factorWhy(key, scores, analysis, agent);
+      const why = factorReasons[f.key] || '';
       return `<div class="tier-factor-row">
         <div class="tier-factor-left">
-          <div class="tier-factor-name">${label}</div>
-          <div class="tier-factor-why">${why}</div>
+          <div class="tier-factor-name">${f.label}</div>
+          ${why ? `<div class="tier-factor-why">${why}</div>` : ''}
         </div>
         <div class="tier-factor-right">
           <div class="tier-factor-score" style="color:${color}">${v}</div>
@@ -1846,8 +1850,12 @@ function renderTierBreakdown(scores, analysis, agent) {
           </div>
         </div>
       </div>`;
-    }).join('')}
-  `).join('');
+    }).join('');
+
+    return header + factorRows;
+  }).join('');
+
+  return rows || '<div style="color:var(--text-dim);font-size:12px;padding:12px 0">Score breakdown not yet available.</div>';
 }
 
 function renderForecast(horizon, data) {
@@ -2284,8 +2292,8 @@ function buildAgentReportHTML(agent) {
         <div class="metric-tile"><div class="metric-tile-label">Holders</div><div class="metric-tile-value">${fmtNumber(agent.holder_count)}</div></div>
         <div class="metric-tile"><div class="metric-tile-label">Liquidity</div><div class="metric-tile-value">${fmtMcap(agent.liquidity_usd)}</div></div>
         <div class="metric-tile"><div class="metric-tile-label">Buy/Sell Ratio</div><div class="metric-tile-value ${parseFloat(agent.buy_sell_ratio||1)>=1?'green':'red'}">${parseFloat(agent.buy_sell_ratio||1).toFixed(2)}x</div></div>
-        <div class="metric-tile"><div class="metric-tile-label">Twitter Followers</div><div class="metric-tile-value">${fmtNumber(agent.twitter_followers)}</div></div>
-        <div class="metric-tile"><div class="metric-tile-label">GitHub Stars</div><div class="metric-tile-value">${fmtNumber(agent.github_stars)}</div></div>
+        ${agent.twitter_followers ? `<div class="metric-tile"><div class="metric-tile-label">Twitter Followers</div><div class="metric-tile-value">${fmtNumber(agent.twitter_followers)}</div></div>` : ''}
+        ${agent.github_stars ? `<div class="metric-tile"><div class="metric-tile-label">GitHub Stars</div><div class="metric-tile-value">${fmtNumber(agent.github_stars)}</div></div>` : ''}
       </div>
     </div>
 
@@ -2297,9 +2305,9 @@ function buildAgentReportHTML(agent) {
       </div>
     </div>` : ''}
 
-    <div id="smart-money-section">
+    <div id="smart-money-section" style="display:none">
       <div class="report-section-title">Smart Money — Top Holders</div>
-      <div id="holders-list" style="font-size:12px;color:var(--text-dim);padding:12px 0">Loading holder data...</div>
+      <div id="holders-list" style="font-size:12px;color:var(--text-dim);padding:12px 0"></div>
     </div>
 
     <div>
@@ -2309,6 +2317,7 @@ function buildAgentReportHTML(agent) {
       </div>
     </div>
 
+    ${(prediction['7d'] || prediction['30d'] || prediction['90d']) ? `
     <div>
       <div class="report-section-title">AI Forecast</div>
       <div class="forecast-grid">
@@ -2316,7 +2325,7 @@ function buildAgentReportHTML(agent) {
         ${renderForecast('30d', prediction['30d'])}
         ${renderForecast('90d', prediction['90d'])}
       </div>
-    </div>
+    </div>` : ''}
 
     ${agent.linked_twitter || agent.linked_website || agent.linked_telegram ? `
     <div>

@@ -84,10 +84,16 @@ def _clamp(v: float, lo=0.0, hi=100.0) -> float:
 def _days_since(date_str) -> float | None:
     if not date_str:
         return None
-    for fmt in ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ",
-                "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+    s = str(date_str).strip()
+    for fmt in (
+        "%Y-%m-%dT%H:%M:%S.%fZ",
+        "%Y-%m-%dT%H:%M:%SZ",
+        "%Y-%m-%dT%H:%M:%S.%f",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%d",
+    ):
         try:
-            dt = datetime.strptime(str(date_str)[:26], fmt[:len(str(date_str)[:26])])
+            dt = datetime.strptime(s, fmt)
             return (datetime.utcnow() - dt).total_seconds() / 86400
         except ValueError:
             continue
@@ -722,6 +728,121 @@ def _build_score_narrative(agent_data: dict, ai_analysis: dict, scores: dict,
 
 
 # ---------------------------------------------------------------------------
+# Factor evidence strings (human-readable reason behind each score)
+# ---------------------------------------------------------------------------
+
+def _build_factor_reasons(agent_data: dict, ai_analysis: dict) -> dict:
+    """Return a {factor_key: one_line_evidence_string} dict for UI display."""
+    reasons: dict[str, str] = {}
+    fm = ai_analysis.get("first_mover", {})
+
+    # F_idea_market_fit
+    cat = str(
+        agent_data.get("category") or agent_data.get("agent_type") or
+        ai_analysis.get("category") or ""
+    ).strip() or "Unknown"
+    ai_tam = ai_analysis.get("market", {}).get("tam_score")
+    if fm.get("category_unique") is not None or fm.get("approach_novel") is not None:
+        cu = fm.get("category_unique")
+        an = fm.get("approach_novel")
+        parts = []
+        if cu is True:  parts.append("novel category")
+        elif cu is False: parts.append("crowded category")
+        if an is True:  parts.append("novel approach")
+        elif an is False: parts.append("common approach")
+        reasons["F_idea_market_fit"] = "AI: " + ", ".join(parts) if parts else f"Category: {cat}"
+    elif ai_tam is not None:
+        reasons["F_idea_market_fit"] = f"Category: {cat}, AI TAM score {ai_tam:.0f}/100"
+    else:
+        reasons["F_idea_market_fit"] = f"Category: {cat}"
+
+    # F_moat
+    days = _days_since(agent_data.get("creation_date") or agent_data.get("first_seen"))
+    ai_def = fm.get("defensibility_score")
+    stars = _safe(agent_data.get("github_stars"), 0)
+    moat_parts = []
+    if ai_def is not None:
+        moat_parts.append(f"defensibility {ai_def:.0f}/100")
+    if days is not None:
+        moat_parts.append(f"{int(days)} days old")
+    if stars > 0:
+        moat_parts.append(f"{int(stars)} GitHub stars")
+    reasons["F_moat"] = ", ".join(moat_parts) if moat_parts else "No moat signals available"
+
+    # F_execution
+    twitter = str(agent_data.get("linked_twitter") or "").strip()
+    website = str(agent_data.get("linked_website") or "").strip()
+    ai_status = str(ai_analysis.get("product", {}).get("status", "")).strip()
+    exec_parts = []
+    if website and len(website) > 5:
+        exec_parts.append("website ✓")
+    if twitter and len(twitter) > 5:
+        followers = int(_safe(agent_data.get("twitter_followers"), 0))
+        exec_parts.append(f"Twitter {followers:,} followers" if followers else "Twitter ✓")
+    if ai_status:
+        exec_parts.append(f"stage: {ai_status}")
+    reasons["F_execution"] = ", ".join(exec_parts) if exec_parts else "No execution signals"
+
+    # F_holders
+    h = _safe(agent_data.get("holder_count"), -1)
+    if h < 0:
+        reasons["F_holders"] = "No holder data available"
+    else:
+        cmp = "above" if h >= _BM_HOLDERS else "below"
+        reasons["F_holders"] = f"{int(h):,} holders vs {_BM_HOLDERS:,} benchmark — {cmp} median"
+
+    # F_mcap
+    m = _safe(agent_data.get("market_cap"), -1)
+    if m < 0:
+        reasons["F_mcap"] = "No market cap data available"
+    elif m == 0:
+        reasons["F_mcap"] = "Zero market cap"
+    else:
+        cmp = "above" if m >= _BM_MCAP else "below"
+        mc_str = (f"${m/1_000_000:.1f}M" if m >= 1_000_000
+                  else f"${m/1_000:.0f}K" if m >= 1_000 else f"${m:,.0f}")
+        reasons["F_mcap"] = f"{mc_str} market cap vs ${_BM_MCAP/1_000_000:.1f}M benchmark — {cmp} median"
+
+    # F_volume
+    v = _safe(agent_data.get("volume_24h"), -1)
+    if v < 0:
+        reasons["F_volume"] = "No volume data available"
+    elif v == 0:
+        reasons["F_volume"] = "Zero trading volume — project may be inactive"
+    else:
+        cmp = "above" if v >= _BM_VOLUME else "below"
+        v_str = (f"${v/1_000_000:.1f}M" if v >= 1_000_000
+                 else f"${v/1_000:.0f}K" if v >= 1_000 else f"${v:,.0f}")
+        reasons["F_volume"] = f"{v_str} daily volume vs ${_BM_VOLUME/1_000:.0f}K benchmark — {cmp} median"
+
+    # F_efficiency
+    vol  = _safe(agent_data.get("volume_24h"), -1)
+    mcap = _safe(agent_data.get("market_cap"),  0)
+    if vol < 0 or mcap <= 0:
+        reasons["F_efficiency"] = "Insufficient data for efficiency calculation"
+    else:
+        r = vol / mcap
+        if r > 2.0:   label = "likely wash trading"
+        elif r > 0.1: label = "healthy activity"
+        elif r > 0.01: label = "moderate trading"
+        else:          label = "low activity"
+        reasons["F_efficiency"] = f"Vol/MCap ratio {r:.2%} — {label}"
+
+    # F_momentum
+    change = agent_data.get("holder_count_change_24h")
+    if change is None:
+        reasons["F_momentum"] = "No holder change data available"
+    else:
+        c = _safe(change, 0)
+        holders = max(_safe(agent_data.get("holder_count"), 1), 1)
+        pct = c / holders * 100.0
+        sign = "+" if c >= 0 else ""
+        reasons["F_momentum"] = f"{sign}{int(c):,} holders in 24h ({sign}{pct:.1f}%)"
+
+    return reasons
+
+
+# ---------------------------------------------------------------------------
 # Composite scoring
 # ---------------------------------------------------------------------------
 
@@ -880,6 +1001,9 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
     factors_scored = sum(1 for k, v in scores.items()
                          if not k.startswith("_") and v is not None)
 
+    # Factor evidence strings
+    factor_reasons = _build_factor_reasons(agent_data, ai_analysis)
+
     # Attach metadata for downstream consumers
     scores["_tier_scores"]      = tier_scores_display
     scores["_one_liner"]        = one_liner
@@ -889,6 +1013,7 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
     scores["_dead_flagged"]     = dead_flagged
     scores["_strong_flagged"]   = strong_flagged
     scores["_factors_scored"]   = factors_scored
+    scores["_factor_reasons"]   = factor_reasons
 
     return {
         "composite_score":    composite,
@@ -904,4 +1029,5 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
         "dead_flagged":        dead_flagged,
         "strong_flagged":      strong_flagged,
         "factors_scored":      factors_scored,
+        "factor_reasons":      factor_reasons,
     }
