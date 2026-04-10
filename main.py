@@ -12,9 +12,12 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
+import math
+import statistics
+
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Response
 from pydantic import BaseModel
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
@@ -27,18 +30,21 @@ from database import (
     get_agent_holders,
     get_agents,
     get_agents_for_backfill,
+    get_agents_for_ecosystem_report,
     get_agents_needing_reanalysis,
     get_all_agents_for_snapshot,
     get_backtest_data,
     get_category_summary,
     get_existing_ids,
     get_holders_last_updated,
+    get_latest_ecosystem_report,
     get_score_history,
     get_stats,
     get_top_agent_ids,
     get_trending_agents,
     get_trending_strip,
     init_db,
+    save_ecosystem_report,
     search_agents,
     take_score_snapshot,
     update_agent_category,
@@ -497,10 +503,23 @@ async def lifespan(app: FastAPI):
 # ---------------------------------------------------------------------------
 
 app = FastAPI(
-    title="VirtualsIQ",
-    description="AI-powered intelligence terminal for Virtuals Protocol",
+    title="VirtualsIQ API",
+    description=(
+        "AI-powered intelligence terminal for Virtuals Protocol.\n\n"
+        "## Public API v1\n"
+        "Use `/api/v1/` endpoints for programmatic access to agent data.\n\n"
+        "## Rate Limits\n"
+        "Public endpoints: 60 requests/minute. Headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`."
+    ),
     version="2.0.0",
     lifespan=lifespan,
+    openapi_tags=[
+        {"name": "agents", "description": "Agent listing, search, and detail"},
+        {"name": "v1", "description": "Public API v1 — stable, paginated, filterable"},
+        {"name": "rankings", "description": "Leaderboards and trending feeds"},
+        {"name": "ecosystem", "description": "Ecosystem-wide stats and reports"},
+        {"name": "admin", "description": "Admin operations (trigger analysis, rescore, etc.)"},
+    ],
 )
 
 templates = Jinja2Templates(directory="templates")
@@ -517,11 +536,97 @@ async def dashboard(request: Request):
 
 @app.get("/agent/{virtuals_id}", response_class=HTMLResponse)
 async def agent_detail_page(request: Request, virtuals_id: str):
-    """Full detail page for an agent (not a modal)."""
+    """SSR agent detail page with pre-rendered meta tags and content for SEO."""
+    agent = await get_agent_detail(virtuals_id)
+    if not agent:
+        return templates.TemplateResponse("index.html", {
+            "request": request,
+            "detail_agent_id": virtuals_id,
+        })
+
+    # Build short summary for meta description
+    overview = agent.get("overview_json") or {}
+    if isinstance(overview, str):
+        try:
+            overview = json.loads(overview)
+        except Exception:
+            overview = {}
+    summary = overview.get("headline") or overview.get("summary") or agent.get("biography") or ""
+    summary = (summary[:200] + "…") if len(summary) > 200 else summary
+    summary = summary.replace('"', "'")
+
+    name = agent.get("name", virtuals_id)
+    ticker = agent.get("ticker", "")
+    category = agent.get("agent_type") or "AI Agent"
+    score = agent.get("composite_score")
+    image = agent.get("image_url") or ""
+    base_url = str(request.base_url).rstrip("/")
+
+    page_title = f"{name} ({ticker}) — VirtualsIQ"
+    page_desc = f"{name} is a {category} AI agent on Virtuals Protocol. Score: {score}. {summary}"[:300]
+
     return templates.TemplateResponse("index.html", {
         "request": request,
         "detail_agent_id": virtuals_id,
+        # SEO meta
+        "page_title": page_title,
+        "page_description": page_desc,
+        "og_title": page_title,
+        "og_description": page_desc,
+        "og_image": image,
+        "og_url": f"{base_url}/agent/{virtuals_id}",
+        # SSR hidden content block
+        "ssr_agent": agent,
+        "ssr_summary": summary,
     })
+
+
+@app.get("/robots.txt", response_class=PlainTextResponse, include_in_schema=False)
+async def robots_txt():
+    """Robots.txt for crawler guidance."""
+    base_url = "https://virtualsiq.com"
+    return (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /api/admin/\n"
+        f"Sitemap: {base_url}/sitemap.xml\n"
+    )
+
+
+@app.get("/sitemap.xml", response_class=PlainTextResponse, include_in_schema=False)
+async def sitemap_xml(response: Response):
+    """XML sitemap listing all agent pages."""
+    response.headers["Content-Type"] = "application/xml"
+    base_url = "https://virtualsiq.com"
+
+    from database import _db as _db_ctx
+    async with _db_ctx() as db:
+        rows = await db.fetch_all(
+            "SELECT virtuals_id, updated_at FROM agents ORDER BY composite_score DESC"
+        )
+
+    urls = [f"""  <url>
+    <loc>{base_url}/</loc>
+    <changefreq>hourly</changefreq>
+    <priority>1.0</priority>
+  </url>"""]
+
+    for row in rows:
+        vid = row.get("virtuals_id", "")
+        last_mod = (row.get("updated_at") or "")[:10]
+        loc = f"{base_url}/agent/{vid}"
+        lastmod_tag = f"\n    <lastmod>{last_mod}</lastmod>" if last_mod else ""
+        urls.append(f"""  <url>
+    <loc>{loc}</loc>{lastmod_tag}
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>""")
+
+    sitemap = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    sitemap += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    sitemap += "\n".join(urls)
+    sitemap += "\n</urlset>"
+    return sitemap
 
 
 @app.get("/category/{category}", response_class=HTMLResponse)
@@ -1829,4 +1934,268 @@ async def rebuild_all_overviews(dry_run: bool = Query(False)):
         "status": "queued",
         "dry_run": dry_run,
         "message": "Rebuilding ALL agent overviews with enhanced data-driven analysis. Check server logs for progress.",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Public API v1  (Task 2: Public API Documentation)
+# ---------------------------------------------------------------------------
+
+_RATE_LIMIT = 60  # requests per minute (soft-enforced via headers)
+_rate_counters: dict = {}  # ip -> remaining (placeholder, not strictly enforced)
+
+
+def _add_rate_headers(response: Response, remaining: int = 59) -> Response:
+    response.headers["X-RateLimit-Limit"] = str(_RATE_LIMIT)
+    response.headers["X-RateLimit-Remaining"] = str(max(0, remaining))
+    return response
+
+
+@app.get(
+    "/api/v1/agents",
+    tags=["v1"],
+    summary="List agents (paginated, filterable)",
+    description=(
+        "Returns a paginated list of agents with core metrics. "
+        "Filter by category, minimum score, or sort by score/market_cap/holders."
+    ),
+)
+async def v1_list_agents(
+    response: Response,
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(25, ge=1, le=100, description="Results per page (max 100)"),
+    category: Optional[str] = Query(None, description="Filter by category (e.g. DeFi, Gaming)"),
+    min_score: Optional[float] = Query(None, ge=0, le=100, description="Minimum composite score"),
+    sort_by: Optional[str] = Query("composite_score", description="Sort field: composite_score | market_cap | holders"),
+):
+    valid_sorts = {"composite_score": "composite_score", "market_cap": "market_cap", "holders": "holders"}
+    sort_col = valid_sorts.get(sort_by or "composite_score", "composite_score")
+
+    result = await get_agents(
+        page=page,
+        page_size=page_size,
+        category=category,
+        sort=sort_col,
+    )
+
+    agents = result.get("agents", [])
+
+    # Apply min_score filter post-query (lightweight)
+    if min_score is not None:
+        agents = [a for a in agents if (a.get("composite_score") or 0) >= min_score]
+
+    # Trim to public fields only
+    public_fields = ["virtuals_id", "name", "ticker", "agent_type", "status",
+                     "composite_score", "tier_classification", "market_cap",
+                     "holder_count", "volume_24h", "price_change_24h", "image_url"]
+    agents_out = [{k: a.get(k) for k in public_fields} for a in agents]
+
+    _add_rate_headers(response)
+    return {
+        "page": page,
+        "page_size": page_size,
+        "total": result.get("total", len(agents_out)),
+        "agents": agents_out,
+    }
+
+
+@app.get(
+    "/api/v1/agent/{virtuals_id}",
+    tags=["v1"],
+    summary="Full agent detail",
+    description=(
+        "Returns complete agent data including AI analysis scores, overview, "
+        "comparables, and market data."
+    ),
+)
+async def v1_agent_detail(virtuals_id: str, response: Response):
+    agent = await get_agent_detail(virtuals_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    public_fields = [
+        "virtuals_id", "name", "ticker", "agent_type", "status", "biography",
+        "composite_score", "tier_classification", "scores_json", "overview_json",
+        "market_cap", "holder_count", "volume_24h", "price_change_24h",
+        "price_usd", "liquidity_usd", "twitter_followers", "github_stars",
+        "image_url", "linked_twitter", "linked_website", "creation_date",
+        "first_mover", "doxx_tier",
+    ]
+    out = {k: agent.get(k) for k in public_fields}
+    _add_rate_headers(response)
+    return out
+
+
+@app.get(
+    "/api/v1/rankings",
+    tags=["v1"],
+    summary="Current top agents by score",
+    description="Returns the top agents ranked by composite score. Use `limit` to control result count (max 100).",
+)
+async def v1_rankings(
+    response: Response,
+    limit: int = Query(25, ge=1, le=100, description="Number of results"),
+    category: Optional[str] = Query(None, description="Filter by category"),
+):
+    agents = await get_trending_agents(feed="top-scored", limit=limit)
+
+    if category:
+        agents = [a for a in agents if (a.get("agent_type") or "").lower() == category.lower()]
+
+    public_fields = ["virtuals_id", "name", "ticker", "agent_type", "composite_score",
+                     "tier_classification", "market_cap", "holder_count", "image_url"]
+    agents_out = [{k: a.get(k) for k in public_fields} for a in agents]
+
+    _add_rate_headers(response)
+    return {"count": len(agents_out), "rankings": agents_out}
+
+
+# ---------------------------------------------------------------------------
+# Ecosystem Report  (Task 3: Weekly Ecosystem Report)
+# ---------------------------------------------------------------------------
+
+@app.get("/ecosystem-report", response_class=HTMLResponse, include_in_schema=False)
+async def ecosystem_report_page(request: Request):
+    """Ecosystem report page."""
+    report_row = await get_latest_ecosystem_report()
+    report = report_row.get("report_json", {}) if report_row else {}
+    generated_at = report_row.get("created_at", "") if report_row else ""
+    return templates.TemplateResponse("ecosystem_report.html", {
+        "request": request,
+        "report": report,
+        "generated_at": generated_at,
+    })
+
+
+@app.get(
+    "/api/ecosystem-report",
+    tags=["ecosystem"],
+    summary="Latest ecosystem report",
+    description="Returns the most recently generated weekly ecosystem report with score distributions, movers, and category breakdowns.",
+)
+async def get_ecosystem_report(response: Response):
+    """Return the latest pre-computed ecosystem report."""
+    report_row = await get_latest_ecosystem_report()
+    if not report_row:
+        raise HTTPException(status_code=404, detail="No ecosystem report found. Generate one via POST /api/admin/generate-ecosystem-report")
+    _add_rate_headers(response)
+    return {
+        "report_date": report_row.get("report_date"),
+        "generated_at": report_row.get("created_at"),
+        "report": report_row.get("report_json", {}),
+    }
+
+
+def _compute_ecosystem_report_data(agents: list) -> dict:
+    """Compute the ecosystem report from a list of agent dicts."""
+    now = datetime.utcnow()
+    from datetime import timedelta as _timedelta
+    week_ago_str = (now - _timedelta(days=7)).isoformat()
+
+    scores = [float(a["composite_score"]) for a in agents if a.get("composite_score") is not None]
+    new_this_week = [a for a in agents if (a.get("created_at") or "") >= week_ago_str]
+
+    # Score distribution buckets
+    buckets = {"0-20": 0, "20-40": 0, "40-60": 0, "60-80": 0, "80-100": 0}
+    for s in scores:
+        if s < 20:
+            buckets["0-20"] += 1
+        elif s < 40:
+            buckets["20-40"] += 1
+        elif s < 60:
+            buckets["40-60"] += 1
+        elif s < 80:
+            buckets["60-80"] += 1
+        else:
+            buckets["80-100"] += 1
+
+    # Category breakdown
+    cat_map: dict = {}
+    for a in agents:
+        cat = (a.get("agent_type") or "Other").strip()
+        if cat not in cat_map:
+            cat_map[cat] = {"count": 0, "scores": []}
+        cat_map[cat]["count"] += 1
+        if a.get("composite_score") is not None:
+            cat_map[cat]["scores"].append(float(a["composite_score"]))
+
+    category_breakdown = []
+    for cat, data in sorted(cat_map.items(), key=lambda x: -x[1]["count"]):
+        avg = round(sum(data["scores"]) / len(data["scores"]), 1) if data["scores"] else None
+        category_breakdown.append({"category": cat, "count": data["count"], "avg_score": avg})
+
+    # Top 5 by score
+    top_by_score = sorted(agents, key=lambda a: float(a.get("composite_score") or 0), reverse=True)[:5]
+
+    # Top 5 by edge (highest score relative to market cap — most undervalued)
+    def _edge(a):
+        score = float(a.get("composite_score") or 0)
+        mcap = float(a.get("market_cap") or 0)
+        if mcap <= 0:
+            return 0
+        return score / (math.log10(mcap + 1) + 1)
+
+    top_by_edge = sorted(agents, key=_edge, reverse=True)[:5]
+
+    # Biggest movers (score changes in score_history are not in this data set,
+    # so we use price_change_24h as a proxy for "movers")
+    movers_up = sorted(
+        [a for a in agents if (a.get("price_change_24h") or 0) > 0],
+        key=lambda a: float(a.get("price_change_24h") or 0),
+        reverse=True,
+    )[:5]
+    movers_down = sorted(
+        [a for a in agents if (a.get("price_change_24h") or 0) < 0],
+        key=lambda a: float(a.get("price_change_24h") or 0),
+    )[:5]
+
+    def _slim(a):
+        return {
+            "virtuals_id": a.get("virtuals_id"),
+            "name": a.get("name"),
+            "ticker": a.get("ticker"),
+            "agent_type": a.get("agent_type"),
+            "composite_score": a.get("composite_score"),
+            "market_cap": a.get("market_cap"),
+            "price_change_24h": a.get("price_change_24h"),
+        }
+
+    return {
+        "summary": {
+            "total_agents": len(agents),
+            "new_this_week": len(new_this_week),
+            "average_score": round(sum(scores) / len(scores), 2) if scores else None,
+            "median_score": round(statistics.median(scores), 2) if scores else None,
+        },
+        "score_distribution": buckets,
+        "top_by_score": [_slim(a) for a in top_by_score],
+        "top_by_edge": [_slim(a) for a in top_by_edge],
+        "biggest_movers_up": [_slim(a) for a in movers_up],
+        "biggest_movers_down": [_slim(a) for a in movers_down],
+        "category_breakdown": category_breakdown,
+        "generated_at": now.isoformat(),
+    }
+
+
+@app.post(
+    "/api/admin/generate-ecosystem-report",
+    tags=["admin"],
+    summary="Generate a new ecosystem report",
+    description="Computes and stores the weekly ecosystem report. Overwrites any existing report for today.",
+)
+async def generate_ecosystem_report():
+    """Compute and persist today's ecosystem report."""
+    agents = await get_agents_for_ecosystem_report()
+    if not agents:
+        raise HTTPException(status_code=503, detail="No scored agents found in database")
+
+    report_data = _compute_ecosystem_report_data(agents)
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    await save_ecosystem_report(today, report_data)
+
+    return {
+        "status": "generated",
+        "report_date": today,
+        "agents_analyzed": len(agents),
+        "summary": report_data["summary"],
     }

@@ -302,6 +302,15 @@ async def init_db():
                 )
             """)
 
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS ecosystem_reports (
+                    id BIGSERIAL PRIMARY KEY,
+                    report_date TEXT NOT NULL UNIQUE,
+                    report_json TEXT DEFAULT '{}',
+                    created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS')
+                )
+            """)
+
             # Indexes
             for idx_sql in [
                 "CREATE INDEX IF NOT EXISTS idx_agents_market_cap ON agents(market_cap DESC)",
@@ -392,6 +401,15 @@ async def init_db():
                     scores_json TEXT DEFAULT '{}',
                     snapshot_date TEXT NOT NULL DEFAULT (date('now')),
                     UNIQUE(virtuals_id, snapshot_date)
+                )
+            """)
+
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS ecosystem_reports (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    report_date TEXT NOT NULL UNIQUE,
+                    report_json TEXT DEFAULT '{}',
+                    created_at TEXT DEFAULT (datetime('now'))
                 )
             """)
 
@@ -1051,6 +1069,58 @@ async def get_holders_last_updated(virtuals_id: str):
             (virtuals_id,)
         )
     return val
+
+
+async def get_latest_ecosystem_report() -> dict | None:
+    """Return the most recent ecosystem report."""
+    async with _db() as db:
+        row = await db.fetch_one(
+            "SELECT * FROM ecosystem_reports ORDER BY report_date DESC LIMIT 1"
+        )
+    if not row:
+        return None
+    try:
+        row["report_json"] = json.loads(row.get("report_json") or "{}")
+    except Exception:
+        row["report_json"] = {}
+    return row
+
+
+async def save_ecosystem_report(report_date: str, report_data: dict):
+    """Upsert an ecosystem report for a given date."""
+    now = datetime.utcnow().isoformat()
+    report_json = json.dumps(report_data)
+    async with _db() as db:
+        await db.execute(
+            """INSERT INTO ecosystem_reports (report_date, report_json, created_at)
+               VALUES (?, ?, ?)
+               ON CONFLICT(report_date) DO UPDATE SET
+                 report_json=excluded.report_json,
+                 created_at=excluded.created_at
+            """,
+            (report_date, report_json, now),
+        )
+        await db.commit()
+
+
+async def get_agents_for_ecosystem_report() -> list:
+    """Return lightweight agent data for ecosystem report computation."""
+    async with _db() as db:
+        rows = await db.fetch_all("""
+            SELECT virtuals_id, name, ticker, agent_type, composite_score,
+                   tier_classification, market_cap, holder_count, price_change_24h,
+                   volume_24h, scores_json, created_at, updated_at
+            FROM agents
+            WHERE composite_score IS NOT NULL
+        """)
+    agents = []
+    for d in rows:
+        try:
+            d["scores_json"] = json.loads(d.get("scores_json") or "{}")
+        except Exception:
+            d["scores_json"] = {}
+        agents.append(d)
+    return agents
 
 
 async def upsert_agent_holders(virtuals_id: str, holders: list):

@@ -3,7 +3,23 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VirtualsIQ</title>
+  <title>{{ page_title or "VirtualsIQ — Virtuals Protocol Intelligence Terminal" }}</title>
+  {% if page_description %}
+  <meta name="description" content="{{ page_description }}" />
+  {% else %}
+  <meta name="description" content="AI-powered intelligence terminal for the Virtuals Protocol ecosystem. Real-time rankings, scores, and deep analysis for every AI agent." />
+  {% endif %}
+  {% if og_title %}
+  <meta property="og:title" content="{{ og_title }}" />
+  <meta property="og:description" content="{{ og_description or page_description or '' }}" />
+  <meta property="og:image" content="{{ og_image or 'https://virtualsiq.com/static/og-default.png' }}" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="{{ og_url or '' }}" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="{{ og_title }}" />
+  <meta name="twitter:description" content="{{ og_description or page_description or '' }}" />
+  <meta name="twitter:image" content="{{ og_image or 'https://virtualsiq.com/static/og-default.png' }}" />
+  {% endif %}
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -998,6 +1014,17 @@
   </style>
 </head>
 <body>
+
+{% if ssr_agent %}
+<!-- SSR: pre-rendered agent content for search engine crawlers -->
+<div id="ssr-agent-content" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;" aria-hidden="true">
+  <h1>{{ ssr_agent.name }} ({{ ssr_agent.ticker }})</h1>
+  <p>Category: {{ ssr_agent.agent_type }}</p>
+  <p>Score: {{ ssr_agent.composite_score }}</p>
+  <p>Tier: {{ ssr_agent.tier_classification }}</p>
+  <p>{{ ssr_summary }}</p>
+</div>
+{% endif %}
 
 <!-- HEADER -->
 <header class="header">

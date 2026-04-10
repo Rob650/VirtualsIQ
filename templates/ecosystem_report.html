@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ecosystem Report — VirtualsIQ</title>
+  <meta name="description" content="Weekly ecosystem report for the Virtuals Protocol — score distributions, top agents, movers, and category breakdowns." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:         #FFFFFF;
+      --bg-2:       #F8F9FA;
+      --bg-3:       #F1F3F5;
+      --border:     #E5E7EB;
+      --text:       #111827;
+      --text-muted: #6B7280;
+      --green:      #168389;
+      --green-bg:   rgba(22,131,137,0.10);
+      --red:        #EF4444;
+      --red-bg:     rgba(239,68,68,0.10);
+      --amber:      #F59E0B;
+      --radius:     8px;
+      --font-ui:    'Inter', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 14px; line-height: 1.6; min-height: 100vh; }
+
+    .header { display: flex; align-items: center; gap: 12px; padding: 14px 24px; border-bottom: 1px solid var(--border); background: var(--bg); }
+    .logo { font-weight: 700; font-size: 16px; color: var(--green); text-decoration: none; letter-spacing: -0.3px; }
+    .header-nav { margin-left: auto; display: flex; gap: 16px; }
+    .header-nav a { color: var(--text-muted); text-decoration: none; font-size: 13px; }
+    .header-nav a:hover { color: var(--text); }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+    .page-title { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+    .page-subtitle { color: var(--text-muted); font-size: 13px; margin-bottom: 32px; }
+
+    .no-report { background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 48px; text-align: center; color: var(--text-muted); }
+    .no-report code { display: inline-block; margin-top: 12px; background: var(--bg-3); padding: 6px 12px; border-radius: 4px; font-size: 12px; color: var(--text); }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+
+    .card { background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+    .card-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); margin-bottom: 12px; }
+    .stat-val { font-size: 28px; font-weight: 700; color: var(--text); }
+    .stat-label { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+    .section { margin-bottom: 32px; }
+    .section-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+
+    .agent-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .agent-row:last-child { border-bottom: none; }
+    .agent-name { font-weight: 500; font-size: 13px; }
+    .agent-ticker { color: var(--text-muted); font-size: 12px; margin-left: 6px; }
+    .agent-cat { color: var(--text-muted); font-size: 11px; }
+    .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 100px; font-size: 11px; font-weight: 500; }
+    .badge-green { background: var(--green-bg); color: var(--green); }
+    .badge-red { background: var(--red-bg); color: var(--red); }
+
+    .dist-bar-wrap { margin-bottom: 8px; }
+    .dist-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); margin-bottom: 3px; }
+    .dist-track { background: var(--bg-3); border-radius: 4px; height: 8px; overflow: hidden; }
+    .dist-fill { height: 100%; background: var(--green); border-radius: 4px; }
+
+    .cat-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .cat-table th { text-align: left; padding: 6px 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); border-bottom: 1px solid var(--border); }
+    .cat-table td { padding: 8px; border-bottom: 1px solid var(--border); }
+    .cat-table tr:last-child td { border-bottom: none; }
+
+    .generate-btn { display: inline-flex; align-items: center; gap: 8px; background: var(--green); color: #fff; border: none; border-radius: var(--radius); padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; margin-bottom: 24px; }
+    .generate-btn:hover { opacity: 0.9; }
+    .generate-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .toast { display: none; margin-bottom: 16px; padding: 10px 14px; border-radius: var(--radius); font-size: 13px; }
+    .toast.ok { background: var(--green-bg); color: var(--green); display: block; }
+    .toast.err { background: var(--red-bg); color: var(--red); display: block; }
+
+    @media (max-width: 700px) {
+      .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <a class="logo" href="/">VirtualsIQ</a>
+  <nav class="header-nav">
+    <a href="/">Dashboard</a>
+    <a href="/docs">API Docs</a>
+    <a href="/ecosystem-report" style="color:var(--green);font-weight:600;">Ecosystem Report</a>
+  </nav>
+</header>
+
+<div class="container">
+  <div class="page-title">Ecosystem Report</div>
+  {% if generated_at %}
+  <div class="page-subtitle">Generated {{ generated_at[:10] }} &mdash; covering all scored agents</div>
+  {% else %}
+  <div class="page-subtitle">No report generated yet</div>
+  {% endif %}
+
+  <div id="toast" class="toast"></div>
+
+  <button class="generate-btn" id="gen-btn" onclick="generateReport()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+    Regenerate Report
+  </button>
+
+  {% if not report %}
+  <div class="no-report">
+    <div style="font-size:32px;margin-bottom:12px;">📊</div>
+    <div style="font-weight:600;margin-bottom:8px;">No ecosystem report has been generated yet.</div>
+    <div>Click "Regenerate Report" above, or call:</div>
+    <code>POST /api/admin/generate-ecosystem-report</code>
+  </div>
+  {% else %}
+
+  {% set summary = report.get("summary", {}) %}
+  {% set dist = report.get("score_distribution", {}) %}
+
+  <!-- Summary cards -->
+  <div class="grid-4">
+    <div class="card">
+      <div class="card-title">Total Agents</div>
+      <div class="stat-val">{{ summary.get("total_agents", "—") }}</div>
+    </div>
+    <div class="card">
+      <div class="card-title">New This Week</div>
+      <div class="stat-val" style="color:var(--green)">{{ summary.get("new_this_week", "—") }}</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Average Score</div>
+      <div class="stat-val">{{ summary.get("average_score", "—") }}</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Median Score</div>
+      <div class="stat-val">{{ summary.get("median_score", "—") }}</div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+
+    <!-- Score Distribution -->
+    <div class="section">
+      <div class="section-title">Score Distribution</div>
+      <div class="card">
+        {% set total = (dist.get("0-20",0) + dist.get("20-40",0) + dist.get("40-60",0) + dist.get("60-80",0) + dist.get("80-100",0)) or 1 %}
+        {% for bucket, label in [("80-100","80–100 Elite"), ("60-80","60–80 Strong"), ("40-60","40–60 Mid"), ("20-40","20–40 Weak"), ("0-20","0–20 Avoid")] %}
+        {% set cnt = dist.get(bucket, 0) %}
+        {% set pct = (cnt / total * 100) | round(1) %}
+        <div class="dist-bar-wrap">
+          <div class="dist-label"><span>{{ label }}</span><span>{{ cnt }} ({{ pct }}%)</span></div>
+          <div class="dist-track"><div class="dist-fill" style="width:{{ pct }}%"></div></div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Top 5 by Score -->
+    <div class="section">
+      <div class="section-title">Top 5 by Score</div>
+      <div class="card">
+        {% for a in report.get("top_by_score", []) %}
+        <div class="agent-row">
+          <div>
+            <a href="/agent/{{ a.virtuals_id }}" style="text-decoration:none;color:inherit;">
+              <span class="agent-name">{{ a.name }}</span>
+              <span class="agent-ticker">{{ a.ticker }}</span>
+            </a>
+            <div class="agent-cat">{{ a.agent_type }}</div>
+          </div>
+          <span class="badge badge-green">{{ a.composite_score | round(1) }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+  </div>
+
+  <div class="grid-2">
+
+    <!-- Biggest Movers Up -->
+    <div class="section">
+      <div class="section-title">Biggest Movers (Up)</div>
+      <div class="card">
+        {% set movers_up = report.get("biggest_movers_up", []) %}
+        {% if movers_up %}
+          {% for a in movers_up %}
+          <div class="agent-row">
+            <div>
+              <a href="/agent/{{ a.virtuals_id }}" style="text-decoration:none;color:inherit;">
+                <span class="agent-name">{{ a.name }}</span>
+                <span class="agent-ticker">{{ a.ticker }}</span>
+              </a>
+            </div>
+            <span class="badge badge-green">+{{ (a.price_change_24h or 0) | round(1) }}%</span>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div style="color:var(--text-muted);font-size:13px;">No data</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Biggest Movers Down -->
+    <div class="section">
+      <div class="section-title">Biggest Movers (Down)</div>
+      <div class="card">
+        {% set movers_down = report.get("biggest_movers_down", []) %}
+        {% if movers_down %}
+          {% for a in movers_down %}
+          <div class="agent-row">
+            <div>
+              <a href="/agent/{{ a.virtuals_id }}" style="text-decoration:none;color:inherit;">
+                <span class="agent-name">{{ a.name }}</span>
+                <span class="agent-ticker">{{ a.ticker }}</span>
+              </a>
+            </div>
+            <span class="badge badge-red">{{ (a.price_change_24h or 0) | round(1) }}%</span>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div style="color:var(--text-muted);font-size:13px;">No data</div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Top by Edge (Most Undervalued) -->
+  <div class="section">
+    <div class="section-title">Top 5 by Edge (Most Undervalued)</div>
+    <div class="card">
+      {% for a in report.get("top_by_edge", []) %}
+      <div class="agent-row">
+        <div>
+          <a href="/agent/{{ a.virtuals_id }}" style="text-decoration:none;color:inherit;">
+            <span class="agent-name">{{ a.name }}</span>
+            <span class="agent-ticker">{{ a.ticker }}</span>
+          </a>
+          <div class="agent-cat">{{ a.agent_type }}</div>
+        </div>
+        <div style="text-align:right">
+          <div><span class="badge badge-green">{{ a.composite_score | round(1) }}</span></div>
+          {% if a.market_cap %}
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${{ "{:,.0f}".format(a.market_cap) }}</div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Category Breakdown -->
+  <div class="section">
+    <div class="section-title">Category Breakdown</div>
+    <div class="card" style="padding:0;overflow:hidden;">
+      <table class="cat-table">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Agents</th>
+            <th>Avg Score</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cat in report.get("category_breakdown", []) %}
+          <tr>
+            <td><a href="/category/{{ cat.category }}" style="color:var(--green);text-decoration:none;">{{ cat.category }}</a></td>
+            <td>{{ cat.count }}</td>
+            <td>{{ cat.avg_score if cat.avg_score is not none else "—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% endif %}
+</div>
+
+<script>
+async function generateReport() {
+  const btn = document.getElementById('gen-btn');
+  const toast = document.getElementById('toast');
+  btn.disabled = true;
+  btn.textContent = 'Generating…';
+  toast.className = 'toast';
+  toast.textContent = '';
+  try {
+    const res = await fetch('/api/admin/generate-ecosystem-report', { method: 'POST' });
+    const data = await res.json();
+    if (res.ok) {
+      toast.className = 'toast ok';
+      toast.textContent = `Report generated for ${data.report_date} — ${data.agents_analyzed} agents analyzed. Refreshing…`;
+      setTimeout(() => location.reload(), 1500);
+    } else {
+      throw new Error(data.detail || 'Generation failed');
+    }
+  } catch (e) {
+    toast.className = 'toast err';
+    toast.textContent = `Error: ${e.message}`;
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Regenerate Report`;
+  }
+}
+</script>
+</body>
+</html>
