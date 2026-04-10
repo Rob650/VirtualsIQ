@@ -849,3 +849,339 @@ async def admin_rescore_all():
 
     asyncio.create_task(_do_rescore())
     return {"status": "queued", "message": "Bulk re-scoring of all agents triggered in background"}
+
+
+# ---------------------------------------------------------------------------
+# Data-driven overview builder (no AI calls — uses structured DB fields only)
+# ---------------------------------------------------------------------------
+
+_VERTICAL_TAM = {
+    "defi":           ("DeFi (decentralized finance)", "$100B+"),
+    "trading":        ("AI-driven trading and market intelligence", "$100B+"),
+    "finance":        ("financial services and fintech", "$90B+"),
+    "infrastructure": ("blockchain infrastructure and tooling", "$80B+"),
+    "infra":          ("blockchain infrastructure and tooling", "$80B+"),
+    "protocol":       ("protocol infrastructure", "$80B+"),
+    "security":       ("blockchain security and auditing", "$70B+"),
+    "gaming":         ("Web3 gaming and interactive entertainment", "$50B+"),
+    "game":           ("Web3 gaming and interactive entertainment", "$50B+"),
+    "social":         ("social media and community platforms", "$30B+"),
+    "community":      ("community and social networking", "$30B+"),
+    "entertainment":  ("digital entertainment and media", "$20B+"),
+    "creative":       ("creative tools and generative media", "$20B+"),
+    "art":            ("digital art and creative expression", "$20B+"),
+    "nft":            ("NFTs and digital collectibles", "$20B+"),
+    "productivity":   ("productivity and automation tools", "$15B+"),
+    "tools":          ("developer tools and utilities", "$15B+"),
+    "analytics":      ("data analytics and market intelligence", "$25B+"),
+    "data":           ("data services and analytics", "$25B+"),
+    "meme":           ("meme culture and viral social tokens", "$5B+"),
+}
+
+_STATUS_LABELS = {
+    "sentient": "Sentient",
+    "genesis":  "Genesis",
+    "prototype": "Prototype",
+}
+
+
+def _build_data_driven_overview(agent: dict) -> dict:
+    """
+    Compose a real, data-driven 5-section overview from structured agent fields.
+    No AI API calls — uses only values already in the database.
+    Returns a dict with the 5 sections. Skips sections that already have
+    non-placeholder content.
+    """
+    name        = agent.get("name") or "This agent"
+    ticker      = agent.get("ticker") or ""
+    biography   = agent.get("biography") or ""
+    agent_type  = (agent.get("agent_type") or "AI Agent").strip()
+    status_raw  = (agent.get("status") or "Prototype").lower()
+    status_lbl  = _STATUS_LABELS.get(status_raw, status_raw.title())
+    doxx_tier   = int(agent.get("doxx_tier") or 3)
+    holder_count = int(agent.get("holder_count") or 0)
+    market_cap  = float(agent.get("market_cap") or 0)
+    top10_conc  = agent.get("top_10_concentration")
+    tw_followers = int(agent.get("twitter_followers") or 0)
+    tw_handle   = agent.get("linked_twitter") or ""
+    website     = agent.get("linked_website") or ""
+    telegram    = agent.get("linked_telegram") or ""
+
+    ticker_str = f" (${ticker})" if ticker else ""
+    vertical_key = agent_type.lower()
+    tam_label, tam_size = _VERTICAL_TAM.get(vertical_key, (f"{agent_type} AI agents", "billions"))
+
+    # ── existing overview ──────────────────────────────────────────────────
+    existing = agent.get("overview_json") or {}
+    if isinstance(existing, str):
+        try:
+            existing = json.loads(existing)
+        except Exception:
+            existing = {}
+
+    def _is_pending(text: str) -> bool:
+        low = (text or "").lower()
+        return (
+            "pending full analysis" in low
+            or "pending a comprehensive" in low
+            or "pending a comprehensive deep-dive" in low
+            or "is pending a comprehensive research pass" in low
+        )
+
+    # ── what_it_does ──────────────────────────────────────────────────────
+    existing_wid = existing.get("what_it_does", "")
+    if existing_wid and not _is_pending(existing_wid):
+        what_it_does = existing_wid
+    elif biography:
+        what_it_does = biography
+    else:
+        what_it_does = (
+            f"{name}{ticker_str} is an AI agent operating on the Virtuals Protocol, "
+            f"classified in the {agent_type} vertical. "
+            f"It is currently at {status_lbl} stage on the Base blockchain."
+        )
+
+    # ── who_is_behind_it ──────────────────────────────────────────────────
+    existing_who = existing.get("who_is_behind_it", "")
+    if existing_who and not _is_pending(existing_who):
+        who_is_behind_it = existing_who
+    else:
+        doxx_map = {
+            1: f"The team behind {name} is publicly identified and verifiable.",
+            2: f"The team behind {name} operates pseudonymously but maintains an active and traceable social presence.",
+            3: f"The team behind {name} is currently anonymous — no verified founder identities have been publicly disclosed.",
+        }
+        who_parts = [doxx_map.get(doxx_tier, doxx_map[3])]
+
+        social_signals = []
+        if tw_handle:
+            if tw_followers > 0:
+                social_signals.append(f"an active Twitter/X account (@{tw_handle.lstrip('@')} with {tw_followers:,} followers)")
+            else:
+                social_signals.append(f"a Twitter/X account (@{tw_handle.lstrip('@')})")
+        if website:
+            social_signals.append("a project website")
+        if telegram:
+            social_signals.append("a Telegram community")
+
+        if social_signals:
+            who_parts.append(
+                f"The project has established {', '.join(social_signals[:-1])}{' and ' + social_signals[-1] if len(social_signals) > 1 else social_signals[0] if not who_parts[0].endswith('.') else ''}."
+                if len(social_signals) > 1
+                else f"The project maintains {social_signals[0]}."
+            )
+        else:
+            who_parts.append(
+                f"The project currently has no verified social channels listed, which is common at the early {status_lbl} stage."
+            )
+
+        if holder_count > 0:
+            if holder_count >= 500:
+                who_parts.append(
+                    f"With {holder_count:,} token holders, {name} has attracted a meaningful early community, "
+                    f"suggesting real interest beyond the founding team."
+                )
+            elif holder_count >= 100:
+                who_parts.append(
+                    f"The project currently has {holder_count:,} token holders, indicating an early but growing community."
+                )
+            else:
+                who_parts.append(
+                    f"The token has {holder_count:,} holder{'s' if holder_count != 1 else ''} at this stage, "
+                    f"reflecting very early distribution."
+                )
+
+        who_is_behind_it = " ".join(who_parts)
+
+    # ── what_is_notable ───────────────────────────────────────────────────
+    existing_win = existing.get("what_is_notable", "")
+    if existing_win and not _is_pending(existing_win):
+        what_is_notable = existing_win
+    else:
+        notable_parts = []
+        notable_parts.append(
+            f"{name}{ticker_str} is positioned in the {agent_type} vertical on Virtuals Protocol, "
+            f"currently operating at {status_lbl} stage on the Base blockchain."
+        )
+
+        infra_signals = []
+        if tw_handle:
+            infra_signals.append("Twitter/X")
+        if website:
+            infra_signals.append("a project website")
+        if telegram:
+            infra_signals.append("Telegram")
+
+        if infra_signals:
+            notable_parts.append(
+                f"The project has established social infrastructure across {', '.join(infra_signals)}, "
+                f"indicating active community-building effort."
+            )
+
+        if status_raw == "sentient":
+            notable_parts.append(
+                f"Reaching Sentient status on Virtuals Protocol is a significant milestone — it signals "
+                f"the agent has met the protocol's autonomy thresholds and is live as an independent on-chain entity."
+            )
+        elif status_raw == "genesis":
+            notable_parts.append(
+                f"Genesis status on Virtuals Protocol represents the highest tier of agent maturity, "
+                f"indicating the project has cleared all protocol benchmarks and is fully operational."
+            )
+
+        if biography and len(biography) > 50:
+            # Extract a short excerpt from biography as a notable detail
+            excerpt = biography[:200].rsplit(" ", 1)[0].rstrip(".,;:") if len(biography) > 200 else biography.rstrip(".,;:")
+            notable_parts.append(f"According to the agent's own description: \"{excerpt}...\"" if len(biography) > 200 else f"The agent describes itself as: \"{excerpt}.\"")
+
+        what_is_notable = " ".join(notable_parts)
+
+    # ── risks_to_monitor ──────────────────────────────────────────────────
+    existing_risk = existing.get("risks_to_monitor", "")
+    if existing_risk and not _is_pending(existing_risk):
+        risks_to_monitor = existing_risk
+    else:
+        risks = []
+
+        if doxx_tier == 3:
+            risks.append(
+                f"Team anonymity is the primary trust risk for {name} — no verified identities are publicly linked to the project. "
+                f"This resolves if the team chooses to dox or builds a sufficiently long public track record."
+            )
+        elif doxx_tier == 2:
+            risks.append(
+                f"The pseudonymous team structure introduces moderate trust uncertainty. "
+                f"This mitigates as the team accumulates a visible delivery record."
+            )
+
+        if not website and not tw_handle:
+            risks.append(
+                f"The absence of a listed website and social accounts makes independent product verification difficult at this stage."
+            )
+        elif not website:
+            risks.append(
+                f"No project website is listed, which limits the ability to evaluate product depth and go-to-market strategy."
+            )
+
+        if holder_count < 50:
+            risks.append(
+                f"With only {holder_count:,} token holder{'s' if holder_count != 1 else ''}, distribution is highly concentrated — "
+                f"watch for wallet concentration data as the token matures."
+            )
+        elif top10_conc and float(top10_conc) > 80:
+            risks.append(
+                f"Top-10 holder concentration is elevated at {float(top10_conc):.0f}%, "
+                f"suggesting the token supply is tightly held. Broader distribution would reduce this risk."
+            )
+
+        if status_raw == "prototype":
+            risks.append(
+                f"{name} is at Prototype stage — core product functionality has not yet been verified on-chain "
+                f"at the level required for Sentient or Genesis status."
+            )
+
+        if not risks:
+            risks.append(
+                f"{name} operates in the competitive {agent_type} vertical on Virtuals Protocol. "
+                f"Key risks to watch include team execution pace, market saturation in the category, "
+                f"and sustained community engagement as the ecosystem grows."
+            )
+
+        risks_to_monitor = " ".join(risks)
+
+    # ── market_opportunity ────────────────────────────────────────────────
+    existing_mkt = existing.get("market_opportunity", "")
+    if existing_mkt and not _is_pending(existing_mkt):
+        market_opportunity = existing_mkt
+    else:
+        mkt_parts = []
+        mkt_parts.append(
+            f"{name} operates in {tam_label} — a sector with an estimated addressable market of {tam_size}. "
+            f"The Virtuals Protocol ecosystem is one of the most active launchpads for autonomous AI agents on Base, "
+            f"giving projects in this vertical immediate access to an on-chain-native audience."
+        )
+
+        if market_cap > 0:
+            if market_cap >= 1_000_000:
+                mkt_parts.append(
+                    f"With a market cap of ${market_cap:,.0f}, {name} has established a measurable on-chain footprint "
+                    f"relative to the broader {agent_type} agent cohort."
+                )
+            else:
+                mkt_parts.append(
+                    f"At a market cap of ${market_cap:,.0f}, {name} is in the early-stage range, "
+                    f"which represents significant upside potential if the product gains traction."
+                )
+
+        if agent_type.lower() in ("trading", "defi", "finance"):
+            mkt_parts.append(
+                f"The intersection of AI and on-chain finance is one of the highest-conviction narratives in Web3, "
+                f"with autonomous trading agents attracting both retail and institutional attention."
+            )
+        elif agent_type.lower() in ("gaming", "game"):
+            mkt_parts.append(
+                f"AI companions and autonomous NPCs represent one of the most natural product-market fits "
+                f"for AI agents on-chain, with the Web3 gaming sector experiencing rapid growth."
+            )
+        elif agent_type.lower() in ("social", "community", "entertainment"):
+            mkt_parts.append(
+                f"Social AI agents that can build and engage communities autonomously are an emerging category "
+                f"with strong narrative tailwinds as AI-native content creation scales."
+            )
+
+        market_opportunity = " ".join(mkt_parts)
+
+    return {
+        "what_it_does":       what_it_does,
+        "who_is_behind_it":   who_is_behind_it,
+        "what_is_notable":    what_is_notable,
+        "risks_to_monitor":   risks_to_monitor,
+        "market_opportunity": market_opportunity,
+    }
+
+
+@app.post("/api/admin/rebuild-pending-overviews")
+async def rebuild_pending_overviews(dry_run: bool = Query(False)):
+    """
+    Scan all agents whose overview_json has placeholder 'pending' text and
+    rebuild those sections using structured DB fields only (no AI API calls).
+    Returns counts; runs in background.
+    """
+    async def _do_rebuild():
+        from database import get_all_agents, update_overview_only
+        logger.info("rebuild-pending-overviews: loading all agents…")
+        agents = await get_all_agents()
+        logger.info(f"rebuild-pending-overviews: {len(agents)} agents loaded")
+        updated = 0
+        skipped = 0
+        for agent in agents:
+            ov = agent.get("overview_json") or {}
+            if isinstance(ov, str):
+                try:
+                    ov = json.loads(ov)
+                except Exception:
+                    ov = {}
+            full_text = json.dumps(ov).lower()
+            if (
+                "pending full analysis" not in full_text
+                and "pending a comprehensive" not in full_text
+            ):
+                skipped += 1
+                continue
+            new_ov = _build_data_driven_overview({**agent, "overview_json": ov})
+            if not dry_run:
+                try:
+                    await update_overview_only(str(agent.get("virtuals_id", "")), new_ov)
+                    updated += 1
+                except Exception as e:
+                    logger.error(f"rebuild-overview failed for {agent.get('virtuals_id')}: {e}")
+            else:
+                updated += 1
+        logger.info(f"rebuild-pending-overviews: done — {updated} updated, {skipped} skipped (already real)")
+
+    asyncio.create_task(_do_rebuild())
+    return {
+        "status": "queued",
+        "dry_run": dry_run,
+        "message": "Scanning all agents and rebuilding pending overviews in background. Check server logs for progress.",
+    }
