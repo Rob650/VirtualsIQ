@@ -906,9 +906,9 @@ def _median(lst: list) -> float:
 
 def _build_data_driven_overview(agent: dict, category_peers: list = None) -> dict:
     """
-    Compose a deeply analytical 5-section overview using data ratios and
+    Compose a deeply analytical 4-section overview using data ratios and
     category comparisons. No AI API calls — uses only values already in the DB.
-    Returns a dict with the 5 sections.
+    Returns a dict with 4 actionable sections: bull_case, bear_case, red_flags, catalysts.
     """
     name         = agent.get("name") or "This agent"
     ticker       = agent.get("ticker") or ""
@@ -1322,81 +1322,247 @@ def _build_data_driven_overview(agent: dict, category_peers: list = None) -> dic
             f"and sustaining community engagement as the broader Virtuals ecosystem continues to grow."
         )
 
-    risks_to_monitor = " ".join(risks[:4])  # Cap at 4 risk points for readability
+    risks_to_monitor = " ".join(risks[:4])  # kept for backward compat in catalysts
 
-    # ── market_opportunity ────────────────────────────────────────────────
-    mkt_parts = []
+    # ── bull_case: what's working ─────────────────────────────────────────
+    bull_parts = []
 
-    mkt_parts.append(
+    # Strong metrics
+    if volume_24h > 10_000:
+        bull_parts.append(
+            f"Strong trading activity — ${volume_24h:,.0f} in 24h volume against "
+            f"{_fmt_mcap(market_cap)} market cap confirms genuine market interest."
+        )
+    elif turnover_rate >= 0.05:
+        bull_parts.append(
+            f"Healthy {turnover_rate:.1%} daily turnover ratio demonstrates active market participation "
+            f"relative to the project's size."
+        )
+
+    if holder_count > 500:
+        bull_parts.append(
+            f"Growing holder base of {holder_count:,} token holders shows broad distribution and community buy-in."
+        )
+
+    if cat_stats.get("mcap_rank") and cat_stats["mcap_rank"] <= 3 and cat_stats.get("cat_size", 0) >= 3:
+        bull_parts.append(
+            f"Category leadership — #{cat_stats['mcap_rank']} of {cat_stats['cat_size']} agents in "
+            f"the {agent_type} vertical by market cap."
+        )
+
+    if doxx_tier == 1:
+        bull_parts.append(
+            f"Fully doxxed team provides accountability and trust rarely seen among early-stage Virtuals agents."
+        )
+
+    if status_raw in ("sentient", "genesis"):
+        bull_parts.append(
+            f"{status_lbl} status confirms {name} is live and operational — not a concept or prototype."
+        )
+
+    if tw_followers > 0 and cat_stats.get("median_tw", 0) > 0 and tw_followers >= cat_stats["median_tw"] * 2:
+        bull_parts.append(
+            f"Twitter/X following of {tw_followers:,} is {tw_followers / cat_stats['median_tw']:.1f}x "
+            f"the {agent_type} category median — exceptional social reach."
+        )
+    elif tw_followers > 10_000:
+        bull_parts.append(
+            f"Strong social presence with {tw_followers:,} Twitter/X followers builds brand awareness "
+            f"well beyond the current token-holding community."
+        )
+
+    if biography and len(biography) > 100:
+        bull_parts.append(
+            f"Clear product narrative: {name} has articulated its mission publicly, "
+            f"reducing information asymmetry for prospective investors."
+        )
+
+    if not bull_parts:
+        bull_parts.append(
+            f"{name}{ticker_str} is positioned in the {agent_type} vertical on Virtuals Protocol. "
+            f"The agent is building its on-chain presence and foundational infrastructure."
+        )
+
+    bull_case = " ".join(bull_parts)
+
+    # ── bear_case: what's concerning ──────────────────────────────────────
+    bear_parts = []
+
+    if turnover_rate < 0.005 and market_cap > 0 and volume_24h > 0:
+        bear_parts.append(
+            f"Thin liquidity: {turnover_rate:.3%} daily turnover against {_fmt_mcap(market_cap)} market cap "
+            f"(${volume_24h:,.0f} 24h volume) — large holders may struggle to exit without price impact."
+        )
+
+    if doxx_tier == 3:
+        bear_parts.append(
+            f"Fully anonymous team — no verified identities linked to the project. "
+            f"Community trust depends entirely on future execution."
+        )
+    elif doxx_tier == 2:
+        bear_parts.append(
+            f"Pseudonymous team with partial accountability — identities are not fully verifiable, "
+            f"which limits trust for new investors."
+        )
+
+    if holder_count > 0 and holder_count < 200:
+        bear_parts.append(
+            f"Very small holder base of {holder_count:,} — highly concentrated ownership "
+            f"means even modest selling could cause outsized price impact."
+        )
+    elif top10_conc > 70:
+        bear_parts.append(
+            f"Top-10 holders control {top10_conc:.0f}% of supply — a concentration level "
+            f"that creates meaningful whale risk."
+        )
+
+    if status_raw == "prototype":
+        bear_parts.append(
+            f"Prototype stage means core capabilities are still being built and tested. "
+            f"Execution risk is elevated until the product ships and gains traction."
+        )
+
+    if not website and not tw_handle:
+        bear_parts.append(
+            f"No verified website or Twitter/X presence — the absence of public channels "
+            f"makes independent due diligence difficult."
+        )
+    elif not website:
+        bear_parts.append(
+            f"No project website — limits product verification and onboarding for new users."
+        )
+
+    if cat_stats.get("cat_size", 0) > 5 and cat_stats.get("mcap_rank", 999) > cat_stats.get("cat_size", 1) // 2:
+        bear_parts.append(
+            f"Mid-to-lower tier in a {cat_stats['cat_size']}-agent vertical — differentiation must be "
+            f"clear and defensible to avoid being crowded out."
+        )
+
+    if not bear_parts:
+        bear_parts.append(
+            f"No major structural concerns at this time. Primary bear case is the broader competitive "
+            f"dynamics of the {agent_type} vertical on Virtuals Protocol."
+        )
+
+    bear_case = " ".join(bear_parts)
+
+    # ── red_flags: hard warnings ──────────────────────────────────────────
+    red_flag_parts = []
+
+    if volume_24h == 0 and market_cap > 0:
+        red_flag_parts.append(
+            f"Zero 24-hour trading volume recorded against a {_fmt_mcap(market_cap)} market cap — "
+            f"this is a serious liquidity warning. Persistent zero volume suggests the token may be "
+            f"effectively untradeable or abandoned."
+        )
+    elif volume_24h == 0 and holder_count < 50:
+        red_flag_parts.append(
+            f"Zero volume and fewer than 50 holders — this project shows no signs of active market participation."
+        )
+
+    if holder_count > 0 and holder_count < 50:
+        red_flag_parts.append(
+            f"Critically low holder count of {holder_count} — at this distribution level, "
+            f"a single wallet exit could be catastrophic for price stability."
+        )
+
+    if top10_conc > 90:
+        red_flag_parts.append(
+            f"Extreme supply concentration: top-10 holders control {top10_conc:.0f}% of supply. "
+            f"This is a severe centralization risk — the project's price is almost entirely "
+            f"controlled by a handful of wallets."
+        )
+
+    if not tw_handle and not website and not telegram:
+        red_flag_parts.append(
+            f"No verified social channels (Twitter/X, website, or Telegram) found. "
+            f"Complete absence of public communication channels is a significant due diligence barrier."
+        )
+
+    if not red_flag_parts:
+        red_flag_parts.append(
+            f"No hard red flags identified in available on-chain and social data at this time. "
+            f"Continue monitoring volume, holder distribution, and team communication cadence."
+        )
+
+    red_flags = " ".join(red_flag_parts)
+
+    # ── catalysts: what could change the score ────────────────────────────
+    catalyst_parts = []
+
+    catalyst_parts.append(
         f"{name} operates in {tam_label} — a sector with an estimated addressable market of {tam_size}. "
-        f"The Virtuals Protocol ecosystem on Base is one of the most active launchpads for autonomous AI agents on-chain, "
-        f"giving projects direct access to a crypto-native, AI-literate audience."
+        f"The Virtuals Protocol ecosystem on Base is one of the most active launchpads for autonomous AI agents on-chain."
     )
 
-    # Upside framing using market cap
-    if market_cap > 0 and cat_stats.get("top_mcap", 0) > 0:
-        top_mcap = cat_stats["top_mcap"]
-        x2 = market_cap * 2
-        x5 = market_cap * 5
-        x10 = market_cap * 10
-        pct_of_leader = market_cap / top_mcap * 100
-        if pct_of_leader < 100:
-            mkt_parts.append(
-                f"The category leader in the {agent_type} vertical commands {_fmt_mcap(top_mcap)}. "
-                f"{name}'s current {_fmt_mcap(market_cap)} implies {pct_of_leader:.0f}% of leader market cap — "
-                f"a 2x would put it at {_fmt_mcap(x2)}, a 5x at {_fmt_mcap(x5)}, and a 10x at {_fmt_mcap(x10)}. "
-                f"{'Reaching leader parity would require a' + f' {top_mcap/market_cap:.1f}x move.' if top_mcap/market_cap >= 2 else 'It is already within striking distance of category leadership.'}"
-            )
-        else:
-            mkt_parts.append(
-                f"{name} is the category leader in the {agent_type} vertical at {_fmt_mcap(market_cap)}. "
-                f"Sustaining this position requires continued product delivery and community engagement as challengers emerge."
-            )
-    elif market_cap > 0:
-        mkt_parts.append(
-            f"At {_fmt_mcap(market_cap)}, {name} is in the early-stage range for the {agent_type} vertical, "
-            f"representing meaningful upside potential if the product gains traction within the Virtuals ecosystem."
+    if status_raw == "prototype":
+        catalyst_parts.append(
+            f"Achieving Sentient status on Virtuals Protocol would be a major milestone catalyst, "
+            f"confirming live deployment and unlocking broader protocol visibility."
         )
 
-    # Vertical narrative tailwind
+    if volume_24h == 0 or volume_24h < 1_000:
+        catalyst_parts.append(
+            f"A sustained increase in trading volume would directly improve the VIQ score — "
+            f"the scoring engine heavily weights market activity as a proxy for genuine interest."
+        )
+
+    if holder_count < 500:
+        catalyst_parts.append(
+            f"Growing the holder base above 500 would signal meaningful distribution improvement "
+            f"and reduce concentration risk."
+        )
+
+    if doxx_tier == 3:
+        catalyst_parts.append(
+            f"A team doxx or pseudonymous social presence would meaningfully improve the execution "
+            f"score and signal long-term commitment to the project."
+        )
+
+    if market_cap > 0 and cat_stats.get("top_mcap", 0) > market_cap * 2:
+        top_mcap = cat_stats["top_mcap"]
+        catalyst_parts.append(
+            f"The category leader commands {_fmt_mcap(top_mcap)} — a {top_mcap/market_cap:.1f}x move "
+            f"from current levels would reach category parity, achievable if product traction develops."
+        )
+
+    # Vertical tailwind
     if agent_type.lower() in ("trading", "defi", "finance"):
-        mkt_parts.append(
-            f"AI-powered on-chain finance is one of the highest-conviction narratives in Web3. "
-            f"Autonomous agents that can trade, execute strategies, or surface alpha 24/7 address the most fundamental "
-            f"limitation of human traders — sleep, emotion, and processing speed. "
-            f"Institutional attention to this category continues to grow."
+        catalyst_parts.append(
+            f"AI-powered on-chain finance is a high-conviction narrative. Macro tailwinds — "
+            f"growing institutional interest in autonomous trading and on-chain alpha — could "
+            f"accelerate adoption for agents in this vertical."
         )
     elif agent_type.lower() in ("gaming", "game"):
-        mkt_parts.append(
-            f"AI companions and autonomous game characters represent one of the most natural near-term use cases "
-            f"for on-chain AI agents. The Web3 gaming sector is expanding rapidly, and the demand for AI-driven "
-            f"in-game experiences is still in early innings."
+        catalyst_parts.append(
+            f"Web3 gaming adoption is accelerating. A visible integration with a major gaming "
+            f"platform or NFT ecosystem could be a significant re-rating catalyst."
         )
     elif agent_type.lower() in ("social", "community", "entertainment"):
-        mkt_parts.append(
-            f"Autonomous social AI agents — capable of building and engaging communities without human operators — "
-            f"are an emerging category with strong narrative tailwinds as AI-native content creation scales globally."
-        )
-    elif agent_type.lower() in ("infrastructure", "infra", "protocol", "tools"):
-        mkt_parts.append(
-            f"Infrastructure agents sit at the base layer of the AI agent stack — "
-            f"the tools and primitives that all other agents depend on. "
-            f"Infrastructure plays in crypto historically accrue disproportionate value as the ecosystem above them scales."
-        )
-    else:
-        mkt_parts.append(
-            f"As the Virtuals Protocol ecosystem expands, agents with clear vertical focus and active deployment "
-            f"status are best positioned to capture the protocol-level growth tailwinds that benefit the whole ecosystem."
+        catalyst_parts.append(
+            f"Viral social moments or high-profile collaborations can rapidly expand the holder "
+            f"base for social AI agents — community growth is the primary catalyst to watch."
         )
 
-    market_opportunity = " ".join(mkt_parts)
+    if not catalyst_parts:
+        catalyst_parts.append(
+            f"Key catalysts to watch: product deployment milestones, holder base growth, "
+            f"and sustained trading activity as the Virtuals Protocol ecosystem expands."
+        )
+
+    catalysts = " ".join(catalyst_parts)
 
     return {
+        "bull_case":   bull_case,
+        "bear_case":   bear_case,
+        "red_flags":   red_flags,
+        "catalysts":   catalysts,
+        # Preserve legacy keys so old cached overviews remain readable
         "what_it_does":       what_it_does,
         "who_is_behind_it":   who_is_behind_it,
         "what_is_notable":    what_is_notable,
         "risks_to_monitor":   risks_to_monitor,
-        "market_opportunity": market_opportunity,
+        "market_opportunity": catalysts,  # map to closest legacy key for compat
     }
 
 

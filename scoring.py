@@ -921,6 +921,9 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
     _vol     = _safe(agent_data.get("volume_24h"),   0)
     _holders = _safe(agent_data.get("holder_count"), 0)
 
+    score_modifiers: list[dict] = []
+    _pre_vitality = composite
+
     if _vol == 0:
         _vitality = 0.62          # ~38% penalty — dead trading is a serious red flag
     elif _vol < 200:
@@ -934,13 +937,26 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
 
     composite = round(_clamp(composite * _vitality, 8.0, 95.0), 1)
 
+    if _vitality != 1.00:
+        _vitality_impact = round(composite - _pre_vitality, 1)
+        if _vol == 0:
+            score_modifiers.append({"label": "Zero volume penalty", "impact": _vitality_impact})
+        elif _vitality < 1.00:
+            score_modifiers.append({"label": "Low activity penalty", "impact": _vitality_impact})
+        else:
+            score_modifiers.append({"label": "Strong volume bonus", "impact": _vitality_impact})
+
     # ── Dead project hard cap ────────────────────────────────────────────────
     # Regardless of AI analysis or category, a project with zero trading AND
     # almost no holders cannot score as a real investment opportunity.
+    _pre_cap = composite
     if _vol == 0 and _holders < 50:
         composite = min(composite, 15.0)
     elif _vol < 10 and _holders < 100:
         composite = min(composite, 20.0)
+
+    if composite < _pre_cap:
+        score_modifiers.append({"label": "Dead project cap applied", "impact": round(composite - _pre_cap, 1)})
 
     # ── Back-fill factor contributions ──────────────────────────────────────
     for fd in factor_details:
@@ -1004,6 +1020,23 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
     # Factor evidence strings
     factor_reasons = _build_factor_reasons(agent_data, ai_analysis)
 
+    # ── Edge Score (Quality vs Price) ────────────────────────────────────────
+    # edge = composite_score - market_cap_percentile
+    # Positive = project scores higher on fundamentals than mcap implies (undervalued)
+    # Negative = market cap implies more quality than fundamentals deliver (overvalued)
+    _mcap_percentile = _f_mcap(agent_data, ai_analysis)
+    if _mcap_percentile is not None:
+        edge_score = round(composite - _mcap_percentile, 1)
+        if edge_score > 5:
+            edge_label = "Undervalued"
+        elif edge_score < -5:
+            edge_label = "Overvalued"
+        else:
+            edge_label = "Fair Value"
+    else:
+        edge_score = None
+        edge_label = None
+
     # Attach metadata for downstream consumers
     scores["_tier_scores"]      = tier_scores_display
     scores["_one_liner"]        = one_liner
@@ -1014,6 +1047,9 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
     scores["_strong_flagged"]   = strong_flagged
     scores["_factors_scored"]   = factors_scored
     scores["_factor_reasons"]   = factor_reasons
+    scores["_score_modifiers"]  = score_modifiers
+    scores["_edge_score"]       = edge_score
+    scores["_edge_label"]       = edge_label
 
     return {
         "composite_score":    composite,
@@ -1030,4 +1066,7 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
         "strong_flagged":      strong_flagged,
         "factors_scored":      factors_scored,
         "factor_reasons":      factor_reasons,
+        "score_modifiers":     score_modifiers,
+        "edge_score":          edge_score,
+        "edge_label":          edge_label,
     }

@@ -1360,6 +1360,7 @@ async function loadAgents() {
         </div>
         <div class="viq-col">
           <div class="viq-val" style="color:${scoreClr}">${scoreNum}</div>
+          ${(() => { const es = (a.scores_json && a.scores_json._edge_label) || a.edge_label; const ev = (a.scores_json && a.scores_json._edge_score !== undefined) ? a.scores_json._edge_score : a.edge_score; if (!es || ev === null || ev === undefined) return ''; const ec = es === 'Undervalued' ? 'var(--green)' : es === 'Overvalued' ? 'var(--red)' : 'var(--yellow,#f59e0b)'; return `<div style="font-size:9px;font-weight:600;color:${ec};line-height:1.2;white-space:nowrap">${ev > 0 ? '+' : ''}${ev} ${es === 'Fair Value' ? 'FAIR' : es.toUpperCase().slice(0,6)}</div>`; })()}
           <button class="star-btn ${watched ? 'starred' : ''}" data-id="${a.virtuals_id}"
             onclick="event.stopPropagation();toggleWatchlist('${a.virtuals_id}')"
             title="${watched ? 'Remove from watchlist' : 'Add to watchlist'}">${watched ? '★' : '☆'}</button>
@@ -1543,12 +1544,23 @@ function renderModal(agent) {
   const prediction = agent.prediction_json || {};
 
   const hasAnalysis = Object.keys(analysis).length > 0 || Object.keys(overviewJson).length > 0 || !!agent.last_analyzed;
+  // New 4-section format
+  const bullCase = overviewJson.bull_case || null;
+  const bearCase = overviewJson.bear_case || null;
+  const redFlags = overviewJson.red_flags || null;
+  const catalysts = overviewJson.catalysts || null;
+  const hasNewFormat = !!(bullCase || bearCase || redFlags || catalysts);
+  // Legacy 5-section fallbacks
   const overview = { summary: overviewJson.what_it_does || analysis.overview?.what_it_does || analysis.overview?.summary || agent.biography };
   const riskData = { bear_case: overviewJson.risks_to_monitor || analysis.overview?.risks_to_monitor || analysis.risk?.bear_case, key_risks: analysis.risk?.key_risks || [] };
   const teamData = { team_summary: overviewJson.who_is_behind_it || analysis.overview?.who_is_behind_it || analysis.team?.team_summary };
   const productData = { description: overviewJson.market_opportunity || analysis.overview?.market_opportunity || analysis.product?.description };
   const fmData = analysis.first_mover || {};
   const intelligenceNotes = overviewJson.what_is_notable || analysis.overview?.what_is_notable || analysis.intelligence_notes;
+  // Edge score + score modifiers from scores_json
+  const edgeScore = scores._edge_score !== undefined ? scores._edge_score : (agent.edge_score !== undefined ? agent.edge_score : null);
+  const edgeLabel = scores._edge_label || agent.edge_label || null;
+  const scoreModifiers = scores._score_modifiers || agent.score_modifiers || [];
 
   // Phase 3: derive one_liner, top_helped, top_hurt from scores_json
   const NEW_FACTOR_KEYS = ['F_idea_market_fit','F_moat','F_execution','F_holders','F_mcap','F_volume','F_efficiency','F_momentum'];
@@ -1596,6 +1608,9 @@ function renderModal(agent) {
     return diffMin < 1 ? 'just now' : diffMin < 60 ? `${diffMin}m ago` : diffMin < 1440 ? `${Math.round(diffMin/60)}h ago` : `${Math.round(diffMin/1440)}d ago`;
   })() : null;
 
+  const edgeColor = edgeLabel === 'Undervalued' ? 'var(--green)' : edgeLabel === 'Overvalued' ? 'var(--red)' : 'var(--yellow,#f59e0b)';
+  const edgeSign = edgeScore !== null ? (edgeScore > 0 ? '+' : '') : '';
+
   const body = document.getElementById('modal-body');
   body.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
@@ -1603,6 +1618,10 @@ function renderModal(agent) {
         <span style="font-family:var(--font-data);font-size:24px;font-weight:700;color:${color}">${score}</span>
         <span style="font-size:13px;color:${color};margin-left:6px;font-weight:600">${tier}</span>
       </div>
+      ${edgeLabel ? `<div style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border:1px solid ${edgeColor};border-radius:20px;font-size:11px;font-weight:600;color:${edgeColor}" title="Edge = VIQ score minus market cap percentile. Positive = fundamentals outpace valuation (undervalued).">
+        <span style="font-family:var(--font-data)">${edgeSign}${edgeScore}</span>
+        <span>${edgeLabel}</span>
+      </div>` : ''}
       ${oneLiner ? `<div style="flex:1;font-size:12px;color:var(--text-muted);font-style:italic;min-width:140px">${oneLiner}</div>` : ''}
     </div>
 
@@ -1618,6 +1637,17 @@ function renderModal(agent) {
       </div>` : ''}
     </div>` : ''}
 
+    ${scoreModifiers && scoreModifiers.length ? `
+    <div style="padding:10px;background:rgba(0,0,0,0.15);border:1px solid var(--border);border-radius:var(--radius-sm)">
+      <div style="font-size:10px;color:var(--text-dim);font-weight:700;letter-spacing:0.5px;margin-bottom:6px">SCORE ADJUSTMENTS</div>
+      ${scoreModifiers.map(m => {
+        const imp = m.impact || 0;
+        const mc = imp >= 0 ? 'var(--green)' : 'var(--red)';
+        const ms = imp >= 0 ? '+' : '';
+        return `<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-bottom:3px"><span>${m.label}</span><span style="color:${mc};font-family:var(--font-data)">${ms}${imp}</span></div>`;
+      }).join('')}
+    </div>` : ''}
+
     ${agent.biography ? `
     <div>
       <div class="report-section-title">Overview</div>
@@ -1627,14 +1657,21 @@ function renderModal(agent) {
 
     ${hasAnalysis ? `
     <div>
-      <div class="report-section-title">AI Analysis
+      <div class="report-section-title">VIQ Analyst Report
         ${lastAnalyzed ? `<span style="font-size:10px;color:var(--text-dim);font-weight:400;margin-left:8px;font-family:var(--font-data)">Last analyzed: ${lastAnalyzed}</span>` : ''}
       </div>
-      <div class="report-sub-card"><div class="report-section-sub primary">What It Does</div>${formatText(overview.summary || 'Analysis in progress.')}</div>
-      <div class="report-sub-card"><div class="report-section-sub">Who Is Behind It</div>${formatText(teamData.team_summary || 'Analysis in progress.')}</div>
-      <div class="report-sub-card"><div class="report-section-sub">What Is Notable</div>${formatText(intelligenceNotes || 'Analysis in progress.')}</div>
-      <div class="report-sub-card risk"><div class="report-section-sub risk">Risks to Monitor</div>${formatText(riskData.bear_case || (riskData.key_risks && riskData.key_risks.join('\n')) || 'Analysis in progress.')}</div>
-      <div class="report-sub-card"><div class="report-section-sub">Market Opportunity</div>${formatText(productData.description || fmData.analysis || 'Analysis in progress.')}</div>
+      ${hasNewFormat ? `
+        ${bullCase ? `<div class="report-sub-card" style="border-left:3px solid var(--green)"><div class="report-section-sub" style="color:var(--green)">Bull Case</div>${formatText(bullCase)}</div>` : ''}
+        ${bearCase ? `<div class="report-sub-card" style="border-left:3px solid var(--red)"><div class="report-section-sub risk">Bear Case</div>${formatText(bearCase)}</div>` : ''}
+        ${redFlags ? `<div class="report-sub-card" style="border-left:3px solid #f97316"><div class="report-section-sub" style="color:#f97316">Red Flags</div>${formatText(redFlags)}</div>` : ''}
+        ${catalysts ? `<div class="report-sub-card" style="border-left:3px solid #3b82f6"><div class="report-section-sub" style="color:#3b82f6">Catalysts</div>${formatText(catalysts)}</div>` : ''}
+      ` : `
+        <div class="report-sub-card"><div class="report-section-sub primary">What It Does</div>${formatText(overview.summary || 'Analysis in progress.')}</div>
+        <div class="report-sub-card"><div class="report-section-sub">Who Is Behind It</div>${formatText(teamData.team_summary || 'Analysis in progress.')}</div>
+        <div class="report-sub-card"><div class="report-section-sub">What Is Notable</div>${formatText(intelligenceNotes || 'Analysis in progress.')}</div>
+        <div class="report-sub-card risk"><div class="report-section-sub risk">Risks to Monitor</div>${formatText(riskData.bear_case || (riskData.key_risks && riskData.key_risks.join('\n')) || 'Analysis in progress.')}</div>
+        <div class="report-sub-card"><div class="report-section-sub">Market Opportunity</div>${formatText(productData.description || fmData.analysis || 'Analysis in progress.')}</div>
+      `}
     </div>
     ` : (!agent.biography ? `
     <div>
