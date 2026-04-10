@@ -357,15 +357,30 @@ def _f_execution(agent: dict, ai: dict) -> float | None:
         has_any = True
         points += 35.0 if "github.com" not in website else 15.0
 
-    # Twitter presence
+    # Twitter / Team presence — gradient score based on account quality.
+    #
+    # On each agent's Twitter profile there is often an "automated by" link
+    # pointing to the TEAM's Twitter account.  Future enhancement: scrape that
+    # link and use the team account's follower count + age instead of the
+    # agent account's metrics.  For now, agent twitter_followers is the proxy.
+    #
+    # Scoring tiers (out of 30 pts):
+    #   No Twitter at all           →  0 pts  (no team signal)
+    #   Twitter exists, ≤100 f/w    →  8 pts  (new / tiny account)
+    #   Twitter exists, 101–1K f/w  → 14 pts  (emerging presence)
+    #   Twitter exists, 1K–10K f/w  → 20 pts  (established agent account)
+    #   Twitter exists, 10K–50K f/w → 25 pts  (strong team signal)
+    #   Twitter exists, >50K f/w    → 30 pts  (proven / influential team)
     twitter = str(agent.get("linked_twitter") or "").strip()
-    max_pts += 25.0
+    max_pts += 30.0
     if twitter and len(twitter) > 5:
         has_any = True
-        points += 20.0
         followers = _safe(agent.get("twitter_followers"), 0)
-        if followers > 10_000: points += 5.0
-        elif followers > 1_000: points += 3.0
+        if   followers > 50_000: points += 30.0
+        elif followers > 10_000: points += 25.0
+        elif followers > 1_000:  points += 20.0
+        elif followers > 100:    points += 14.0
+        else:                    points +=  8.0
 
     # Product stage
     ai_status = str(ai.get("product", {}).get("status", "")).lower().replace(" ", "_")
