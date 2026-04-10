@@ -885,251 +885,511 @@ _STATUS_LABELS = {
 }
 
 
-def _build_data_driven_overview(agent: dict) -> dict:
-    """
-    Compose a real, data-driven 5-section overview from structured agent fields.
-    No AI API calls — uses only values already in the database.
-    Returns a dict with the 5 sections. Skips sections that already have
-    non-placeholder content.
-    """
-    name        = agent.get("name") or "This agent"
-    ticker      = agent.get("ticker") or ""
-    biography   = agent.get("biography") or ""
-    agent_type  = (agent.get("agent_type") or "AI Agent").strip()
-    status_raw  = (agent.get("status") or "Prototype").lower()
-    status_lbl  = _STATUS_LABELS.get(status_raw, status_raw.title())
-    doxx_tier   = int(agent.get("doxx_tier") or 3)
-    holder_count = int(agent.get("holder_count") or 0)
-    market_cap  = float(agent.get("market_cap") or 0)
-    top10_conc  = agent.get("top_10_concentration")
-    tw_followers = int(agent.get("twitter_followers") or 0)
-    tw_handle   = agent.get("linked_twitter") or ""
-    website     = agent.get("linked_website") or ""
-    telegram    = agent.get("linked_telegram") or ""
+def _fmt_mcap(v: float) -> str:
+    """Format market cap as $XM or $XK etc."""
+    if v >= 1_000_000_000:
+        return f"${v / 1_000_000_000:.1f}B"
+    if v >= 1_000_000:
+        return f"${v / 1_000_000:.1f}M"
+    if v >= 1_000:
+        return f"${v / 1_000:.0f}K"
+    return f"${v:,.0f}"
 
-    ticker_str = f" (${ticker})" if ticker else ""
+
+def _median(lst: list) -> float:
+    s = sorted(lst)
+    n = len(s)
+    if n == 0:
+        return 0.0
+    return s[n // 2] if n % 2 == 1 else (s[n // 2 - 1] + s[n // 2]) / 2.0
+
+
+def _build_data_driven_overview(agent: dict, category_peers: list = None) -> dict:
+    """
+    Compose a deeply analytical 5-section overview using data ratios and
+    category comparisons. No AI API calls — uses only values already in the DB.
+    Returns a dict with the 5 sections.
+    """
+    name         = agent.get("name") or "This agent"
+    ticker       = agent.get("ticker") or ""
+    biography    = (agent.get("biography") or "").strip()
+    agent_type   = (agent.get("agent_type") or "AI Agent").strip()
+    status_raw   = (agent.get("status") or "Prototype").lower()
+    status_lbl   = _STATUS_LABELS.get(status_raw, status_raw.title())
+    doxx_tier    = int(agent.get("doxx_tier") or 3)
+    holder_count = int(agent.get("holder_count") or 0)
+    market_cap   = float(agent.get("market_cap") or 0)
+    volume_24h   = float(agent.get("volume_24h") or 0)
+    top10_conc   = float(agent.get("top_10_concentration") or 0)
+    tw_followers = int(agent.get("twitter_followers") or 0)
+    tw_handle    = (agent.get("linked_twitter") or "").strip()
+    website      = (agent.get("linked_website") or "").strip()
+    telegram     = (agent.get("linked_telegram") or "").strip()
+
+    ticker_str   = f" (${ticker})" if ticker else ""
     vertical_key = agent_type.lower()
     tam_label, tam_size = _VERTICAL_TAM.get(vertical_key, (f"{agent_type} AI agents", "billions"))
 
-    # ── existing overview ──────────────────────────────────────────────────
-    existing = agent.get("overview_json") or {}
-    if isinstance(existing, str):
-        try:
-            existing = json.loads(existing)
-        except Exception:
-            existing = {}
+    # ── compute key ratios ────────────────────────────────────────────────
+    turnover_rate    = volume_24h / market_cap if market_cap > 0 else 0.0   # daily liquidity health
+    value_per_holder = market_cap / holder_count if holder_count > 0 else 0.0
+    social_ratio     = tw_followers / holder_count if holder_count > 0 else 0.0
 
-    def _is_pending(text: str) -> bool:
-        low = (text or "").lower()
-        return (
-            "pending full analysis" in low
-            or "pending a comprehensive" in low
-            or "pending a comprehensive deep-dive" in low
-            or "is pending a comprehensive research pass" in low
-        )
+    # ── category peer comparison ──────────────────────────────────────────
+    cat_stats: dict = {}
+    if category_peers:
+        valid_peers = [p for p in category_peers if p.get("virtuals_id") != agent.get("virtuals_id")]
+        cat_mcaps    = [float(p.get("market_cap") or 0) for p in valid_peers if p.get("market_cap")]
+        cat_holders  = [int(p.get("holder_count") or 0) for p in valid_peers if p.get("holder_count")]
+        cat_volumes  = [float(p.get("volume_24h") or 0) for p in valid_peers if p.get("volume_24h")]
+        cat_tw       = [int(p.get("twitter_followers") or 0) for p in valid_peers if p.get("twitter_followers")]
+        if cat_mcaps:
+            cat_stats["median_mcap"]  = _median(cat_mcaps)
+            cat_stats["top_mcap"]     = max(cat_mcaps)
+            sorted_desc = sorted(cat_mcaps + ([market_cap] if market_cap else []), reverse=True)
+            cat_stats["mcap_rank"]    = sorted_desc.index(market_cap) + 1 if market_cap in sorted_desc else None
+            cat_stats["cat_size"]     = len(sorted_desc)
+        if cat_holders:
+            cat_stats["median_holders"] = _median(cat_holders)
+        if cat_volumes:
+            cat_stats["median_volume"]  = _median(cat_volumes)
+        if cat_tw:
+            cat_stats["median_tw"]      = _median(cat_tw)
+
+    # ── helpers ───────────────────────────────────────────────────────────
+    def _turnover_label(rate: float) -> str:
+        if rate == 0:
+            return "near-zero daily turnover"
+        if rate >= 0.20:
+            return f"{rate:.1%} daily turnover — exceptionally high trading velocity"
+        if rate >= 0.05:
+            return f"{rate:.1%} daily turnover — healthy trading activity"
+        if rate >= 0.01:
+            return f"{rate:.1%} daily turnover — moderate liquidity"
+        return f"{rate:.2%} daily turnover — very thin liquidity relative to market cap"
+
+    def _holder_quality(holders: int, mcap: float) -> str:
+        if holders == 0:
+            return "no on-chain holder data available"
+        vph = mcap / holders if mcap > 0 else 0
+        if vph > 50_000:
+            return f"{holders:,} holders with an average position of {_fmt_mcap(vph)} — large, concentrated positions typical of institutional or whale-dominated distribution"
+        if vph > 10_000:
+            return f"{holders:,} holders averaging {_fmt_mcap(vph)} per wallet — mid-size positions suggesting a mix of serious investors and early community"
+        if vph > 1_000:
+            return f"{holders:,} holders averaging {_fmt_mcap(vph)} per wallet — broad distribution with healthy retail participation"
+        return f"{holders:,} holders averaging {_fmt_mcap(vph)} per wallet — very wide distribution, typical of high-visibility or meme-driven projects"
+
+    def _social_quality(followers: int, holders: int) -> str:
+        if followers == 0 and holders == 0:
+            return "no social or holder data available"
+        if followers == 0:
+            return "no Twitter/X following data found"
+        if holders == 0:
+            return f"{followers:,} Twitter/X followers with no holder count available for comparison"
+        ratio = followers / holders
+        if ratio >= 10:
+            return f"{followers:,} Twitter/X followers versus {holders:,} token holders — a {ratio:.1f}x social-to-holder ratio indicating massive brand awareness well beyond the token-holding community"
+        if ratio >= 3:
+            return f"{followers:,} Twitter/X followers versus {holders:,} token holders — a {ratio:.1f}x ratio showing strong community interest that significantly outpaces on-chain participation"
+        if ratio >= 1:
+            return f"{followers:,} Twitter/X followers versus {holders:,} token holders — a {ratio:.1f}x social-to-holder ratio, relatively balanced"
+        return f"{followers:,} Twitter/X followers versus {holders:,} token holders — holder base exceeds social following, suggesting on-chain distribution precedes social traction"
 
     # ── what_it_does ──────────────────────────────────────────────────────
-    existing_wid = existing.get("what_it_does", "")
-    if existing_wid and not _is_pending(existing_wid):
-        what_it_does = existing_wid
+    if biography and len(biography) > 80:
+        # Build a rich wrapper around the biography with product-specific context
+        bio_excerpt = biography if len(biography) <= 600 else biography[:597] + "..."
+        wid_parts = []
+
+        # Opening: what it is
+        wid_parts.append(
+            f"{name}{ticker_str} is an AI agent on the Virtuals Protocol, operating in the {agent_type} vertical "
+            f"at {status_lbl} status on the Base blockchain. "
+            f"The agent describes its own mission as follows: {bio_excerpt}"
+        )
+
+        # Mechanism paragraph derived from biography keywords
+        bio_lower = biography.lower()
+        mechanism_hints = []
+        if any(w in bio_lower for w in ["trade", "trading", "market", "alpha", "signal", "portfolio"]):
+            mechanism_hints.append(
+                f"The core product is designed around market intelligence and autonomous trading capabilities — "
+                f"areas where AI agents on Base can offer execution speed and data synthesis that human traders cannot match at scale."
+            )
+        if any(w in bio_lower for w in ["defi", "yield", "liquidity", "swap", "vault", "stake", "amm", "dex", "lending"]):
+            mechanism_hints.append(
+                f"The DeFi integration layer suggests {name} is targeting on-chain financial automation — "
+                f"an area that benefits from Virtuals Protocol's permissionless deployment model."
+            )
+        if any(w in bio_lower for w in ["social", "content", "community", "influencer", "post", "tweet", "audience"]):
+            mechanism_hints.append(
+                f"The social media and content angle positions {name} at the intersection of AI-native community building "
+                f"and autonomous digital presence — a rapidly emerging category within the Virtuals ecosystem."
+            )
+        if any(w in bio_lower for w in ["game", "gaming", "npc", "player", "quest", "world", "rpg"]):
+            mechanism_hints.append(
+                f"Gaming as a vertical makes {name} a natural fit for the autonomous agent model — "
+                f"AI-driven NPCs, in-game advisors, and autonomous companions represent one of the clearest near-term use cases for on-chain AI."
+            )
+        if any(w in bio_lower for w in ["analys", "research", "data", "insight", "intelligence", "report"]):
+            mechanism_hints.append(
+                f"The research and analytics angle puts {name} in the information-to-action pipeline — "
+                f"surfacing intelligence that helps users make better decisions faster than would be possible manually."
+            )
+
+        for hint in mechanism_hints[:2]:
+            wid_parts.append(hint)
+
+        # Token mechanics
+        if ticker:
+            wid_parts.append(
+                f"The ${ticker} token serves as the native coordination layer for {name}'s ecosystem. "
+                f"Within the Virtuals Protocol framework, tokens enable holders to access the agent's outputs, "
+                f"participate in governance, and share in the value the agent generates over time."
+            )
+
+        # Status and deployment maturity
+        if status_raw == "sentient":
+            wid_parts.append(
+                f"{name} has achieved Sentient status on Virtuals Protocol — a significant milestone "
+                f"confirming the agent is live, operational, and has met the protocol's autonomy thresholds "
+                f"for independent on-chain operation."
+            )
+        elif status_raw == "genesis":
+            wid_parts.append(
+                f"{name} operates at Genesis status — the highest tier within Virtuals Protocol, "
+                f"signifying full deployment maturity and protocol-verified autonomy capabilities."
+            )
+        else:
+            wid_parts.append(
+                f"As a Prototype-stage agent, {name} is in active development. "
+                f"The core capabilities are being built and tested ahead of the Sentient status milestone."
+            )
+
+        # Social and community context
+        if tw_handle or website:
+            channels = []
+            if tw_handle:
+                handle_display = tw_handle.split("/")[-1].lstrip("@") if "/" in tw_handle else tw_handle.lstrip("@")
+                followers_note = f" ({tw_followers:,} followers)" if tw_followers > 0 else ""
+                channels.append(f"Twitter/X (@{handle_display}{followers_note})")
+            if website:
+                channels.append(f"a project website ({website})")
+            if telegram:
+                channels.append("Telegram")
+            wid_parts.append(
+                f"The project maintains an active public presence across {', '.join(channels)}, "
+                f"providing the community and investors with ongoing updates and product visibility."
+            )
+
+        what_it_does = "\n\n".join(wid_parts)
     elif biography:
-        what_it_does = biography
+        what_it_does = (
+            f"{name}{ticker_str} is a {status_lbl}-stage AI agent on the Virtuals Protocol in the {agent_type} vertical. "
+            f"{biography}"
+        )
     else:
         what_it_does = (
             f"{name}{ticker_str} is an AI agent operating on the Virtuals Protocol, "
-            f"classified in the {agent_type} vertical. "
-            f"It is currently at {status_lbl} stage on the Base blockchain."
+            f"classified in the {agent_type} vertical at {status_lbl} stage on the Base blockchain. "
+            f"No detailed biography or product description has been publicly disclosed at this time. "
+            f"The agent's social channels and on-chain presence are the primary sources of information while "
+            f"documentation is pending."
         )
 
     # ── who_is_behind_it ──────────────────────────────────────────────────
-    existing_who = existing.get("who_is_behind_it", "")
-    if existing_who and not _is_pending(existing_who):
-        who_is_behind_it = existing_who
+    who_parts = []
+
+    # Team identity
+    if doxx_tier == 1:
+        who_parts.append(
+            f"The team behind {name} is publicly identified — verifiable founder identities have been linked to the project, "
+            f"providing a meaningful level of accountability uncommon among early-stage Virtuals agents."
+        )
+    elif doxx_tier == 2:
+        who_parts.append(
+            f"The team behind {name} operates pseudonymously but maintains a consistent and traceable social presence. "
+            f"While founder identities are not fully doxxed, the pseudonymous track record provides partial accountability."
+        )
     else:
-        doxx_map = {
-            1: f"The team behind {name} is publicly identified and verifiable.",
-            2: f"The team behind {name} operates pseudonymously but maintains an active and traceable social presence.",
-            3: f"The team behind {name} is currently anonymous — no verified founder identities have been publicly disclosed.",
-        }
-        who_parts = [doxx_map.get(doxx_tier, doxx_map[3])]
+        who_parts.append(
+            f"The team behind {name} is fully anonymous — no verified founder identities have been publicly linked to the project. "
+            f"Full anonymity is common among Virtuals Protocol builders, but it means community trust must be earned through execution."
+        )
 
-        social_signals = []
-        if tw_handle:
-            if tw_followers > 0:
-                social_signals.append(f"an active Twitter/X account (@{tw_handle.lstrip('@')} with {tw_followers:,} followers)")
-            else:
-                social_signals.append(f"a Twitter/X account (@{tw_handle.lstrip('@')})")
-        if website:
-            social_signals.append("a project website")
-        if telegram:
-            social_signals.append("a Telegram community")
+    # Community size as proxy for team capability
+    if holder_count > 0:
+        hq = _holder_quality(holder_count, market_cap)
+        who_parts.append(
+            f"The on-chain community profile shows {hq}. "
+            + (f"Top-10 holders control {top10_conc:.0f}% of supply — {'a highly concentrated ownership structure that warrants monitoring' if top10_conc > 70 else 'a relatively healthy distribution with no extreme whale dominance' if top10_conc < 40 else 'moderate concentration typical of early-stage projects'}."
+               if top10_conc > 0 else "")
+        )
 
-        if social_signals:
-            who_parts.append(
-                f"The project has established {', '.join(social_signals[:-1])}{' and ' + social_signals[-1] if len(social_signals) > 1 else social_signals[0] if not who_parts[0].endswith('.') else ''}."
-                if len(social_signals) > 1
-                else f"The project maintains {social_signals[0]}."
-            )
-        else:
-            who_parts.append(
-                f"The project currently has no verified social channels listed, which is common at the early {status_lbl} stage."
-            )
+    # Social channels
+    if tw_handle:
+        handle_display = tw_handle.split("/")[-1].lstrip("@") if "/" in tw_handle else tw_handle.lstrip("@")
+        sq = _social_quality(tw_followers, holder_count)
+        who_parts.append(
+            f"The project's Twitter/X presence (@{handle_display}) shows {sq}. "
+            f"{'A large follower base relative to holders signals strong brand awareness and potential for future on-chain growth.' if social_ratio >= 3 else 'Active social communication is the primary window into team development cadence and community health.' if tw_followers > 0 else ''}"
+        )
 
-        if holder_count > 0:
-            if holder_count >= 500:
-                who_parts.append(
-                    f"With {holder_count:,} token holders, {name} has attracted a meaningful early community, "
-                    f"suggesting real interest beyond the founding team."
-                )
-            elif holder_count >= 100:
-                who_parts.append(
-                    f"The project currently has {holder_count:,} token holders, indicating an early but growing community."
-                )
-            else:
-                who_parts.append(
-                    f"The token has {holder_count:,} holder{'s' if holder_count != 1 else ''} at this stage, "
-                    f"reflecting very early distribution."
-                )
+    if website:
+        who_parts.append(f"A project website ({website}) provides additional discoverability and serves as the team's primary documentation surface.")
 
-        who_is_behind_it = " ".join(who_parts)
+    if telegram:
+        who_parts.append(f"The Telegram community channel offers direct access to the core team and early adopters.")
+
+    if not tw_handle and not website and not telegram:
+        who_parts.append(
+            f"The project currently has no verified social channels listed, making independent due diligence challenging. "
+            f"This is a higher-risk profile common at the earliest stages of Virtuals deployment."
+        )
+
+    who_is_behind_it = " ".join(who_parts)
 
     # ── what_is_notable ───────────────────────────────────────────────────
-    existing_win = existing.get("what_is_notable", "")
-    if existing_win and not _is_pending(existing_win):
-        what_is_notable = existing_win
-    else:
-        notable_parts = []
-        notable_parts.append(
-            f"{name}{ticker_str} is positioned in the {agent_type} vertical on Virtuals Protocol, "
-            f"currently operating at {status_lbl} stage on the Base blockchain."
-        )
+    notable_parts = []
 
-        infra_signals = []
-        if tw_handle:
-            infra_signals.append("Twitter/X")
-        if website:
-            infra_signals.append("a project website")
-        if telegram:
-            infra_signals.append("Telegram")
+    # Lead with the most data-driven insight
+    if cat_stats and market_cap > 0:
+        median_mcap = cat_stats.get("median_mcap", 0)
+        top_mcap    = cat_stats.get("top_mcap", 0)
+        mcap_rank   = cat_stats.get("mcap_rank")
+        cat_size    = cat_stats.get("cat_size", 0)
 
-        if infra_signals:
-            notable_parts.append(
-                f"The project has established social infrastructure across {', '.join(infra_signals)}, "
-                f"indicating active community-building effort."
-            )
-
-        if status_raw == "sentient":
-            notable_parts.append(
-                f"Reaching Sentient status on Virtuals Protocol is a significant milestone — it signals "
-                f"the agent has met the protocol's autonomy thresholds and is live as an independent on-chain entity."
-            )
-        elif status_raw == "genesis":
-            notable_parts.append(
-                f"Genesis status on Virtuals Protocol represents the highest tier of agent maturity, "
-                f"indicating the project has cleared all protocol benchmarks and is fully operational."
-            )
-
-        if biography and len(biography) > 50:
-            # Extract a short excerpt from biography as a notable detail
-            excerpt = biography[:200].rsplit(" ", 1)[0].rstrip(".,;:") if len(biography) > 200 else biography.rstrip(".,;:")
-            notable_parts.append(f"According to the agent's own description: \"{excerpt}...\"" if len(biography) > 200 else f"The agent describes itself as: \"{excerpt}.\"")
-
-        what_is_notable = " ".join(notable_parts)
-
-    # ── risks_to_monitor ──────────────────────────────────────────────────
-    existing_risk = existing.get("risks_to_monitor", "")
-    if existing_risk and not _is_pending(existing_risk):
-        risks_to_monitor = existing_risk
-    else:
-        risks = []
-
-        if doxx_tier == 3:
-            risks.append(
-                f"Team anonymity is the primary trust risk for {name} — no verified identities are publicly linked to the project. "
-                f"This resolves if the team chooses to dox or builds a sufficiently long public track record."
-            )
-        elif doxx_tier == 2:
-            risks.append(
-                f"The pseudonymous team structure introduces moderate trust uncertainty. "
-                f"This mitigates as the team accumulates a visible delivery record."
-            )
-
-        if not website and not tw_handle:
-            risks.append(
-                f"The absence of a listed website and social accounts makes independent product verification difficult at this stage."
-            )
-        elif not website:
-            risks.append(
-                f"No project website is listed, which limits the ability to evaluate product depth and go-to-market strategy."
-            )
-
-        if holder_count < 50:
-            risks.append(
-                f"With only {holder_count:,} token holder{'s' if holder_count != 1 else ''}, distribution is highly concentrated — "
-                f"watch for wallet concentration data as the token matures."
-            )
-        elif top10_conc and float(top10_conc) > 80:
-            risks.append(
-                f"Top-10 holder concentration is elevated at {float(top10_conc):.0f}%, "
-                f"suggesting the token supply is tightly held. Broader distribution would reduce this risk."
-            )
-
-        if status_raw == "prototype":
-            risks.append(
-                f"{name} is at Prototype stage — core product functionality has not yet been verified on-chain "
-                f"at the level required for Sentient or Genesis status."
-            )
-
-        if not risks:
-            risks.append(
-                f"{name} operates in the competitive {agent_type} vertical on Virtuals Protocol. "
-                f"Key risks to watch include team execution pace, market saturation in the category, "
-                f"and sustained community engagement as the ecosystem grows."
-            )
-
-        risks_to_monitor = " ".join(risks)
-
-    # ── market_opportunity ────────────────────────────────────────────────
-    existing_mkt = existing.get("market_opportunity", "")
-    if existing_mkt and not _is_pending(existing_mkt):
-        market_opportunity = existing_mkt
-    else:
-        mkt_parts = []
-        mkt_parts.append(
-            f"{name} operates in {tam_label} — a sector with an estimated addressable market of {tam_size}. "
-            f"The Virtuals Protocol ecosystem is one of the most active launchpads for autonomous AI agents on Base, "
-            f"giving projects in this vertical immediate access to an on-chain-native audience."
-        )
-
-        if market_cap > 0:
-            if market_cap >= 1_000_000:
-                mkt_parts.append(
-                    f"With a market cap of ${market_cap:,.0f}, {name} has established a measurable on-chain footprint "
-                    f"relative to the broader {agent_type} agent cohort."
+        if mcap_rank and cat_size:
+            if mcap_rank == 1:
+                notable_parts.append(
+                    f"{name} is the largest agent by market cap in the {agent_type} vertical on Virtuals Protocol "
+                    f"at {_fmt_mcap(market_cap)}, leading a category of {cat_size} agents."
+                )
+            elif mcap_rank <= 3:
+                notable_parts.append(
+                    f"{name} ranks #{mcap_rank} by market cap in the {agent_type} vertical at {_fmt_mcap(market_cap)}, "
+                    f"placing it in the top tier of {cat_size} agents in this category."
                 )
             else:
-                mkt_parts.append(
-                    f"At a market cap of ${market_cap:,.0f}, {name} is in the early-stage range, "
-                    f"which represents significant upside potential if the product gains traction."
+                pct_of_leader = (market_cap / top_mcap * 100) if top_mcap > 0 else 0
+                notable_parts.append(
+                    f"{name} ranks #{mcap_rank} of {cat_size} agents in the {agent_type} vertical at {_fmt_mcap(market_cap)} — "
+                    f"{pct_of_leader:.0f}% of the category leader's market cap, "
+                    f"{'well within striking distance' if pct_of_leader >= 30 else 'with substantial upside if it can close the gap'}."
                 )
 
-        if agent_type.lower() in ("trading", "defi", "finance"):
-            mkt_parts.append(
-                f"The intersection of AI and on-chain finance is one of the highest-conviction narratives in Web3, "
-                f"with autonomous trading agents attracting both retail and institutional attention."
-            )
-        elif agent_type.lower() in ("gaming", "game"):
-            mkt_parts.append(
-                f"AI companions and autonomous NPCs represent one of the most natural product-market fits "
-                f"for AI agents on-chain, with the Web3 gaming sector experiencing rapid growth."
-            )
-        elif agent_type.lower() in ("social", "community", "entertainment"):
-            mkt_parts.append(
-                f"Social AI agents that can build and engage communities autonomously are an emerging category "
-                f"with strong narrative tailwinds as AI-native content creation scales."
-            )
+        if median_mcap > 0 and market_cap > 0:
+            ratio_to_median = market_cap / median_mcap
+            if ratio_to_median >= 2:
+                notable_parts.append(
+                    f"At {ratio_to_median:.1f}x the category median market cap of {_fmt_mcap(median_mcap)}, "
+                    f"{name} is a category standout, not a median player."
+                )
+            elif ratio_to_median < 0.5:
+                notable_parts.append(
+                    f"With a market cap {ratio_to_median:.1f}x the category median ({_fmt_mcap(median_mcap)}), "
+                    f"{name} is trading at a significant discount to peers, which could represent either a value opportunity or reflect real differentiation challenges."
+                )
+    elif market_cap > 0:
+        notable_parts.append(
+            f"{name}{ticker_str} has established a market cap of {_fmt_mcap(market_cap)}, "
+            f"reflecting real on-chain capital commitment from its holder community."
+        )
 
-        market_opportunity = " ".join(mkt_parts)
+    # Turnover ratio
+    if turnover_rate > 0:
+        notable_parts.append(
+            f"Daily trading metrics show {_turnover_label(turnover_rate)} "
+            f"(${volume_24h:,.0f} volume against {_fmt_mcap(market_cap)} market cap). "
+            + ("High turnover confirms deep market liquidity and active speculative interest." if turnover_rate >= 0.05
+               else "Moderate turnover is consistent with a maturing holder base holding for the longer term." if turnover_rate >= 0.01
+               else "Low turnover suggests most holders are not actively trading — either strong conviction or thin market depth.")
+        )
+    elif volume_24h == 0 and market_cap > 0:
+        notable_parts.append(
+            f"No 24-hour trading volume has been recorded for {name} at this time, "
+            f"which may reflect data latency or very low trading activity on the current measurement window."
+        )
+
+    # Status milestone
+    if status_raw == "sentient":
+        notable_parts.append(
+            f"Sentient status on Virtuals Protocol is a meaningful on-chain milestone, confirming {name} is live "
+            f"and operational as an autonomous agent — not merely a concept or prototype."
+        )
+    elif status_raw == "genesis":
+        notable_parts.append(
+            f"Genesis status is the highest tier on Virtuals Protocol, distinguishing {name} as a fully mature, "
+            f"protocol-verified autonomous agent."
+        )
+
+    # Twitter standout
+    if tw_followers > 0 and cat_stats.get("median_tw", 0) > 0:
+        tw_vs_median = tw_followers / cat_stats["median_tw"]
+        if tw_vs_median >= 2:
+            notable_parts.append(
+                f"With {tw_followers:,} Twitter/X followers — {tw_vs_median:.1f}x the {agent_type} category median — "
+                f"{name} has exceptional social reach relative to its peers."
+            )
+    elif tw_followers > 10_000:
+        notable_parts.append(
+            f"A Twitter/X following of {tw_followers:,} represents strong social brand visibility for an AI agent in this category."
+        )
+
+    if not notable_parts:
+        notable_parts.append(
+            f"{name}{ticker_str} is positioned in the {agent_type} vertical on Virtuals Protocol at {status_lbl} stage. "
+            f"The agent is building its on-chain presence with foundational social and distribution infrastructure in place."
+        )
+
+    what_is_notable = " ".join(notable_parts)
+
+    # ── risks_to_monitor ──────────────────────────────────────────────────
+    risks = []
+
+    # Team anonymity
+    if doxx_tier == 3:
+        risks.append(
+            f"Full team anonymity is {name}'s primary trust risk. "
+            f"No verified identities are publicly linked — accountability depends entirely on the team's future execution record. "
+            f"This risk resolves if founders choose to doxx or if on-chain product delivery builds a long enough public track record."
+        )
+    elif doxx_tier == 2:
+        risks.append(
+            f"The pseudonymous team structure introduces moderate trust uncertainty. "
+            f"Accountability is partial — social presence exists but identities are not fully verifiable. "
+            f"This mitigates as delivery cadence accumulates."
+        )
+
+    # Liquidity risk
+    if market_cap > 0 and turnover_rate < 0.005:
+        risks.append(
+            f"Liquidity risk: daily turnover of {turnover_rate:.3%} against a {_fmt_mcap(market_cap)} market cap "
+            f"(${volume_24h:,.0f} 24h volume) suggests very thin trading depth. "
+            f"This becomes meaningful if large holders attempt to exit — resolves with broader distribution and sustained trading activity."
+        )
+    elif volume_24h == 0 and market_cap > 0:
+        risks.append(
+            f"Zero recorded 24-hour trading volume is a flag worth monitoring — it may reflect data latency, "
+            f"but persistent zero volume against a {_fmt_mcap(market_cap)} market cap would indicate liquidity has dried up."
+        )
+
+    # Concentration risk
+    if holder_count > 0 and holder_count < 100:
+        risks.append(
+            f"Extreme concentration risk: only {holder_count:,} token holder{'s' if holder_count != 1 else ''} "
+            f"means even modest selling by a single large wallet could cause outsized price impact. "
+            f"Watch for holder growth as the primary signal of distribution improvement."
+        )
+    elif top10_conc > 80:
+        risks.append(
+            f"Top-10 holders control {top10_conc:.0f}% of supply — a highly concentrated ownership structure. "
+            f"Coordinated selling by whales could destabilize the market. "
+            f"Broader distribution and time will reduce this risk."
+        )
+    elif top10_conc > 60:
+        risks.append(
+            f"Top-10 holder concentration at {top10_conc:.0f}% is elevated. "
+            f"This is not unusual for early-stage projects, but it is a dynamic to watch as distribution evolves."
+        )
+
+    # Website gap
+    if not website:
+        risks.append(
+            f"The absence of a project website limits independent product verification and makes onboarding new users harder. "
+            f"A dedicated web presence would strengthen credibility and provide a home for documentation."
+        )
+
+    # Prototype stage risk
+    if status_raw == "prototype":
+        risks.append(
+            f"{name} is at Prototype stage — the core product has not yet been verified at the level required for "
+            f"Sentient or Genesis status. Execution risk is elevated until the product ships and gains on-chain traction."
+        )
+
+    # Competition
+    if cat_stats.get("cat_size", 0) > 5:
+        risks.append(
+            f"The {agent_type} vertical has {cat_stats['cat_size']} agents competing on Virtuals Protocol. "
+            f"Differentiation must be clear and defensible to avoid being crowded out as the category matures."
+        )
+
+    if not risks:
+        risks.append(
+            f"{name} operates in the competitive {agent_type} vertical on Virtuals Protocol. "
+            f"Primary risks include market saturation in the category, execution pace relative to peers, "
+            f"and sustaining community engagement as the broader Virtuals ecosystem continues to grow."
+        )
+
+    risks_to_monitor = " ".join(risks[:4])  # Cap at 4 risk points for readability
+
+    # ── market_opportunity ────────────────────────────────────────────────
+    mkt_parts = []
+
+    mkt_parts.append(
+        f"{name} operates in {tam_label} — a sector with an estimated addressable market of {tam_size}. "
+        f"The Virtuals Protocol ecosystem on Base is one of the most active launchpads for autonomous AI agents on-chain, "
+        f"giving projects direct access to a crypto-native, AI-literate audience."
+    )
+
+    # Upside framing using market cap
+    if market_cap > 0 and cat_stats.get("top_mcap", 0) > 0:
+        top_mcap = cat_stats["top_mcap"]
+        x2 = market_cap * 2
+        x5 = market_cap * 5
+        x10 = market_cap * 10
+        pct_of_leader = market_cap / top_mcap * 100
+        if pct_of_leader < 100:
+            mkt_parts.append(
+                f"The category leader in the {agent_type} vertical commands {_fmt_mcap(top_mcap)}. "
+                f"{name}'s current {_fmt_mcap(market_cap)} implies {pct_of_leader:.0f}% of leader market cap — "
+                f"a 2x would put it at {_fmt_mcap(x2)}, a 5x at {_fmt_mcap(x5)}, and a 10x at {_fmt_mcap(x10)}. "
+                f"{'Reaching leader parity would require a' + f' {top_mcap/market_cap:.1f}x move.' if top_mcap/market_cap >= 2 else 'It is already within striking distance of category leadership.'}"
+            )
+        else:
+            mkt_parts.append(
+                f"{name} is the category leader in the {agent_type} vertical at {_fmt_mcap(market_cap)}. "
+                f"Sustaining this position requires continued product delivery and community engagement as challengers emerge."
+            )
+    elif market_cap > 0:
+        mkt_parts.append(
+            f"At {_fmt_mcap(market_cap)}, {name} is in the early-stage range for the {agent_type} vertical, "
+            f"representing meaningful upside potential if the product gains traction within the Virtuals ecosystem."
+        )
+
+    # Vertical narrative tailwind
+    if agent_type.lower() in ("trading", "defi", "finance"):
+        mkt_parts.append(
+            f"AI-powered on-chain finance is one of the highest-conviction narratives in Web3. "
+            f"Autonomous agents that can trade, execute strategies, or surface alpha 24/7 address the most fundamental "
+            f"limitation of human traders — sleep, emotion, and processing speed. "
+            f"Institutional attention to this category continues to grow."
+        )
+    elif agent_type.lower() in ("gaming", "game"):
+        mkt_parts.append(
+            f"AI companions and autonomous game characters represent one of the most natural near-term use cases "
+            f"for on-chain AI agents. The Web3 gaming sector is expanding rapidly, and the demand for AI-driven "
+            f"in-game experiences is still in early innings."
+        )
+    elif agent_type.lower() in ("social", "community", "entertainment"):
+        mkt_parts.append(
+            f"Autonomous social AI agents — capable of building and engaging communities without human operators — "
+            f"are an emerging category with strong narrative tailwinds as AI-native content creation scales globally."
+        )
+    elif agent_type.lower() in ("infrastructure", "infra", "protocol", "tools"):
+        mkt_parts.append(
+            f"Infrastructure agents sit at the base layer of the AI agent stack — "
+            f"the tools and primitives that all other agents depend on. "
+            f"Infrastructure plays in crypto historically accrue disproportionate value as the ecosystem above them scales."
+        )
+    else:
+        mkt_parts.append(
+            f"As the Virtuals Protocol ecosystem expands, agents with clear vertical focus and active deployment "
+            f"status are best positioned to capture the protocol-level growth tailwinds that benefit the whole ecosystem."
+        )
+
+    market_opportunity = " ".join(mkt_parts)
 
     return {
         "what_it_does":       what_it_does,
@@ -1140,18 +1400,44 @@ def _build_data_driven_overview(agent: dict) -> dict:
     }
 
 
+def _is_template_overview(ov: dict) -> bool:
+    """Detect overviews generated by the old shallow template (not real analysis)."""
+    wid = (ov.get("what_it_does") or "").lower()
+    who = (ov.get("who_is_behind_it") or "").lower()
+    notable = (ov.get("what_is_notable") or "").lower()
+    # Old template patterns
+    return (
+        "is a sentient ai agent operating within the virtuals protocol ecosystem, positioned in the" in wid
+        or "is pending a comprehensive" in wid
+        or "pending full analysis" in wid
+        or "is an ai agent operating on the virtuals protocol, classified in the" in wid
+        # who section old pattern
+        or "is currently anonymous — no verified identity has been publicly confirmed" in who
+        # notable section old pattern
+        or "scoring data supports the view that this agent is operating in a large total addressable market" in notable
+    )
+
+
 @app.post("/api/admin/rebuild-pending-overviews")
 async def rebuild_pending_overviews(dry_run: bool = Query(False)):
     """
-    Scan all agents whose overview_json has placeholder 'pending' text and
-    rebuild those sections using structured DB fields only (no AI API calls).
-    Returns counts; runs in background.
+    Scan all agents whose overview_json has placeholder 'pending' text OR was
+    generated by the old shallow template, and rebuild using the richer
+    data-driven generator. No AI API calls.
     """
     async def _do_rebuild():
         from database import get_all_agents, update_overview_only
         logger.info("rebuild-pending-overviews: loading all agents…")
         agents = await get_all_agents()
         logger.info(f"rebuild-pending-overviews: {len(agents)} agents loaded")
+
+        # Build category peer map for comparison stats
+        from collections import defaultdict
+        category_map: dict = defaultdict(list)
+        for a in agents:
+            cat = (a.get("agent_type") or "Other").strip().lower()
+            category_map[cat].append(a)
+
         updated = 0
         skipped = 0
         for agent in agents:
@@ -1162,13 +1448,17 @@ async def rebuild_pending_overviews(dry_run: bool = Query(False)):
                 except Exception:
                     ov = {}
             full_text = json.dumps(ov).lower()
-            if (
-                "pending full analysis" not in full_text
-                and "pending a comprehensive" not in full_text
-            ):
+            needs_rebuild = (
+                "pending full analysis" in full_text
+                or "pending a comprehensive" in full_text
+                or _is_template_overview(ov)
+            )
+            if not needs_rebuild:
                 skipped += 1
                 continue
-            new_ov = _build_data_driven_overview({**agent, "overview_json": ov})
+            cat = (agent.get("agent_type") or "Other").strip().lower()
+            peers = category_map.get(cat, [])
+            new_ov = _build_data_driven_overview({**agent, "overview_json": ov}, category_peers=peers)
             if not dry_run:
                 try:
                     await update_overview_only(str(agent.get("virtuals_id", "")), new_ov)
@@ -1177,11 +1467,54 @@ async def rebuild_pending_overviews(dry_run: bool = Query(False)):
                     logger.error(f"rebuild-overview failed for {agent.get('virtuals_id')}: {e}")
             else:
                 updated += 1
-        logger.info(f"rebuild-pending-overviews: done — {updated} updated, {skipped} skipped (already real)")
+        logger.info(f"rebuild-pending-overviews: done — {updated} updated, {skipped} skipped")
 
     asyncio.create_task(_do_rebuild())
     return {
         "status": "queued",
         "dry_run": dry_run,
-        "message": "Scanning all agents and rebuilding pending overviews in background. Check server logs for progress.",
+        "message": "Scanning all agents for pending/template overviews and rebuilding. Check server logs for progress.",
+    }
+
+
+@app.post("/api/admin/rebuild-all-overviews")
+async def rebuild_all_overviews(dry_run: bool = Query(False)):
+    """
+    Force-rebuild ALL agent overviews using the richer data-driven generator.
+    Overwrites even overviews that already exist. No AI API calls.
+    """
+    async def _do_rebuild_all():
+        from database import get_all_agents, update_overview_only
+        from collections import defaultdict
+        logger.info("rebuild-all-overviews: loading all agents…")
+        agents = await get_all_agents()
+        logger.info(f"rebuild-all-overviews: {len(agents)} agents to process")
+
+        category_map: dict = defaultdict(list)
+        for a in agents:
+            cat = (a.get("agent_type") or "Other").strip().lower()
+            category_map[cat].append(a)
+
+        updated = 0
+        errors = 0
+        for agent in agents:
+            cat = (agent.get("agent_type") or "Other").strip().lower()
+            peers = category_map.get(cat, [])
+            new_ov = _build_data_driven_overview(agent, category_peers=peers)
+            if not dry_run:
+                try:
+                    await update_overview_only(str(agent.get("virtuals_id", "")), new_ov)
+                    updated += 1
+                except Exception as e:
+                    logger.error(f"rebuild-all-overviews failed for {agent.get('virtuals_id')}: {e}")
+                    errors += 1
+            else:
+                updated += 1
+        logger.info(f"rebuild-all-overviews: done — {updated} updated, {errors} errors")
+
+    asyncio.create_task(_do_rebuild_all())
+    return {
+        "status": "queued",
+        "dry_run": dry_run,
+        "message": "Rebuilding ALL agent overviews with enhanced data-driven analysis. Check server logs for progress.",
     }
