@@ -1,25 +1,39 @@
 """
-VirtualsIQ — Scoring Engine v3
+VirtualsIQ — Scoring Engine v4 (benchmark-based)
 
 Ranking hierarchy (weights):
-  1. Uniqueness  40%  — how novel/differentiated is the idea?
-  2. TAM         25%  — how large is the addressable market?
-  3. Moat        15%  — does the project have defensibility?
-  4. Execution   10%  — team signals, presence (tiebreaker, NOT a gate)
-  5. Market      10%  — on-chain validation: holders, mcap, volume
+  1. Idea × Market Fit  50%  — uniqueness + TAM (geometric mean)
+  2. Moat               20%  — defensibility + community + age
+  3. Market             25%  — on-chain validation vs benchmark top-20
+  4. Execution          10%  — team signals, presence (tiebreaker, NOT a gate)
+
+Benchmark approach:
+  - Identify the top ~20 real projects (high holders, volume, market cap).
+    These define what a "90-point" market score looks like.
+  - Score every agent's market metrics relative to those benchmarks on a
+    log scale — so small projects aren't crushed to zero, but the gap
+    between a 1M-holder project and a 50-holder project is meaningful.
+  - Benchmarks are derived from live data (excl. 365love whose Virtuals
+    API market cap is known to be wrong).
 
 Philosophy:
-  - A unique idea in a large market scores 70+ even with zero doxx.
-  - Moat separates durable from fragile projects.
-  - Execution (including doxx) is a secondary differentiator.
-  - Market metrics confirm community belief.
+  - A unique idea in a large market scores well even with zero doxx.
+  - Moat separates durable from fragile projects; community size counts.
+  - Market metrics confirm the idea resonates with real users.
   - NULL / empty fields → factor is SKIPPED (no penalty for absence).
     Remaining factors are re-weighted proportionally.
   - doxx_tier = 3 (anonymous) IS real data and scores accordingly; it is
     NOT treated as "missing." True missing = null/empty field.
 
-Score range: 8 (floor, almost nothing present) → 95 (elite)
+Score range: 8 (floor) → 95 (elite)
 dead_flagged / strong_flagged are UI badges only — zero scoring impact.
+
+Expected distribution with this calibration:
+  85–95  Top-tier: elite idea + proven market (AI-analyzed + benchmark MC/holders)
+  65–84  Strong: good idea or strong market, solid moat
+  40–64  Moderate: decent idea, limited market validation
+  20–39  Weak: poor idea/execution, minimal market signal
+  8–19   Avoid: meme/generic + near-zero market presence
 """
 
 from __future__ import annotations
@@ -306,6 +320,14 @@ def _f_moat(agent: dict, ai: dict) -> float | None:
     if partnership is not None:
         signals.append((_clamp(float(partnership)), 1.5))
 
+    # Community size: a large holder base is a hard-to-replicate network moat.
+    # Only count if ≥ 1 000 holders (below that it's noise, not community).
+    holders = _safe(agent.get("holder_count"), 0)
+    if holders >= 1_000:
+        # log10(1000)=3 → 20*3=60; log10(1M)=6 → 20*6=120 capped at 90
+        community_moat = _clamp(20.0 * math.log10(holders))
+        signals.append((community_moat, 2.0))  # weight 2× — community is durable
+
     if not signals:
         return None  # no defensibility data at all — skip
 
@@ -383,44 +405,69 @@ def _f_execution(agent: dict, ai: dict) -> float | None:
 
 
 # ---------------------------------------------------------------------------
-# Factor 5-9 — MARKET VALIDATION  (collectively 10%)
+# Factor 5-9 — MARKET VALIDATION  (collectively 25%)
+# Benchmark-relative scoring: derived from the top ~20 projects by market
+# metrics (holders, MC, volume) — excluding 365love whose Virtuals API MC
+# is known to be wrong.
+#
+# Top-20 approximate statistics (live data, April 2026):
+#   Holders: Toshi 1.08M, Keyboard Cat 908K, Luna 457K, aixbt 412K, G.A.M.E 282K
+#            → 20th-percentile ≈ 10 000 holders
+#   MC:      Ribbita $111M, Toshi $75M, Fabric $37M, aixbt $25M, G.A.M.E $8.7M
+#            → 20th-percentile ≈ $1 000 000 (but meaningful project = $1M+)
+#   Volume:  Roarin $179K, Keyboard Cat $114K, REPPO $50K, Ribbita $61K
+#            → 20th-percentile ≈ $10 000/day
+#
+# _BM_* values are the "90-score" reference points.  Projects at or above the
+# benchmark score ≥ 90; those well below fall proportionally on a power-law
+# log scale (exponent 1.5 for steeper drop-off below benchmark).
 # ---------------------------------------------------------------------------
 
-_HOLDER_BP = [
-    (1,        5.0), (10,      15.0), (50,      25.0), (100,     35.0),
-    (500,     50.0), (1_000,  62.0),  (5_000,  75.0),  (10_000, 85.0),
-    (50_000,  93.0), (100_000, 97.0),
-]
+_BM_HOLDERS = 10_000     # 10K holders → proven community
+_BM_MCAP    = 1_000_000  # $1M MC     → market-validated
+_BM_VOLUME  = 10_000     # $10K/day   → active trading
 
-_MCAP_BP = [
-    (1_000,       8.0),  (10_000,      20.0), (100_000,     35.0),
-    (500_000,    50.0),  (1_000_000,   65.0), (5_000_000,   78.0),
-    (10_000_000, 87.0),  (50_000_000,  93.0), (100_000_000, 97.0),
-]
 
-_VOLUME_BP = [
-    (100,       8.0),  (1_000,    20.0), (5_000,    33.0),
-    (10_000,   47.0),  (50_000,  62.0),  (100_000,  75.0),
-    (500_000,  87.0),  (1_000_000, 93.0),
-]
+def _bm_log_score(value: float, benchmark: float, floor: float = 5.0) -> float:
+    """
+    Benchmark-relative log score on [floor, 95].
+
+    value >= benchmark  → 90–95  (above-benchmark tail scales linearly to 95)
+    value = benchmark   → 90
+    value = 0           → floor (5)
+
+    Uses exponent 1.5 on the log ratio below benchmark so the drop-off is
+    steeper than pure log but not as harsh as quadratic.
+    """
+    if value <= 0:
+        return floor
+    log_ratio = math.log10(value + 1) / math.log10(benchmark + 1)
+    if log_ratio >= 1.0:
+        # Above-benchmark bonus: up to +5 for projects well above benchmark
+        return _clamp(90.0 + (log_ratio - 1.0) * 10.0)
+    score = floor + (90.0 - floor) * (log_ratio ** 1.5)
+    return _clamp(score)
 
 
 def _f_holders(agent: dict, ai: dict) -> float | None:
     h = _safe(agent.get("holder_count"), -1)
-    if h < 0: return None
-    return _clamp(_log_score(h, _HOLDER_BP)) if h > 0 else 5.0
+    if h < 0:
+        return None
+    return _bm_log_score(h, _BM_HOLDERS) if h > 0 else 5.0
 
 
 def _f_mcap(agent: dict, ai: dict) -> float | None:
     m = _safe(agent.get("market_cap"), -1)
-    if m < 0: return None
-    return _clamp(_log_score(m, _MCAP_BP)) if m > 0 else 5.0
+    if m < 0:
+        return None
+    return _bm_log_score(m, _BM_MCAP) if m > 0 else 5.0
 
 
 def _f_volume(agent: dict, ai: dict) -> float | None:
     v = _safe(agent.get("volume_24h"), -1)
-    if v < 0: return None
-    return _clamp(_log_score(v, _VOLUME_BP)) if v > 0 else 5.0
+    if v < 0:
+        return None
+    return _bm_log_score(v, _BM_VOLUME) if v > 0 else 5.0
 
 
 def _f_efficiency(agent: dict, ai: dict) -> float | None:
@@ -477,24 +524,27 @@ def _f_idea_market_fit(agent: dict, ai: dict) -> float:
 
 FACTORS = [
     # (function, weight, name, tier)
-    (_f_idea_market_fit, 0.65, "F_idea_market_fit", "idea"),
+    # Within-tier weights determine the weighted average inside each tier;
+    # cross-tier contributions are controlled by _TIER_WEIGHTS below.
+    (_f_idea_market_fit, 1.00, "F_idea_market_fit", "idea"),      # sole factor in tier
 
-    (_f_moat,            0.15, "F_moat",            "moat"),
+    (_f_moat,            1.00, "F_moat",            "moat"),      # sole factor in tier
 
-    (_f_execution,       0.10, "F_execution",        "execution"),
+    (_f_execution,       1.00, "F_execution",        "execution"), # sole factor in tier
 
-    (_f_holders,         0.042, "F_holders",         "market"),
-    (_f_mcap,            0.034, "F_mcap",            "market"),
-    (_f_volume,          0.014, "F_volume",          "market"),
-    (_f_efficiency,      0.005, "F_efficiency",      "market"),
-    (_f_momentum,        0.005, "F_momentum",        "market"),
+    # Market sub-factors — within-tier weights reflect relative importance
+    (_f_holders,         0.42, "F_holders",         "market"),
+    (_f_mcap,            0.34, "F_mcap",            "market"),
+    (_f_volume,          0.14, "F_volume",          "market"),
+    (_f_efficiency,      0.05, "F_efficiency",      "market"),
+    (_f_momentum,        0.05, "F_momentum",        "market"),
 ]
 
 _TIER_WEIGHTS = {
-    "idea":      0.65,
-    "moat":      0.15,
-    "execution": 0.10,
-    "market":    0.10,
+    "idea":      0.45,   # was 0.65 — still dominant but market gets more say
+    "moat":      0.20,   # was 0.15 — community moat now explicit
+    "execution": 0.10,   # tiebreaker, not gate (unchanged)
+    "market":    0.25,   # was 0.10 — benchmark-relative, core differentiator
 }
 
 

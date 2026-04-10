@@ -32,6 +32,13 @@ STATUS_MAP = {
     "BONDING": "Prototype",
 }
 
+# Contracts where the Virtuals API mcapInVirtual field is known to be wrong.
+# For these, we zero out the Virtuals-sourced MC so DexScreener can supply the
+# real value (or it stays 0 rather than showing a wildly inflated number).
+_VIRTUALS_MC_SKIP_CONTRACTS: set[str] = {
+    "0xb7f98fc88ee269642092275b49e3cc8ca006852a",  # 365love — Virtuals API returns ~$497M, clearly wrong
+}
+
 AGENT_TYPE_MAP = {
     "trading": "Trading",
     "defi": "DeFi",
@@ -161,7 +168,13 @@ def _parse_agent(item: dict) -> dict:
         attrs.get("telegram") or attrs.get("linkedTelegram") or ""
     )
 
-    market_cap = float(attrs.get("mcapInVirtual") or attrs.get("marketCap") or 0)
+    # Use DexScreener as the authoritative MC source for contracts in the skip set;
+    # the Virtuals API field mcapInVirtual can be wildly wrong for some tokens.
+    contract_lower = contract.lower()
+    if contract_lower in _VIRTUALS_MC_SKIP_CONTRACTS:
+        market_cap = 0.0  # will be populated (or kept 0) by DexScreener enrichment
+    else:
+        market_cap = float(attrs.get("mcapInVirtual") or attrs.get("marketCap") or 0)
     price_usd = float(attrs.get("currentPrice") or attrs.get("priceUsd") or 0)
 
     image_obj = attrs.get("image") or {}
@@ -371,14 +384,31 @@ async def preload_all_agents(on_batch=None):
 
 
 async def enrich_top_agents_dexscreener(top_n: int = 100):
-    """Enrich the top N agents (by market cap) with DexScreener market data."""
+    """Enrich the top N agents (by market cap) with DexScreener market data.
+
+    Agents in _VIRTUALS_MC_SKIP_CONTRACTS are always included regardless of
+    their stored market_cap (which may be 0 after the Virtuals MC was zeroed out).
+    """
     async with _db() as db:
-        rows = await db.fetch_all(
+        top_rows = await db.fetch_all(
             """SELECT virtuals_id, contract_address FROM agents
                WHERE contract_address IS NOT NULL AND contract_address != ''
                ORDER BY market_cap DESC LIMIT ?""",
             (top_n,)
         )
+        # Always include the MC-override contracts so they get a DexScreener update
+        override_rows = []
+        for contract_addr in _VIRTUALS_MC_SKIP_CONTRACTS:
+            row = await db.fetch_one(
+                "SELECT virtuals_id, contract_address FROM agents WHERE LOWER(contract_address) = ?",
+                (contract_addr,)
+            )
+            if row:
+                override_rows.append(row)
+
+    # Merge, deduplicating by virtuals_id
+    seen = {r["virtuals_id"] for r in top_rows}
+    rows = list(top_rows) + [r for r in override_rows if r["virtuals_id"] not in seen]
 
     if not rows:
         logger.info("No agents with contract addresses found for DexScreener enrichment")
