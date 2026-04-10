@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VIQ Backtest — VirtualsIQ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:         #FFFFFF;
+      --bg-2:       #F8F9FA;
+      --bg-3:       #F1F3F5;
+      --bg-4:       #E9ECEF;
+      --border:     #E5E7EB;
+      --border-2:   #D1D5DB;
+      --text:       #111827;
+      --text-muted: #6B7280;
+      --text-dim:   #9CA3AF;
+      --green:      #168389;
+      --green-bg:   rgba(22,131,137,0.10);
+      --green-dark: #168389;
+      --red:        #EF4444;
+      --red-bg:     rgba(239,68,68,0.10);
+      --amber:      #F59E0B;
+      --radius:     8px;
+      --radius-sm:  6px;
+      --font-ui:    'Inter', sans-serif;
+      --font-data:  'Inter', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-ui);
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .logo { display: flex; align-items: center; gap: 8px; flex-shrink: 0; text-decoration: none; }
+    .logo-mark {
+      width: 34px; height: 34px;
+      background: linear-gradient(135deg, #2DD4BF, #168389);
+      border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-weight: 700; font-size: 13px; letter-spacing: -0.5px;
+    }
+    .logo-name { font-weight: 700; font-size: 16px; color: var(--text); }
+    .logo-name span { color: var(--green); }
+    .header-back {
+      display: inline-flex; align-items: center; gap: 6px;
+      margin-left: auto;
+      color: var(--text-muted); font-size: 13px; text-decoration: none;
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+    }
+    .header-back:hover { color: var(--green); border-color: var(--green); }
+    .page { max-width: 900px; margin: 0 auto; padding: 24px 16px 48px; }
+    .page-title {
+      font-size: 22px; font-weight: 700; color: var(--text);
+      margin-bottom: 4px;
+    }
+    .page-subtitle { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
+    .days-selector {
+      display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap;
+    }
+    .day-btn {
+      padding: 6px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      background: var(--bg-2); color: var(--text-muted); font-size: 13px; cursor: pointer;
+      font-family: var(--font-ui);
+    }
+    .day-btn:hover { border-color: var(--green); color: var(--green); }
+    .day-btn.active { background: var(--green); border-color: var(--green); color: #fff; font-weight: 600; }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    .stat-card {
+      padding: 16px; background: var(--bg-2);
+      border: 1px solid var(--border); border-radius: var(--radius);
+    }
+    .stat-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .stat-value { font-size: 24px; font-weight: 700; font-family: var(--font-data); color: var(--text); }
+    .stat-value.positive { color: var(--green); }
+    .stat-value.negative { color: var(--red); }
+    .stat-desc { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+    .section-title {
+      font-size: 13px; font-weight: 700; color: var(--text);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      margin-bottom: 12px;
+    }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th {
+      text-align: left; padding: 8px 10px;
+      font-size: 11px; font-weight: 600; color: var(--text-dim);
+      text-transform: uppercase; letter-spacing: 0.4px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    tbody tr { border-bottom: 1px solid var(--border); }
+    tbody tr:hover { background: var(--bg-2); }
+    tbody td { padding: 9px 10px; color: var(--text-muted); vertical-align: middle; }
+    tbody td.name-cell { color: var(--text); font-weight: 500; }
+    .return-pos { color: var(--green); font-weight: 600; font-family: var(--font-data); }
+    .return-neg { color: var(--red); font-weight: 600; font-family: var(--font-data); }
+    .score-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 100px;
+      font-family: var(--font-data); font-size: 12px; font-weight: 700;
+    }
+    .empty-notice {
+      text-align: center; padding: 60px 20px;
+      color: var(--text-dim); font-size: 14px; line-height: 1.8;
+    }
+    .empty-notice strong { color: var(--text-muted); }
+    .loading-spinner {
+      width: 22px; height: 22px;
+      border: 3px solid var(--border); border-top-color: var(--green);
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+      margin: 40px auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .info-box {
+      padding: 12px 16px; background: var(--green-bg);
+      border: 1px solid rgba(22,131,137,0.3); border-radius: var(--radius-sm);
+      font-size: 12px; color: var(--green-dark); margin-bottom: 24px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <a href="/" class="logo">
+    <div class="logo-mark">VIQ</div>
+    <span class="logo-name">Virtuals<span>IQ</span></span>
+  </a>
+  <a href="/" class="header-back">← Dashboard</a>
+</div>
+
+<div class="page">
+  <div class="page-title">VIQ Score Backtest</div>
+  <div class="page-subtitle">How well did VIQ scores predict market cap growth?</div>
+
+  <div class="days-selector">
+    <button class="day-btn active" data-days="7">7 Days</button>
+    <button class="day-btn" data-days="14">14 Days</button>
+    <button class="day-btn" data-days="30">30 Days</button>
+    <button class="day-btn" data-days="60">60 Days</button>
+    <button class="day-btn" data-days="90">90 Days</button>
+  </div>
+
+  <div id="stats-area">
+    <div class="loading-spinner"></div>
+  </div>
+</div>
+
+<script>
+let currentDays = 7;
+
+function fmtReturn(v) {
+  if (v == null) return '—';
+  const s = (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
+  return `<span class="${v >= 0 ? 'return-pos' : 'return-neg'}">${s}</span>`;
+}
+function fmtMcap(v) {
+  if (!v) return '—';
+  if (v >= 1e9) return '$' + (v/1e9).toFixed(1) + 'B';
+  if (v >= 1e6) return '$' + (v/1e6).toFixed(1) + 'M';
+  if (v >= 1e3) return '$' + (v/1e3).toFixed(0) + 'K';
+  return '$' + v.toFixed(0);
+}
+function scoreColor(s) {
+  if (s >= 80) return '#168389';
+  if (s >= 65) return '#0891B2';
+  if (s >= 50) return '#F59E0B';
+  return '#EF4444';
+}
+
+async function loadBacktest(days) {
+  const area = document.getElementById('stats-area');
+  area.innerHTML = '<div class="loading-spinner"></div>';
+  try {
+    const res = await fetch(`/api/backtest?days=${days}`);
+    const data = await res.json();
+    renderBacktest(data);
+  } catch(e) {
+    area.innerHTML = '<div class="empty-notice">Failed to load backtest data.</div>';
+  }
+}
+
+function renderBacktest(data) {
+  const area = document.getElementById('stats-area');
+
+  if (!data.sample_size) {
+    area.innerHTML = `<div class="info-box">
+      Backtest data builds up over time as daily score snapshots accumulate.
+      Snapshots are taken automatically after each daily scoring run.
+      Check back after a few days of data collection.
+    </div>
+    <div class="empty-notice">
+      <strong>No snapshot data yet</strong><br>
+      ${data.note || ''}
+    </div>`;
+    return;
+  }
+
+  const corrStr  = data.correlation != null ? data.correlation.toFixed(3) : '—';
+  const corrPos  = data.correlation != null && data.correlation > 0;
+  const hitStr   = data.hit_rate   != null ? data.hit_rate + '%' : '—';
+  const top10Str = data.top10_avg_return != null ? (data.top10_avg_return >= 0 ? '+' : '') + data.top10_avg_return.toFixed(1) + '%' : '—';
+  const bot10Str = data.bottom10_avg_return != null ? (data.bottom10_avg_return >= 0 ? '+' : '') + data.bottom10_avg_return.toFixed(1) + '%' : '—';
+
+  const corrClass  = data.correlation > 0.1 ? 'positive' : data.correlation < -0.1 ? 'negative' : '';
+  const top10Class = (data.top10_avg_return || 0) >= 0 ? 'positive' : 'negative';
+  const bot10Class = (data.bottom10_avg_return || 0) >= 0 ? 'positive' : 'negative';
+
+  const agents = data.agents || [];
+  const rows = agents.slice(0, 50).map(a => {
+    const sc = Math.round(a.score);
+    const clr = scoreColor(sc);
+    return `<tr>
+      <td class="name-cell">${a.name || '—'}</td>
+      <td>${a.ticker ? '<span style="color:var(--text-dim)">' + a.ticker + '</span>' : '—'}</td>
+      <td><span class="score-badge" style="background:${clr}22;color:${clr}">${sc}</span></td>
+      <td style="font-family:var(--font-data)">${fmtMcap(a.mcap_then)}</td>
+      <td style="font-family:var(--font-data)">${fmtMcap(a.mcap_now)}</td>
+      <td>${fmtReturn(a.pct_return)}</td>
+    </tr>`;
+  }).join('');
+
+  area.innerHTML = `
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Correlation (score vs return)</div>
+        <div class="stat-value ${corrClass}">${corrStr}</div>
+        <div class="stat-desc">${data.sample_size} agents · ${data.days}d lookback</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">High-Score Hit Rate</div>
+        <div class="stat-value ${data.hit_rate >= 50 ? 'positive' : 'negative'}">${hitStr}</div>
+        <div class="stat-desc">% of top-half VIQ agents with positive returns</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Top-10 VIQ Avg Return</div>
+        <div class="stat-value ${top10Class}">${top10Str}</div>
+        <div class="stat-desc">Average market cap change for highest-scored agents</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Bottom-10 VIQ Avg Return</div>
+        <div class="stat-value ${bot10Class}">${bot10Str}</div>
+        <div class="stat-desc">Average market cap change for lowest-scored agents</div>
+      </div>
+    </div>
+
+    <div class="section-title">Top Picks vs Actual Performance</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Agent</th>
+            <th>Ticker</th>
+            <th>VIQ Score</th>
+            <th>MCap Then</th>
+            <th>MCap Now</th>
+            <th>Return</th>
+          </tr>
+        </thead>
+        <tbody>${rows || '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-dim)">No data</td></tr>'}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+document.querySelectorAll('.day-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.day-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    currentDays = parseInt(this.dataset.days);
+    loadBacktest(currentDays);
+  });
+});
+
+loadBacktest(currentDays);
+</script>
+</body>
+</html>

@@ -289,6 +289,19 @@ async def init_db():
                 )
             """)
 
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS score_snapshots (
+                    id BIGSERIAL PRIMARY KEY,
+                    virtuals_id TEXT NOT NULL,
+                    composite_score REAL,
+                    edge_score REAL,
+                    market_cap REAL,
+                    scores_json JSONB DEFAULT '{}',
+                    snapshot_date DATE NOT NULL DEFAULT CURRENT_DATE,
+                    UNIQUE(virtuals_id, snapshot_date)
+                )
+            """)
+
             # Indexes
             for idx_sql in [
                 "CREATE INDEX IF NOT EXISTS idx_agents_market_cap ON agents(market_cap DESC)",
@@ -298,6 +311,8 @@ async def init_db():
                 "CREATE INDEX IF NOT EXISTS idx_agents_first_mover ON agents(first_mover)",
                 "CREATE INDEX IF NOT EXISTS idx_score_history_agent ON score_history(agent_id)",
                 "CREATE INDEX IF NOT EXISTS idx_predictions_agent ON predictions(agent_id)",
+                "CREATE INDEX IF NOT EXISTS idx_score_snapshots_vid ON score_snapshots(virtuals_id)",
+                "CREATE INDEX IF NOT EXISTS idx_score_snapshots_date ON score_snapshots(snapshot_date DESC)",
             ]:
                 await conn.execute(idx_sql)
 
@@ -367,6 +382,19 @@ async def init_db():
                 )
             """)
 
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS score_snapshots (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    virtuals_id TEXT NOT NULL,
+                    composite_score REAL,
+                    edge_score REAL,
+                    market_cap REAL,
+                    scores_json TEXT DEFAULT '{}',
+                    snapshot_date TEXT NOT NULL DEFAULT (date('now')),
+                    UNIQUE(virtuals_id, snapshot_date)
+                )
+            """)
+
             for idx_sql in [
                 "CREATE INDEX IF NOT EXISTS idx_agents_market_cap ON agents(market_cap DESC)",
                 "CREATE INDEX IF NOT EXISTS idx_agents_composite_score ON agents(composite_score DESC)",
@@ -375,6 +403,8 @@ async def init_db():
                 "CREATE INDEX IF NOT EXISTS idx_agents_first_mover ON agents(first_mover)",
                 "CREATE INDEX IF NOT EXISTS idx_score_history_agent ON score_history(agent_id)",
                 "CREATE INDEX IF NOT EXISTS idx_predictions_agent ON predictions(agent_id)",
+                "CREATE INDEX IF NOT EXISTS idx_score_snapshots_vid ON score_snapshots(virtuals_id)",
+                "CREATE INDEX IF NOT EXISTS idx_score_snapshots_date ON score_snapshots(snapshot_date DESC)",
             ]:
                 await db.execute(idx_sql)
 
@@ -1052,3 +1082,120 @@ async def upsert_agent_holders(virtuals_id: str, holders: list):
                 )
             )
         await db.commit()
+
+
+# ── Score Snapshots ───────────────────────────────────────────────────────────
+
+async def take_score_snapshot(virtuals_id: str, composite_score: float,
+                               edge_score: float, market_cap: float,
+                               scores_json: dict):
+    """Upsert today's score snapshot for an agent."""
+    today = datetime.utcnow().date().isoformat()
+    async with _db() as db:
+        await db.execute("""
+            INSERT INTO score_snapshots (virtuals_id, composite_score, edge_score, market_cap, scores_json, snapshot_date)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(virtuals_id, snapshot_date) DO UPDATE SET
+                composite_score=excluded.composite_score,
+                edge_score=excluded.edge_score,
+                market_cap=excluded.market_cap,
+                scores_json=excluded.scores_json
+        """, (virtuals_id, composite_score, edge_score, market_cap,
+              json.dumps(scores_json) if isinstance(scores_json, dict) else (scores_json or "{}"),
+              today))
+        await db.commit()
+
+
+async def get_score_history(virtuals_id: str, days: int = 30) -> list:
+    """Return last N days of score snapshots for an agent, oldest-first."""
+    async with _db() as db:
+        rows = await db.fetch_all("""
+            SELECT snapshot_date, composite_score, edge_score, market_cap, scores_json
+            FROM score_snapshots
+            WHERE virtuals_id=?
+            ORDER BY snapshot_date ASC
+            LIMIT ?
+        """, (virtuals_id, days))
+    result = []
+    for r in rows:
+        sj = r.get("scores_json") or "{}"
+        if isinstance(sj, str):
+            try:
+                sj = json.loads(sj)
+            except Exception:
+                sj = {}
+        result.append({
+            "date": r["snapshot_date"],
+            "composite_score": r.get("composite_score"),
+            "edge_score": r.get("edge_score"),
+            "market_cap": r.get("market_cap"),
+            "scores_json": sj,
+        })
+    return result
+
+
+async def get_all_agents_for_snapshot() -> list:
+    """Return minimal agent data needed for daily snapshots."""
+    async with _db() as db:
+        rows = await db.fetch_all(
+            "SELECT virtuals_id, composite_score, market_cap, scores_json FROM agents"
+        )
+    result = []
+    for r in rows:
+        sj = r.get("scores_json") or "{}"
+        if isinstance(sj, str):
+            try:
+                sj = json.loads(sj)
+            except Exception:
+                sj = {}
+        result.append({
+            "virtuals_id": r["virtuals_id"],
+            "composite_score": r.get("composite_score") or 0,
+            "market_cap": r.get("market_cap") or 0,
+            "scores_json": sj,
+        })
+    return result
+
+
+async def get_agent_comparables(virtuals_id: str, agent_type: str,
+                                 current_score: float, limit: int = 5) -> list:
+    """Find agents in the same category with similar scores, excluding the given agent."""
+    async with _db() as db:
+        rows = await db.fetch_all("""
+            SELECT virtuals_id, name, ticker, image_url, composite_score,
+                   tier_classification, market_cap, agent_type,
+                   ABS(composite_score - ?) AS score_diff
+            FROM agents
+            WHERE virtuals_id != ? AND agent_type = ?
+              AND composite_score IS NOT NULL
+            ORDER BY score_diff ASC
+            LIMIT ?
+        """, (current_score, virtuals_id, agent_type, limit))
+    return [dict(r) for r in rows]
+
+
+async def get_backtest_data(days_ago: int = 30) -> list:
+    """
+    Return rows pairing each agent's score N days ago with current market cap,
+    for backtest correlation analysis.
+    """
+    import datetime as _dt
+    cutoff = (_dt.datetime.utcnow().date() - _dt.timedelta(days=days_ago)).isoformat()
+    async with _db() as db:
+        rows = await db.fetch_all("""
+            SELECT s.virtuals_id, s.composite_score AS score_at_snapshot,
+                   s.market_cap AS mcap_at_snapshot, s.snapshot_date,
+                   a.market_cap AS current_mcap, a.name, a.ticker
+            FROM score_snapshots s
+            JOIN agents a ON a.virtuals_id = s.virtuals_id
+            WHERE s.snapshot_date <= ? AND s.composite_score IS NOT NULL
+              AND s.market_cap > 0 AND a.market_cap > 0
+            ORDER BY s.snapshot_date DESC
+        """, (cutoff,))
+    # Keep only the earliest (oldest) snapshot per agent
+    seen = {}
+    for r in rows:
+        vid = r["virtuals_id"]
+        if vid not in seen:
+            seen[vid] = dict(r)
+    return list(seen.values())

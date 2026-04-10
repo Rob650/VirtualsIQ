@@ -1009,6 +1009,7 @@
     <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
     <input class="search-input" type="text" placeholder="Search agents, tickers..." id="search-input" autocomplete="off" />
   </div>
+  <a href="/backtest" style="flex-shrink:0;font-size:12px;color:var(--text-dim);text-decoration:none;padding:4px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);white-space:nowrap" title="VIQ Backtest Analysis">📈 Backtest</a>
 </header>
 
 <div id="main-content">
@@ -1362,7 +1363,7 @@ async function loadAgents() {
           <div class="viq-val" style="color:${scoreClr}">${scoreNum}</div>
           ${(() => { const es = (a.scores_json && a.scores_json._edge_label) || a.edge_label; const ev = (a.scores_json && a.scores_json._edge_score !== undefined) ? a.scores_json._edge_score : a.edge_score; if (!es || ev === null || ev === undefined) return ''; const ec = es === 'Undervalued' ? 'var(--green)' : es === 'Overvalued' ? 'var(--red)' : 'var(--yellow,#f59e0b)'; return `<div style="font-size:9px;font-weight:600;color:${ec};line-height:1.2;white-space:nowrap">${ev > 0 ? '+' : ''}${ev} ${es === 'Fair Value' ? 'FAIR' : es.toUpperCase().slice(0,6)}</div>`; })()}
           <button class="star-btn ${watched ? 'starred' : ''}" data-id="${a.virtuals_id}"
-            onclick="event.stopPropagation();toggleWatchlist('${a.virtuals_id}')"
+            onclick="event.stopPropagation();toggleWatchlist('${a.virtuals_id}',${scoreNum})"
             title="${watched ? 'Remove from watchlist' : 'Add to watchlist'}">${watched ? '★' : '☆'}</button>
         </div>
       </div>`;
@@ -1929,10 +1930,44 @@ function saveWatchlist(wl) {
 }
 function isWatched(id) { return getWatchlist().has(String(id)); }
 
-function toggleWatchlist(id) {
+// Store score at time of bookmarking for change detection
+function getWatchlistScores() {
+  try { return JSON.parse(localStorage.getItem('viq_watchlist_scores') || '{}'); }
+  catch(e) { return {}; }
+}
+function saveWatchlistScore(id, score) {
+  const scores = getWatchlistScores();
+  scores[String(id)] = score;
+  localStorage.setItem('viq_watchlist_scores', JSON.stringify(scores));
+}
+function removeWatchlistScore(id) {
+  const scores = getWatchlistScores();
+  delete scores[String(id)];
+  localStorage.setItem('viq_watchlist_scores', JSON.stringify(scores));
+}
+function getScoreDelta(id, currentScore) {
+  const scores = getWatchlistScores();
+  const saved = scores[String(id)];
+  if (saved == null || currentScore == null) return null;
+  return currentScore - saved;
+}
+
+function toggleWatchlist(id, currentScore) {
   const wl = getWatchlist();
   const sid = String(id);
-  if (wl.has(sid)) { wl.delete(sid); } else { wl.add(sid); }
+  if (wl.has(sid)) {
+    wl.delete(sid);
+    removeWatchlistScore(sid);
+  } else {
+    wl.add(sid);
+    // Capture score at bookmark time — read from DOM if not passed
+    if (currentScore == null) {
+      const viqEl = document.querySelector(`.star-btn[data-id="${sid}"]`)?.closest('.agent-row, .detail-meta')
+                    ?.querySelector('.viq-val, [data-score]');
+      currentScore = viqEl ? parseFloat(viqEl.textContent) : null;
+    }
+    if (currentScore != null) saveWatchlistScore(sid, currentScore);
+  }
   saveWatchlist(wl);
   document.querySelectorAll(`.star-btn[data-id="${sid}"]`).forEach(btn => {
     const now = wl.has(sid);
@@ -2021,6 +2056,10 @@ async function renderWatchlistView() {
       const hl   = a.holder_count ? 'HL '   + fmtCompact(a.holder_count) : '';
       const metricLine = [vol, mc, hl].filter(Boolean).join('  ');
       const priceStr = a.price ? '$' + parseFloat(a.price).toPrecision(4) : '—';
+      const delta = getScoreDelta(a.virtuals_id, scoreNum);
+      const deltaTag = (delta != null && Math.abs(delta) >= 5)
+        ? `<span style="font-size:10px;font-weight:600;margin-left:4px;color:${delta > 0 ? 'var(--green)' : 'var(--red)'}">${delta > 0 ? '▲' : '▼'}${Math.abs(Math.round(delta))}</span>`
+        : '';
       return `<div class="agent-row" onclick="navigateToAgent('${a.virtuals_id}')">
         <div class="rank">${i + 1}</div>
         <div class="agent-cell">
@@ -2035,8 +2074,8 @@ async function renderWatchlistView() {
         <div class="price-col"><div class="price-val">${priceStr}</div><div class="mcap-val">${fmtMcap(a.market_cap)}</div></div>
         <div class="change-col"><div class="change-val ${changeClass}">${fmtChange(a.price_change_24h)}</div></div>
         <div class="viq-col">
-          <div class="viq-val" style="color:${scoreClr}">${scoreNum}</div>
-          <button class="star-btn starred" data-id="${a.virtuals_id}" onclick="event.stopPropagation();toggleWatchlist('${a.virtuals_id}')" title="Remove from watchlist">★</button>
+          <div class="viq-val" style="color:${scoreClr}">${scoreNum}${deltaTag}</div>
+          <button class="star-btn starred" data-id="${a.virtuals_id}" onclick="event.stopPropagation();toggleWatchlist('${a.virtuals_id}',${scoreNum})" title="Remove from watchlist">★</button>
         </div>
       </div>`;
     }).join('');
@@ -2151,6 +2190,8 @@ async function loadDetailAgent(id) {
     const agent = await res.json();
     document.getElementById('detail-breadcrumb').textContent = agent.name || '';
     renderDetailContent(agent);
+    loadScoreHistory(id);
+    loadComparables(id);
   } catch(e) {
     content.innerHTML = `<div style="text-align:center;padding:60px;color:var(--red)">
       Failed to load agent.
@@ -2195,7 +2236,7 @@ function renderDetailContent(agent) {
           <a href="${virtualsUrl}" target="_blank" rel="noopener" class="detail-ext-link virtuals">↗ Virtuals</a>
           ${dexUrl ? `<a href="${dexUrl}" target="_blank" rel="noopener" class="detail-ext-link dex">📊 DexScreener</a>` : ''}
           <button class="star-btn ${watched ? 'starred' : ''}" data-id="${agent.virtuals_id}"
-            onclick="toggleWatchlist('${agent.virtuals_id}')"
+            onclick="toggleWatchlist('${agent.virtuals_id}',${score})"
             title="${watched ? 'Remove from watchlist' : 'Add to watchlist'}">${watched ? '★' : '☆'}</button>
         </div>
       </div>
@@ -2373,6 +2414,16 @@ function buildAgentReportHTML(agent) {
         ${agent.linked_telegram ? `<a href="${agent.linked_telegram}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-muted);font-size:12px;text-decoration:none">✈ Telegram</a>` : ''}
       </div>
     </div>` : ''}
+
+    <div id="score-history-section">
+      <div class="report-section-title">Score Trend <span style="font-size:10px;font-weight:400;color:var(--text-dim);margin-left:6px">30-day history</span></div>
+      <div id="score-sparkline-wrap" style="color:var(--text-dim);font-size:12px;padding:8px 0">Loading...</div>
+    </div>
+
+    <div id="comparables-section">
+      <div class="report-section-title">Similar Agents</div>
+      <div id="comparables-wrap" style="color:var(--text-dim);font-size:12px;padding:8px 0">Loading...</div>
+    </div>
   `;
 }
 
@@ -2381,6 +2432,91 @@ async function triggerAnalysis(virtualsId) {
     showToast('Analysis queued — refresh in ~30s');
     await fetch(`/api/analyze/${virtualsId}`, { method: 'POST' });
   } catch(e) { showToast('Failed to queue analysis', true); }
+}
+
+// ===== SCORE HISTORY SPARKLINE =====
+function renderSparkline(points) {
+  if (!points.length) return '<span style="color:var(--text-dim);font-size:12px">No history yet — scores are snapshotted daily.</span>';
+  const W = 280, H = 48, pad = 4;
+  const scores = points.map(p => p.composite_score || 0);
+  const minS = Math.min(...scores), maxS = Math.max(...scores);
+  const range = maxS - minS || 1;
+  const xStep = (W - pad * 2) / Math.max(scores.length - 1, 1);
+  const coords = scores.map((s, i) => {
+    const x = pad + i * xStep;
+    const y = H - pad - ((s - minS) / range) * (H - pad * 2);
+    return [x, y];
+  });
+  const pathD = coords.map((c, i) => (i === 0 ? 'M' : 'L') + c[0].toFixed(1) + ',' + c[1].toFixed(1)).join(' ');
+  const first = scores[0], last = scores[scores.length - 1];
+  const delta = last - first;
+  const deltaStr = (delta >= 0 ? '+' : '') + delta.toFixed(1);
+  const lineClr = delta >= 0 ? 'var(--green)' : 'var(--red)';
+  const lastPt = coords[coords.length - 1];
+  return `<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+    <svg width="${W}" height="${H}" style="overflow:visible;flex-shrink:0">
+      <path d="${pathD}" fill="none" stroke="${lineClr}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="${lastPt[0].toFixed(1)}" cy="${lastPt[1].toFixed(1)}" r="3" fill="${lineClr}"/>
+    </svg>
+    <div>
+      <div style="font-family:var(--font-data);font-size:20px;font-weight:700;color:${lineClr}">${last.toFixed(1)}</div>
+      <div style="font-size:11px;color:var(--text-dim)">${deltaStr} over ${points.length} days</div>
+      <div style="font-size:10px;color:var(--text-dim);margin-top:2px">${points[0].date} → ${points[points.length-1].date}</div>
+    </div>
+  </div>`;
+}
+
+async function loadScoreHistory(id) {
+  const wrap = document.getElementById('score-sparkline-wrap');
+  if (!wrap) return;
+  try {
+    const res = await fetch(`/api/agent/${id}/score-history?days=30`);
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    wrap.innerHTML = renderSparkline(data.history || []);
+  } catch(e) {
+    wrap.innerHTML = '<span style="color:var(--text-dim);font-size:12px">Score history unavailable.</span>';
+  }
+}
+
+// ===== COMPARABLES =====
+function scoreColorInline(s) {
+  if (s >= 80) return '#168389';
+  if (s >= 65) return '#0891B2';
+  if (s >= 50) return '#F59E0B';
+  return '#EF4444';
+}
+
+async function loadComparables(id) {
+  const wrap = document.getElementById('comparables-wrap');
+  if (!wrap) return;
+  try {
+    const res = await fetch(`/api/agent/${id}/comparables?limit=5`);
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    const comps = data.comparables || [];
+    if (!comps.length) {
+      wrap.innerHTML = '<span style="color:var(--text-dim);font-size:12px">No similar agents found in the same category.</span>';
+      return;
+    }
+    wrap.innerHTML = `<div style="display:flex;gap:10px;flex-wrap:wrap">${comps.map(a => {
+      const sc = Math.round(a.composite_score || 0);
+      const clr = scoreColorInline(sc);
+      const mcap = a.market_cap >= 1e6 ? '$' + (a.market_cap/1e6).toFixed(1) + 'M' : a.market_cap >= 1e3 ? '$' + (a.market_cap/1e3).toFixed(0) + 'K' : '—';
+      const tier = a.tier_classification || '';
+      return `<div onclick="navigateToAgent('${a.virtuals_id}')" style="cursor:pointer;padding:10px 14px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);min-width:130px;flex:1;max-width:180px;transition:border-color 0.15s" onmouseover="this.style.borderColor='var(--green)'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.name}</div>
+        <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px">${a.ticker || ''}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="font-family:var(--font-data);font-size:16px;font-weight:700;color:${clr}">${sc}</span>
+          <span style="font-size:10px;color:var(--text-dim)">${mcap}</span>
+        </div>
+        ${tier ? `<div style="font-size:10px;color:${clr};margin-top:3px">${tier}</div>` : ''}
+      </div>`;
+    }).join('')}</div>`;
+  } catch(e) {
+    wrap.innerHTML = '<span style="color:var(--text-dim);font-size:12px">Similar agents unavailable.</span>';
+  }
 }
 
 // ===== MODAL CLOSE =====

@@ -22,20 +22,25 @@ from starlette.requests import Request
 from analyzer import analyze_agent, batch_triage
 from database import (
     bulk_score_agents,
+    get_agent_comparables,
     get_agent_detail,
     get_agent_holders,
     get_agents,
     get_agents_for_backfill,
     get_agents_needing_reanalysis,
+    get_all_agents_for_snapshot,
+    get_backtest_data,
     get_category_summary,
     get_existing_ids,
     get_holders_last_updated,
+    get_score_history,
     get_stats,
     get_top_agent_ids,
     get_trending_agents,
     get_trending_strip,
     init_db,
     search_agents,
+    take_score_snapshot,
     update_agent_category,
     update_agent_scores,
     upsert_agent,
@@ -128,6 +133,31 @@ def create_job(agent_id: str) -> str:
         "error": None,
     }
     return job_id
+
+
+# ---------------------------------------------------------------------------
+# Daily score snapshot helper
+# ---------------------------------------------------------------------------
+
+async def _take_daily_snapshots():
+    """Snapshot today's scores for all agents into score_snapshots table."""
+    try:
+        agents = await get_all_agents_for_snapshot()
+        count = 0
+        for a in agents:
+            scores = a.get("scores_json") or {}
+            edge = float(scores.get("tier_scores", {}).get("moat", 0) or 0)
+            await take_score_snapshot(
+                virtuals_id=str(a["virtuals_id"]),
+                composite_score=float(a.get("composite_score") or 0),
+                edge_score=edge,
+                market_cap=float(a.get("market_cap") or 0),
+                scores_json=scores,
+            )
+            count += 1
+        logger.info(f"Daily snapshots taken for {count} agents")
+    except Exception as e:
+        logger.error(f"_take_daily_snapshots failed: {e}", exc_info=True)
 
 
 # ---------------------------------------------------------------------------
@@ -393,6 +423,7 @@ async def _daily_refresh_loop():
             await enrich_top_agents_dexscreener(top_n=100)
             score_count = await bulk_score_agents()
             logger.info(f"Daily auto-scored {score_count} agents — queuing AI re-analysis")
+            await _take_daily_snapshots()
             enrichment_state["last_description_refresh"] = datetime.utcnow().isoformat()
             asyncio.create_task(_auto_analyze_all())
         except asyncio.CancelledError:
@@ -595,6 +626,120 @@ async def search_endpoint(q: str = Query("", min_length=1)):
     """Search agents by name or ticker, return top 10 matches."""
     results = await search_agents(q, limit=10)
     return {"query": q, "results": results, "count": len(results)}
+
+
+@app.get("/api/agent/{virtuals_id}/score-history")
+async def agent_score_history(virtuals_id: str, days: int = Query(30, ge=1, le=365)):
+    """Return last N days of score snapshots for an agent."""
+    agent = await get_agent_detail(virtuals_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    history = await get_score_history(virtuals_id, days=days)
+    return {"virtuals_id": virtuals_id, "history": history, "count": len(history)}
+
+
+@app.get("/api/agent/{virtuals_id}/comparables")
+async def agent_comparables(virtuals_id: str, limit: int = Query(5, ge=1, le=10)):
+    """Return similar agents in the same category by score proximity."""
+    agent = await get_agent_detail(virtuals_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    agent_type = agent.get("agent_type") or ""
+    current_score = float(agent.get("composite_score") or 50)
+    if not agent_type:
+        return {"virtuals_id": virtuals_id, "comparables": []}
+    comps = await get_agent_comparables(virtuals_id, agent_type, current_score, limit=limit)
+    return {"virtuals_id": virtuals_id, "agent_type": agent_type, "comparables": comps}
+
+
+@app.get("/api/backtest")
+async def backtest_stats(days: int = Query(30, ge=7, le=90)):
+    """Compute correlation between VIQ scores N days ago and subsequent market cap change."""
+    import math
+    rows = await get_backtest_data(days_ago=days)
+    if not rows:
+        return {
+            "days": days,
+            "sample_size": 0,
+            "correlation": None,
+            "hit_rate": None,
+            "top10_avg_return": None,
+            "bottom10_avg_return": None,
+            "agents": [],
+            "note": "No snapshot data yet — snapshots are taken daily after scoring runs."
+        }
+
+    # Compute percent return for each agent
+    agents = []
+    for r in rows:
+        mcap_then = float(r.get("mcap_at_snapshot") or 0)
+        mcap_now  = float(r.get("current_mcap") or 0)
+        if mcap_then <= 0 or mcap_now <= 0:
+            continue
+        pct_return = (mcap_now - mcap_then) / mcap_then * 100
+        agents.append({
+            "virtuals_id": r["virtuals_id"],
+            "name": r.get("name", ""),
+            "ticker": r.get("ticker", ""),
+            "score": float(r["score_at_snapshot"]),
+            "mcap_then": mcap_then,
+            "mcap_now": mcap_now,
+            "pct_return": round(pct_return, 2),
+            "snapshot_date": r.get("snapshot_date"),
+        })
+
+    if len(agents) < 3:
+        return {
+            "days": days,
+            "sample_size": len(agents),
+            "correlation": None,
+            "hit_rate": None,
+            "top10_avg_return": None,
+            "bottom10_avg_return": None,
+            "agents": agents,
+            "note": "Not enough data for statistical analysis yet."
+        }
+
+    # Pearson correlation between score and pct_return
+    n = len(agents)
+    scores   = [a["score"] for a in agents]
+    returns  = [a["pct_return"] for a in agents]
+    mean_s   = sum(scores) / n
+    mean_r   = sum(returns) / n
+    cov      = sum((s - mean_s) * (r - mean_r) for s, r in zip(scores, returns)) / n
+    std_s    = math.sqrt(sum((s - mean_s) ** 2 for s in scores) / n) or 1
+    std_r    = math.sqrt(sum((r - mean_r) ** 2 for r in returns) / n) or 1
+    correlation = round(cov / (std_s * std_r), 4)
+
+    # Hit rate: % of top-half-scored agents that had positive returns
+    median_score = sorted(scores)[n // 2]
+    high_score_agents = [a for a in agents if a["score"] >= median_score]
+    hit_rate = round(
+        sum(1 for a in high_score_agents if a["pct_return"] > 0) / len(high_score_agents) * 100, 1
+    ) if high_score_agents else None
+
+    # Average return for top-10 vs bottom-10 by score
+    sorted_agents = sorted(agents, key=lambda a: a["score"], reverse=True)
+    top10    = sorted_agents[:10]
+    bottom10 = sorted_agents[-10:]
+    top10_avg    = round(sum(a["pct_return"] for a in top10) / len(top10), 2) if top10 else None
+    bottom10_avg = round(sum(a["pct_return"] for a in bottom10) / len(bottom10), 2) if bottom10 else None
+
+    return {
+        "days": days,
+        "sample_size": n,
+        "correlation": correlation,
+        "hit_rate": hit_rate,
+        "top10_avg_return": top10_avg,
+        "bottom10_avg_return": bottom10_avg,
+        "agents": sorted_agents[:50],  # top 50 for the table
+    }
+
+
+@app.get("/backtest", response_class=HTMLResponse)
+async def backtest_page(request: Request):
+    """Public backtest analysis page."""
+    return templates.TemplateResponse("backtest.html", {"request": request})
 
 
 @app.get("/api/agent/{virtuals_id}/on-chain")
@@ -842,6 +987,7 @@ async def admin_rescore_all():
         try:
             count = await bulk_score_agents()
             logger.info(f"Manual rescore complete: {count} agents scored")
+            await _take_daily_snapshots()
         except Exception as e:
             logger.error(f"Manual rescore failed: {e}", exc_info=True)
         finally:
