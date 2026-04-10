@@ -485,7 +485,7 @@ def _f_volume(agent: dict, ai: dict) -> float | None:
     v = _safe(agent.get("volume_24h"), -1)
     if v < 0:
         return None
-    return _bm_log_score(v, _BM_VOLUME) if v > 0 else 5.0
+    return _bm_log_score(v, _BM_VOLUME) if v > 0 else 1.0
 
 
 def _f_efficiency(agent: dict, ai: dict) -> float | None:
@@ -551,18 +551,19 @@ FACTORS = [
     (_f_execution,       1.00, "F_execution",        "execution"), # sole factor in tier
 
     # Market sub-factors — within-tier weights reflect relative importance
-    (_f_holders,         0.42, "F_holders",         "market"),
-    (_f_mcap,            0.34, "F_mcap",            "market"),
-    (_f_volume,          0.14, "F_volume",          "market"),
-    (_f_efficiency,      0.05, "F_efficiency",      "market"),
+    # Volume is the primary activity signal — projects with zero volume are dead
+    (_f_holders,         0.35, "F_holders",         "market"),
+    (_f_mcap,            0.22, "F_mcap",            "market"),
+    (_f_volume,          0.30, "F_volume",          "market"),
+    (_f_efficiency,      0.08, "F_efficiency",      "market"),
     (_f_momentum,        0.05, "F_momentum",        "market"),
 ]
 
 _TIER_WEIGHTS = {
-    "idea":      0.45,   # was 0.65 — still dominant but market gets more say
-    "moat":      0.20,   # was 0.15 — community moat now explicit
+    "idea":      0.35,   # reduced — text alone can't rescue dead projects
+    "moat":      0.20,   # community moat (unchanged)
     "execution": 0.10,   # tiebreaker, not gate (unchanged)
-    "market":    0.25,   # was 0.10 — benchmark-relative, core differentiator
+    "market":    0.35,   # increased — on-chain activity is core differentiator
 }
 
 
@@ -792,6 +793,33 @@ def calculate_composite_score(agent_data: dict, ai_analysis: dict) -> dict:
     # ── Map to [8, 95] ───────────────────────────────────────────────────────
     composite = 8.0 + (raw_composite / 100.0) * 87.0
     composite = round(_clamp(composite, 8.0, 95.0), 1)
+
+    # ── Activity vitality multiplier ─────────────────────────────────────────
+    # Volume is the clearest signal of a live vs dead project. Projects with
+    # zero trading activity get penalized regardless of how good their idea is.
+    _vol     = _safe(agent_data.get("volume_24h"),   0)
+    _holders = _safe(agent_data.get("holder_count"), 0)
+
+    if _vol == 0:
+        _vitality = 0.62          # ~38% penalty — dead trading is a serious red flag
+    elif _vol < 200:
+        _vitality = 0.80
+    elif _vol < 1_000:
+        _vitality = 0.90
+    elif _vol < 10_000:
+        _vitality = 1.00
+    else:
+        _vitality = 1.06          # mild bonus for genuinely active projects
+
+    composite = round(_clamp(composite * _vitality, 8.0, 95.0), 1)
+
+    # ── Dead project hard cap ────────────────────────────────────────────────
+    # Regardless of AI analysis or category, a project with zero trading AND
+    # almost no holders cannot score as a real investment opportunity.
+    if _vol == 0 and _holders < 50:
+        composite = min(composite, 15.0)
+    elif _vol < 10 and _holders < 100:
+        composite = min(composite, 20.0)
 
     # ── Back-fill factor contributions ──────────────────────────────────────
     for fd in factor_details:
