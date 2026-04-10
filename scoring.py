@@ -406,26 +406,29 @@ def _f_execution(agent: dict, ai: dict) -> float | None:
 
 # ---------------------------------------------------------------------------
 # Factor 5-9 — MARKET VALIDATION  (collectively 25%)
-# Benchmark-relative scoring: derived from the top ~20 projects by market
-# metrics (holders, MC, volume) — excluding 365love whose Virtuals API MC
-# is known to be wrong.
+# Benchmark-relative scoring derived from the "$5M+ cohort":
+#   All agents with market cap > $5M, excluding 365love (whose Virtuals API
+#   MC is known to be wrong).  These 8 projects represent proven successes.
 #
-# Top-20 approximate statistics (live data, April 2026):
-#   Holders: Toshi 1.08M, Keyboard Cat 908K, Luna 457K, aixbt 412K, G.A.M.E 282K
-#            → 20th-percentile ≈ 10 000 holders
-#   MC:      Ribbita $111M, Toshi $75M, Fabric $37M, aixbt $25M, G.A.M.E $8.7M
-#            → 20th-percentile ≈ $1 000 000 (but meaningful project = $1M+)
-#   Volume:  Roarin $179K, Keyboard Cat $114K, REPPO $50K, Ribbita $61K
-#            → 20th-percentile ≈ $10 000/day
+# $5M+ cohort (live data, April 2026):
+#   Ribbita ($113M, 71K h, $74K vol), Toshi ($75M, 1.08M h, $3.8K vol),
+#   Fabric Protocol ($37M, 1.8K h, $28K vol), aixbt ($25M, 413K h, $18K vol),
+#   G.A.M.E ($8.6M, 282K h, $13K vol), Mamo ($7.7M, 72K h, $4.4K vol),
+#   Luna ($6M, 458K h, $14K vol), Keyboard Cat ($5.2M, 908K h, $115K vol)
+#
+# Benchmark = median of each metric in this cohort:
+#   holders  → 347 618  (median of 8 values)
+#   MC       → $16 831 178
+#   volume   → $16 108/day
 #
 # _BM_* values are the "90-score" reference points.  Projects at or above the
 # benchmark score ≥ 90; those well below fall proportionally on a power-law
 # log scale (exponent 1.5 for steeper drop-off below benchmark).
 # ---------------------------------------------------------------------------
 
-_BM_HOLDERS = 10_000     # 10K holders → proven community
-_BM_MCAP    = 1_000_000  # $1M MC     → market-validated
-_BM_VOLUME  = 10_000     # $10K/day   → active trading
+_BM_HOLDERS = 347_618    # median holders of $5M+ cohort
+_BM_MCAP    = 16_831_178 # median MC of $5M+ cohort
+_BM_VOLUME  = 16_108     # median 24h volume of $5M+ cohort
 
 
 def _bm_log_score(value: float, benchmark: float, floor: float = 5.0) -> float:
