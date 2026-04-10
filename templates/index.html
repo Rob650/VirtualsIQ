@@ -1496,6 +1496,9 @@ function renderModal(agent) {
   const factorScores = scores.scores || Object.fromEntries(Object.entries(scores).filter(([k]) => /^F\d+_/.test(k))) || {};
   const tierScores = scores.tier_scores || scores._tier_scores || {};
   const FACTOR_LABELS = {
+    F1_holders:'Holder Count', F2_mcap:'Market Cap', F3_volume:'24h Volume',
+    F4_moat:'Moat / Status', F5_idea_market_fit:'Idea × Market Fit',
+    F6_execution:'Execution Quality', F7_efficiency:'Vol/MC Efficiency', F8_momentum:'Price Momentum',
     F1_category_uniqueness:'Category Uniqueness', F2_approach_novelty:'Approach Novelty',
     F3_cross_chain_originality:'Cross-Chain Original', F4_timing_advantage:'Timing Advantage',
     F5_defensibility:'Defensibility / Moat', F6_doxx_tier:'Team Visibility',
@@ -1509,7 +1512,7 @@ function renderModal(agent) {
     F21_follower_growth:'Follower Growth', F22_community_depth:'Community Depth',
     F23_organic_signals:'Organic vs Paid', F24_smart_money:'Smart Money',
   };
-  const TIER_NAMES = {first_mover:'First Mover', team:'Team & Execution', value:'Value Pool', community:'Community'};
+  const TIER_NAMES = {traction:'Traction', fundamentals:'Fundamentals', market:'Market', execution:'Execution', first_mover:'First Mover', team:'Team & Execution', value:'Value Pool', community:'Community'};
   const sortedFactors = Object.entries(factorScores).sort((a,b) => b[1] - a[1]);
   const topHelped = sortedFactors.slice(0, 3).map(([k,v]) => ({label: FACTOR_LABELS[k] || k, score: Math.round(v)}));
   const topHurt   = sortedFactors.slice(-3).reverse().map(([k,v]) => ({label: FACTOR_LABELS[k] || k, score: Math.round(v)}));
@@ -2123,6 +2126,9 @@ function buildAgentReportHTML(agent) {
   const tierScores   = scores.tier_scores || scores._tier_scores || {};
 
   const FACTOR_LABELS = {
+    F1_holders:'Holder Count', F2_mcap:'Market Cap', F3_volume:'24h Volume',
+    F4_moat:'Moat / Status', F5_idea_market_fit:'Idea × Market Fit',
+    F6_execution:'Execution Quality', F7_efficiency:'Vol/MC Efficiency', F8_momentum:'Price Momentum',
     F1_category_uniqueness:'Category Uniqueness', F2_approach_novelty:'Approach Novelty',
     F3_cross_chain_originality:'Cross-Chain Original', F4_timing_advantage:'Timing Advantage',
     F5_defensibility:'Defensibility / Moat', F6_doxx_tier:'Team Visibility',
@@ -2136,7 +2142,7 @@ function buildAgentReportHTML(agent) {
     F21_follower_growth:'Follower Growth', F22_community_depth:'Community Depth',
     F23_organic_signals:'Organic vs Paid', F24_smart_money:'Smart Money',
   };
-  const TIER_NAMES = {first_mover:'First Mover', team:'Team & Execution', value:'Value Pool', community:'Community'};
+  const TIER_NAMES = {traction:'Traction', fundamentals:'Fundamentals', market:'Market', execution:'Execution', first_mover:'First Mover', team:'Team & Execution', value:'Value Pool', community:'Community'};
 
   const sortedFactors = Object.entries(factorScores).sort((a, b) => b[1] - a[1]);
   const topHelped = sortedFactors.slice(0, 3).map(([k, v]) => ({ label: FACTOR_LABELS[k] || k, score: Math.round(v) }));
