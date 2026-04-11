@@ -574,12 +574,21 @@ def _score_phase1_upside(agent_data: dict, ai_analysis: dict) -> tuple[float, di
 
     # Smart Money Inflow Acceleration 7d (25%) — gracefully degrade
     smart_flow = agent_data.get("smart_money_net_flow_14d")
-    if smart_flow is not None:
+    sm_accel = agent_data.get("smart_money_acceleration")
+    if smart_flow is not None or sm_accel is not None:
         flow = _safe(smart_flow, 0)
         mcap = max(_safe(agent_data.get("market_cap"), 1), 1)
         flow_pct = flow / mcap * 100
-        sm_score = _clamp(50.0 + flow_pct * 10.0)
+        base_sm = _clamp(50.0 + flow_pct * 10.0)
+        # Acceleration bonus/penalty: positive acceleration boosts score
+        if sm_accel is not None:
+            accel = _safe(sm_accel, 0)
+            accel_boost = _clamp(accel * 5.0, -20.0, 20.0)
+            sm_score = _clamp(base_sm + accel_boost)
+        else:
+            sm_score = base_sm
         evidence["smart_money_source"] = "real"
+        evidence["smart_money_acceleration"] = round(_safe(sm_accel, 0), 4)
     else:
         sm_score = 50.0
         evidence["smart_money_source"] = "default"
@@ -1043,7 +1052,13 @@ def _score_risk(agent_data: dict, ai_analysis: dict) -> tuple[float, dict]:
     evidence["risk_mutability_score"] = round(mutability_score, 1)
 
     # ── Wash Trading Signal (10%) ──────────────────────────────────────────
-    if vol >= 0 and mcap > 0:
+    moralis_wash = agent_data.get("wash_score")
+    if moralis_wash is not None:
+        # Moralis wash_score is 0-100 where higher = more wash trading
+        # Invert: high wash = low safety score
+        wash_score = _clamp(100.0 - float(moralis_wash))
+        evidence["wash_trading_source"] = "moralis"
+    elif vol >= 0 and mcap > 0:
         vol_ratio = vol / mcap
         if vol_ratio > 2.0:      wash_score = 10.0   # very likely wash trading
         elif vol_ratio > 1.0:    wash_score = 30.0

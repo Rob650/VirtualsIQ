@@ -311,6 +311,26 @@ async def init_db():
                 )
             """)
 
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS smart_money_snapshots (
+                    id BIGSERIAL PRIMARY KEY,
+                    agent_id TEXT NOT NULL,
+                    token_address TEXT NOT NULL,
+                    snapshot_date DATE NOT NULL DEFAULT CURRENT_DATE,
+                    top10_concentration DOUBLE PRECISION,
+                    top20_concentration DOUBLE PRECISION,
+                    smart_money_net_flow DOUBLE PRECISION,
+                    smart_money_acceleration DOUBLE PRECISION,
+                    holder_count INTEGER,
+                    wash_score INTEGER,
+                    buy_count_7d INTEGER DEFAULT 0,
+                    sell_count_7d INTEGER DEFAULT 0,
+                    raw_data_json TEXT DEFAULT '{}',
+                    created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS'),
+                    UNIQUE(agent_id, snapshot_date)
+                )
+            """)
+
             # Indexes
             for idx_sql in [
                 "CREATE INDEX IF NOT EXISTS idx_agents_market_cap ON agents(market_cap DESC)",
@@ -432,6 +452,26 @@ async def init_db():
                     report_date TEXT NOT NULL UNIQUE,
                     report_json TEXT DEFAULT '{}',
                     created_at TEXT DEFAULT (datetime('now'))
+                )
+            """)
+
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS smart_money_snapshots (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    agent_id TEXT NOT NULL,
+                    token_address TEXT NOT NULL,
+                    snapshot_date TEXT NOT NULL DEFAULT (date('now')),
+                    top10_concentration REAL,
+                    top20_concentration REAL,
+                    smart_money_net_flow REAL,
+                    smart_money_acceleration REAL,
+                    holder_count INTEGER,
+                    wash_score INTEGER,
+                    buy_count_7d INTEGER DEFAULT 0,
+                    sell_count_7d INTEGER DEFAULT 0,
+                    raw_data_json TEXT DEFAULT '{}',
+                    created_at TEXT DEFAULT (datetime('now')),
+                    UNIQUE(agent_id, snapshot_date)
                 )
             """)
 
@@ -1350,3 +1390,81 @@ async def get_backtest_data(days_ago: int = 30) -> list:
         if vid not in seen:
             seen[vid] = dict(r)
     return list(seen.values())
+
+
+# ── Smart Money Snapshots ─────────────────────────────────────────────────────
+
+async def save_smart_money_snapshot(agent_id: str, token_address: str, sm_data: dict):
+    """Upsert today's smart money snapshot for an agent."""
+    today = datetime.utcnow().date().isoformat()
+    now = datetime.utcnow().isoformat()
+    raw = json.dumps({k: v for k, v in sm_data.items()
+                      if k not in ("smart_wallets_buying", "smart_wallets_selling")})
+    async with _db() as db:
+        await db.execute("""
+            INSERT INTO smart_money_snapshots
+                (agent_id, token_address, snapshot_date, top10_concentration,
+                 top20_concentration, smart_money_net_flow, smart_money_acceleration,
+                 holder_count, wash_score, buy_count_7d, sell_count_7d,
+                 raw_data_json, created_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(agent_id, snapshot_date) DO UPDATE SET
+                top10_concentration=excluded.top10_concentration,
+                top20_concentration=excluded.top20_concentration,
+                smart_money_net_flow=excluded.smart_money_net_flow,
+                smart_money_acceleration=excluded.smart_money_acceleration,
+                holder_count=excluded.holder_count,
+                wash_score=excluded.wash_score,
+                buy_count_7d=excluded.buy_count_7d,
+                sell_count_7d=excluded.sell_count_7d,
+                raw_data_json=excluded.raw_data_json,
+                created_at=excluded.created_at
+        """, (
+            agent_id,
+            token_address,
+            today,
+            sm_data.get("top_10_concentration"),
+            sm_data.get("top_20_concentration"),
+            sm_data.get("smart_money_net_flow_14d"),
+            sm_data.get("smart_money_acceleration"),
+            sm_data.get("holder_count"),
+            sm_data.get("wash_score"),
+            sm_data.get("buy_count_7d", 0),
+            sm_data.get("sell_count_7d", 0),
+            raw,
+            now,
+        ))
+        await db.commit()
+
+
+async def get_smart_money_snapshot(agent_id: str) -> dict | None:
+    """Return the most recent smart money snapshot for an agent."""
+    async with _db() as db:
+        row = await db.fetch_one("""
+            SELECT * FROM smart_money_snapshots
+            WHERE agent_id=?
+            ORDER BY snapshot_date DESC
+            LIMIT 1
+        """, (agent_id,))
+    if not row:
+        return None
+    raw = row.get("raw_data_json") or "{}"
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except Exception:
+            raw = {}
+    return {
+        "agent_id": row["agent_id"],
+        "token_address": row["token_address"],
+        "snapshot_date": row["snapshot_date"],
+        "top10_concentration": row.get("top10_concentration"),
+        "top20_concentration": row.get("top20_concentration"),
+        "smart_money_net_flow": row.get("smart_money_net_flow"),
+        "smart_money_acceleration": row.get("smart_money_acceleration"),
+        "holder_count": row.get("holder_count"),
+        "wash_score": row.get("wash_score"),
+        "buy_count_7d": row.get("buy_count_7d", 0),
+        "sell_count_7d": row.get("sell_count_7d", 0),
+        "raw_data": raw,
+    }

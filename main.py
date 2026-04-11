@@ -67,6 +67,8 @@ from virtuals_ingestion import (
     refresh_holder_counts,
     scan_newest_agents,
 )
+from smart_money import enrich_agent_smart_money
+from database import save_smart_money_snapshot, get_smart_money_snapshot
 
 logging.basicConfig(
     level=logging.INFO,
@@ -458,6 +460,50 @@ async def _daily_refresh_loop():
 
 
 # ---------------------------------------------------------------------------
+# Smart money enrichment helper
+# ---------------------------------------------------------------------------
+
+async def _run_smart_money_enrichment(limit: int = 100):
+    """Enrich top N agents with smart money data from Moralis. Saves to DB."""
+    try:
+        top_ids = await get_top_agent_ids(limit)
+        enriched = 0
+        for vid in top_ids:
+            agent = await get_agent_detail(vid)
+            if not agent:
+                continue
+            token_address = agent.get("contract_address", "")
+            if not token_address:
+                continue
+            try:
+                sm_data = await enrich_agent_smart_money(agent)
+                if sm_data.get("data_available"):
+                    await save_smart_money_snapshot(vid, token_address, sm_data)
+                    # Write key fields back to agents table for immediate use in scoring
+                    from database import _db as _db_ctx
+                    async with _db_ctx() as db:
+                        await db.execute(
+                            """UPDATE agents SET
+                                   top_10_concentration=COALESCE(?, top_10_concentration),
+                                   updated_at=?
+                               WHERE virtuals_id=?""",
+                            (
+                                sm_data.get("top_10_concentration"),
+                                datetime.utcnow().isoformat(),
+                                vid,
+                            )
+                        )
+                        await db.commit()
+                    enriched += 1
+                await asyncio.sleep(0.1)  # gentle pacing between agents
+            except Exception as e:
+                logger.warning(f"[SmartMoney] Enrichment failed for {vid}: {e}")
+        logger.info(f"[SmartMoney] Enriched {enriched}/{len(top_ids)} agents")
+    except Exception as e:
+        logger.error(f"[SmartMoney] _run_smart_money_enrichment failed: {e}", exc_info=True)
+
+
+# ---------------------------------------------------------------------------
 # Scheduled daily sync
 # ---------------------------------------------------------------------------
 
@@ -483,6 +529,10 @@ async def _run_daily_sync():
         await refresh_holder_counts(limit=100)
         enrichment_state["last_holder_refresh"] = datetime.utcnow().isoformat()
         logger.info("Daily sync: holder counts refreshed")
+
+        # Smart money enrichment for top 100 agents with token addresses
+        await _run_smart_money_enrichment(limit=100)
+        logger.info("Daily sync: smart money enrichment complete")
 
         score_count = await bulk_score_agents()
         logger.info(f"Daily sync: scored {score_count} agents")
@@ -1190,6 +1240,72 @@ async def agent_holders(virtuals_id: str):
             "contract_address": contract_address,
             "message": "Live data temporarily unavailable",
         }
+
+
+@app.get("/api/agent/{virtuals_id}/smart-money")
+async def agent_smart_money(virtuals_id: str, refresh: bool = Query(False)):
+    """
+    Smart Money data for an agent — concentration, flow, wash trading.
+
+    Returns cached DB snapshot (refreshed nightly) or fetches live if refresh=true.
+    The Smart Money tab on the frontend can pull from this endpoint.
+    """
+    agent = await get_agent_detail(virtuals_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    token_address = agent.get("contract_address", "")
+
+    if refresh and token_address:
+        try:
+            sm_data = await enrich_agent_smart_money(agent)
+            if sm_data.get("data_available"):
+                await save_smart_money_snapshot(virtuals_id, token_address, sm_data)
+            return {
+                "virtuals_id": virtuals_id,
+                "token_address": token_address,
+                "source": "live",
+                **sm_data,
+            }
+        except Exception as e:
+            logger.warning(f"[SmartMoney] Live fetch failed for {virtuals_id}: {e}")
+
+    # Return cached snapshot
+    snapshot = await get_smart_money_snapshot(virtuals_id)
+    if snapshot:
+        return {
+            "virtuals_id": virtuals_id,
+            "token_address": token_address,
+            "source": "cached",
+            "snapshot_date": snapshot.get("snapshot_date"),
+            "smart_money_net_flow_14d": snapshot.get("smart_money_net_flow"),
+            "smart_money_acceleration": snapshot.get("smart_money_acceleration"),
+            "top_10_concentration": snapshot.get("top10_concentration"),
+            "top_20_concentration": snapshot.get("top20_concentration"),
+            "wash_score": snapshot.get("wash_score"),
+            "buy_count_7d": snapshot.get("buy_count_7d", 0),
+            "sell_count_7d": snapshot.get("sell_count_7d", 0),
+            "holder_count": snapshot.get("holder_count"),
+            "data_available": True,
+        }
+
+    # No data yet — return structure with nulls so frontend can show "pending"
+    return {
+        "virtuals_id": virtuals_id,
+        "token_address": token_address,
+        "source": "no_data",
+        "smart_money_net_flow_14d": None,
+        "smart_money_acceleration": None,
+        "top_10_concentration": agent.get("top_10_concentration"),
+        "top_20_concentration": None,
+        "wash_score": None,
+        "buy_count_7d": 0,
+        "sell_count_7d": 0,
+        "holder_count": agent.get("holder_count"),
+        "data_available": False,
+        "message": "Smart money data will be available after the next daily sync (03:00 UTC)"
+            if token_address else "No token contract address available for this agent",
+    }
 
 
 @app.get("/api/health")
