@@ -1043,7 +1043,8 @@
 <!-- FILTER TABS -->
 <div class="filter-tabs-wrap">
   <div class="filter-tabs">
-    <button class="filter-tab active" data-feed="trending" data-sort="market_cap">Trending</button>
+    <button class="filter-tab active" data-feed="all" data-sort="composite_score">All</button>
+    <button class="filter-tab" data-feed="trending" data-sort="market_cap">Trending</button>
     <button class="filter-tab" data-feed="new" data-sort="newest">New</button>
     <button class="filter-tab" data-feed="top-viq" data-sort="composite_score">Top VIQ</button>
     <button class="filter-tab" data-feed="smart-money" data-sort="market_cap">Smart Money</button>
@@ -1137,6 +1138,110 @@
   </div>
 </div>
 
+<!-- LEARN VIEW -->
+<div id="learn-view" style="display:none">
+  <div style="padding:16px;max-width:860px;margin:0 auto">
+    <div style="margin-bottom:20px;padding:0 0 12px;border-bottom:1px solid var(--border)">
+      <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:4px;letter-spacing:-0.3px">How VirtualsIQ Works</div>
+      <div style="font-size:13px;color:var(--text-muted)">What each tab means and how agents are ranked</div>
+    </div>
+
+    <div class="report-section-title">Feed Tabs</div>
+
+    <div class="report-sub-card" style="margin-bottom:10px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px">📊 All</div>
+      <p style="font-size:13px;color:var(--text-muted);line-height:1.6;margin:0">Every agent on Virtuals Protocol, sorted by VIQ composite score (highest first). The best starting point for discovering quality agents across the full ecosystem.</p>
+    </div>
+
+    <div class="report-sub-card" style="margin-bottom:10px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px">🔥 Trending</div>
+      <p style="font-size:13px;color:var(--text-muted);line-height:1.6;margin-bottom:8px">Agents ranked by market cap — the most actively traded and widely held right now. Trending reflects market attention, not necessarily fundamentals.</p>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:var(--green-bg);color:var(--green-dark);border:1px solid rgba(22,131,137,0.2)">High volume</span>
+        <span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:var(--green-bg);color:var(--green-dark);border:1px solid rgba(22,131,137,0.2)">Large holder base</span>
+        <span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:var(--green-bg);color:var(--green-dark);border:1px solid rgba(22,131,137,0.2)">Market cap sorted</span>
+      </div>
+    </div>
+
+    <div class="report-sub-card" style="margin-bottom:10px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px">🆕 New</div>
+      <p style="font-size:13px;color:var(--text-muted);line-height:1.6;margin-bottom:8px">Recently launched agents sorted by launch date. Most are in the <strong>Prototype phase</strong> — early stage, still building. Higher risk, but an opportunity to find gems before they get noticed.</p>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:rgba(245,158,11,0.1);color:var(--amber);border:1px solid rgba(245,158,11,0.2)">Prototype phase</span>
+        <span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:rgba(245,158,11,0.1);color:var(--amber);border:1px solid rgba(245,158,11,0.2)">Early-stage agents</span>
+        <span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:rgba(245,158,11,0.1);color:var(--amber);border:1px solid rgba(245,158,11,0.2)">Sorted by newest</span>
+      </div>
+    </div>
+
+    <div class="report-sub-card" style="margin-bottom:10px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px">🏆 Top VIQ</div>
+      <p style="font-size:13px;color:var(--text-muted);line-height:1.6;margin:0">Agents ranked purely by VIQ composite score. This surfaces the strongest fundamentals regardless of market cap or popularity — often where the best risk/reward opportunities are.</p>
+    </div>
+
+    <div class="report-sub-card" style="margin-bottom:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px">🐋 Smart Money</div>
+      <p style="font-size:13px;color:var(--text-muted);line-height:1.6;margin-bottom:8px">Analyzes who holds each agent and how. Smart Money tracking looks for patterns that suggest informed or institutional accumulation — not just who holds, but <em>how</em> they hold.</p>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:rgba(168,85,247,0.1);color:var(--purple);border:1px solid rgba(168,85,247,0.2)">Whale wallets (&gt;1% supply)</span>
+        <span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:rgba(168,85,247,0.1);color:var(--purple);border:1px solid rgba(168,85,247,0.2)">Holder concentration</span>
+        <span style="padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:rgba(168,85,247,0.1);color:var(--purple);border:1px solid rgba(168,85,247,0.2)">Top-10 distribution</span>
+      </div>
+    </div>
+
+    <div class="report-section-title">The VIQ Score (0–100)</div>
+
+    <div style="padding:14px 16px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px">
+      <p style="font-size:13px;color:var(--text-muted);line-height:1.6;margin-bottom:12px">The <strong style="color:var(--text)">VIQ score</strong> is an AI-generated composite rating across four dimensions. Higher is better — but phase matters.</p>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
+        <div style="padding:12px;background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm)">
+          <div style="font-size:10px;font-weight:700;color:var(--green-dark);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Quality</div>
+          <div style="font-size:12px;color:var(--text-muted);line-height:1.5">Team credibility, product execution, and defensibility of the core idea</div>
+        </div>
+        <div style="padding:12px;background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm)">
+          <div style="font-size:10px;font-weight:700;color:var(--teal);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Upside</div>
+          <div style="font-size:12px;color:var(--text-muted);line-height:1.5">Market size, revenue model, and growth potential vs. current valuation</div>
+        </div>
+        <div style="padding:12px;background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm)">
+          <div style="font-size:10px;font-weight:700;color:var(--purple);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Momentum</div>
+          <div style="font-size:12px;color:var(--text-muted);line-height:1.5">Holder growth rate, volume trends, and community activity signals</div>
+        </div>
+        <div style="padding:12px;background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm)">
+          <div style="font-size:10px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Risk</div>
+          <div style="font-size:12px;color:var(--text-muted);line-height:1.5">Concentration risk, team anonymity, wallet behavior red flags</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding:10px 14px;background:var(--green-bg);border:1px solid rgba(22,131,137,0.2);border-radius:var(--radius-sm);margin-bottom:16px;font-size:12px;color:var(--text-muted);line-height:1.6">
+      <strong style="color:var(--green-dark)">Phase-aware scoring:</strong> Prototype agents are scored against other Prototypes. Sentient agents are scored against the full universe. A score of 70 means something different depending on phase — context matters.
+    </div>
+
+    <div class="report-section-title">Score Tiers</div>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:20px">
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm)">
+        <div style="font-family:var(--font-data);font-size:15px;font-weight:700;color:#168389;min-width:40px;flex-shrink:0">75+</div>
+        <div><div style="font-size:12px;font-weight:600;color:var(--text)">Top Tier</div><div style="font-size:11px;color:var(--text-dim)">Exceptional fundamentals across all dimensions</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm)">
+        <div style="font-family:var(--font-data);font-size:15px;font-weight:700;color:#A855F7;min-width:40px;flex-shrink:0">50–74</div>
+        <div><div style="font-size:12px;font-weight:600;color:var(--text)">Strong / Moderate</div><div style="font-size:11px;color:var(--text-dim)">Solid foundation with some room for improvement</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm)">
+        <div style="font-family:var(--font-data);font-size:15px;font-weight:700;color:#F59E0B;min-width:40px;flex-shrink:0">30–49</div>
+        <div><div style="font-size:12px;font-weight:600;color:var(--text)">Weak</div><div style="font-size:11px;color:var(--text-dim)">Notable gaps in fundamentals or very early stage</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm)">
+        <div style="font-family:var(--font-data);font-size:15px;font-weight:700;color:#EF4444;min-width:40px;flex-shrink:0">&lt;30</div>
+        <div><div style="font-size:12px;font-weight:600;color:var(--text)">Avoid</div><div style="font-size:11px;color:var(--text-dim)">High risk, poor fundamentals, or insufficient data</div></div>
+      </div>
+    </div>
+
+    <div style="padding:12px 14px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:11px;color:var(--text-dim);line-height:1.6;margin-bottom:32px">
+      VirtualsIQ is an independent analysis tool. Nothing here constitutes financial advice. Always do your own research before making any investment decisions.
+    </div>
+  </div>
+</div>
+
 <!-- MODAL -->
 <div class="modal-overlay" id="modal-overlay">
   <div class="modal" id="modal">
@@ -1201,6 +1306,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       Community
     </button>
+    <button class="bottom-tab" id="tab-learn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      Learn
+    </button>
   </div>
 </nav>
 
@@ -1224,7 +1333,7 @@ const DETAIL_AGENT_ID = '{{ detail_agent_id or "" }}';
 const state = {
   page: 1,
   pageSize: 25,
-  sort: 'market_cap',
+  sort: 'composite_score',
   category: '',
   status: '',
   doxxTier: '',
@@ -2035,16 +2144,26 @@ document.querySelectorAll('.bottom-tab').forEach(btn => {
   btn.addEventListener('click', function() {
     document.querySelectorAll('.bottom-tab').forEach(b => b.classList.remove('active'));
     this.classList.add('active');
-    const tabId = this.id; // e.g. "tab-watchlist"
-    if (tabId === 'tab-watchlist') {
-      state.watchlistFilter = true;
-      state.page = 1;
-      renderWatchlistView();
+    const tabId = this.id;
+    const learnView = document.getElementById('learn-view');
+    const mainContent = document.getElementById('main-content');
+    if (tabId === 'tab-learn') {
+      learnView.style.display = 'block';
+      mainContent.style.display = 'none';
+      document.getElementById('detail-view').style.display = 'none';
     } else {
-      if (state.watchlistFilter) {
-        state.watchlistFilter = false;
+      learnView.style.display = 'none';
+      mainContent.style.display = 'block';
+      if (tabId === 'tab-watchlist') {
+        state.watchlistFilter = true;
         state.page = 1;
-        loadAgents();
+        renderWatchlistView();
+      } else {
+        if (state.watchlistFilter) {
+          state.watchlistFilter = false;
+          state.page = 1;
+          loadAgents();
+        }
       }
     }
   });
@@ -2194,6 +2313,7 @@ function navigateBack() {
 
 function showDetailPage(id) {
   document.getElementById('main-content').style.display = 'none';
+  document.getElementById('learn-view').style.display = 'none';
   document.getElementById('detail-view').style.display = 'block';
   window.scrollTo({ top: 0, behavior: 'smooth' });
   loadDetailAgent(id);
