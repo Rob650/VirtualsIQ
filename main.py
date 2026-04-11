@@ -8,6 +8,9 @@ import json
 import logging
 import os
 import uuid
+
+# Fallback API key (set as Railway env var when possible)
+os.environ.setdefault("MORALIS_API_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IjFiNjZjOTRkLTY3YTYtNDIwZS1hMDI4LTA1YjQ3YmEwNDk5ZCIsIm9yZ0lkIjoiNTA5MTk3IiwidXNlcklkIjoiNTIzOTEyIiwidHlwZUlkIjoiMzliOWE1MGYtNDE2Ny00OGU4LTgxY2YtOGI0OTBlMjZmMjU4IiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NzU5MTQ3NDQsImV4cCI6NDkzMTY3NDc0NH0.vuS6W3oiWYK475GcaAhj6ojGf-6VJiciuZGi1tLITQA")
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional
