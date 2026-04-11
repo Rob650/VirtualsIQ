@@ -332,11 +332,33 @@ async def init_db():
                 ("last_price_refresh", "TEXT", "NULL"),
                 ("last_holder_refresh", "TEXT", "NULL"),
                 ("last_description_refresh", "TEXT", "NULL"),
+                # v1.1 phase-aware scoring columns
+                ("lifecycle_phase", "INTEGER", "NULL"),
+                ("quality_score", "DOUBLE PRECISION", "NULL"),
+                ("upside_score", "DOUBLE PRECISION", "NULL"),
+                ("momentum_score", "DOUBLE PRECISION", "NULL"),
+                ("risk_score", "DOUBLE PRECISION", "NULL"),
+                ("momentum_break_active", "BOOLEAN", "FALSE"),
+                ("phase1_upside", "DOUBLE PRECISION", "NULL"),
+                ("phase2_upside", "DOUBLE PRECISION", "NULL"),
+                ("phase3_upside", "DOUBLE PRECISION", "NULL"),
             ]:
                 try:
                     await conn.execute(
                         f"ALTER TABLE agents ADD COLUMN IF NOT EXISTS {col} {dtype} DEFAULT {default}"
                     )
+                except Exception:
+                    pass
+
+            # Indexes for new ranking endpoints
+            for idx_sql in [
+                "CREATE INDEX IF NOT EXISTS idx_agents_lifecycle_phase ON agents(lifecycle_phase)",
+                "CREATE INDEX IF NOT EXISTS idx_agents_quality_score ON agents(quality_score DESC)",
+                "CREATE INDEX IF NOT EXISTS idx_agents_upside_score ON agents(upside_score DESC)",
+                "CREATE INDEX IF NOT EXISTS idx_agents_risk_score ON agents(risk_score DESC)",
+            ]:
+                try:
+                    await conn.execute(idx_sql)
                 except Exception:
                     pass
 
@@ -432,9 +454,31 @@ async def init_db():
                 ("last_price_refresh", "TEXT", "NULL"),
                 ("last_holder_refresh", "TEXT", "NULL"),
                 ("last_description_refresh", "TEXT", "NULL"),
+                # v1.1 phase-aware scoring columns
+                ("lifecycle_phase", "INTEGER", "NULL"),
+                ("quality_score", "REAL", "NULL"),
+                ("upside_score", "REAL", "NULL"),
+                ("momentum_score", "REAL", "NULL"),
+                ("risk_score", "REAL", "NULL"),
+                ("momentum_break_active", "INTEGER", "0"),
+                ("phase1_upside", "REAL", "NULL"),
+                ("phase2_upside", "REAL", "NULL"),
+                ("phase3_upside", "REAL", "NULL"),
             ]:
                 try:
                     await db.execute(f"ALTER TABLE agents ADD COLUMN {col} {dtype} DEFAULT {default}")
+                except Exception:
+                    pass
+
+            # Indexes for new ranking endpoints
+            for idx_sql in [
+                "CREATE INDEX IF NOT EXISTS idx_agents_lifecycle_phase ON agents(lifecycle_phase)",
+                "CREATE INDEX IF NOT EXISTS idx_agents_quality_score ON agents(quality_score DESC)",
+                "CREATE INDEX IF NOT EXISTS idx_agents_upside_score ON agents(upside_score DESC)",
+                "CREATE INDEX IF NOT EXISTS idx_agents_risk_score ON agents(risk_score DESC)",
+            ]:
+                try:
+                    await db.execute(idx_sql)
                 except Exception:
                     pass
 
@@ -510,12 +554,27 @@ async def update_agent_scores(virtuals_id: str, composite_score: float,
                                first_mover: bool, doxx_tier: int):
     """Update intelligence scores for an agent and record history."""
     now = datetime.utcnow().isoformat()
+
+    # Extract v1.1 sub-scores from scores_json if present
+    lifecycle_phase      = scores_json.get("lifecycle_phase")
+    quality_score        = scores_json.get("quality_score")
+    upside_score         = scores_json.get("upside_score")
+    momentum_score_val   = scores_json.get("momentum_score")
+    risk_score_val       = scores_json.get("risk_score")
+    momentum_break       = 1 if scores_json.get("momentum_break_active") else 0
+    phase1_upside        = scores_json.get("phase1_upside")
+    phase2_upside        = scores_json.get("phase2_upside")
+    phase3_upside        = scores_json.get("phase3_upside")
+
     async with _db() as db:
         await db.execute("""
             UPDATE agents SET
                 composite_score=?, tier_classification=?, scores_json=?,
                 analysis_json=?, prediction_json=?, overview_json=?,
                 first_mover=?, doxx_tier=?,
+                lifecycle_phase=?, quality_score=?, upside_score=?,
+                momentum_score=?, risk_score=?, momentum_break_active=?,
+                phase1_upside=?, phase2_upside=?, phase3_upside=?,
                 last_analyzed=?, last_scanned=?, updated_at=?
             WHERE virtuals_id=?
         """, (
@@ -523,6 +582,9 @@ async def update_agent_scores(virtuals_id: str, composite_score: float,
             json.dumps(scores_json), json.dumps(analysis_json),
             json.dumps(prediction_json), json.dumps(overview_json),
             1 if first_mover else 0, doxx_tier,
+            lifecycle_phase, quality_score, upside_score,
+            momentum_score_val, risk_score_val, momentum_break,
+            phase1_upside, phase2_upside, phase3_upside,
             now, now, now, virtuals_id
         ))
 
@@ -906,7 +968,7 @@ async def bulk_upsert_agents(agents: list, batch_size: int = 500) -> int:
 
 
 async def bulk_score_agents() -> int:
-    """Score all agents using on-chain data. Returns count scored."""
+    """Score all agents using on-chain data only (no AI calls). Returns count scored."""
     from scoring import calculate_composite_score
 
     async with _db() as db:
@@ -928,16 +990,35 @@ async def bulk_score_agents() -> int:
             result["tier_classification"],
             json.dumps(result["scores"]),
             1 if result["first_mover"] else 0,
+            # v1.1 sub-scores
+            result.get("lifecycle_phase"),
+            result.get("quality_score"),
+            result.get("upside_score"),
+            result.get("momentum_score"),
+            result.get("risk_score"),
+            1 if result.get("momentum_break_active") else 0,
+            result.get("phase1_upside"),
+            result.get("phase2_upside"),
+            result.get("phase3_upside"),
             agent["virtuals_id"]
         ))
         scored += 1
 
+    now = datetime.utcnow().isoformat()
     async with _db() as db:
         for i in range(0, len(batch), 500):
             chunk = batch[i:i + 500]
             await db.executemany(
-                "UPDATE agents SET composite_score=?, tier_classification=?, scores_json=?, first_mover=?, updated_at=? WHERE virtuals_id=?",
-                [(r[0], r[1], r[2], r[3], datetime.utcnow().isoformat(), r[4]) for r in chunk]
+                """UPDATE agents SET
+                       composite_score=?, tier_classification=?, scores_json=?,
+                       first_mover=?,
+                       lifecycle_phase=?, quality_score=?, upside_score=?,
+                       momentum_score=?, risk_score=?, momentum_break_active=?,
+                       phase1_upside=?, phase2_upside=?, phase3_upside=?,
+                       updated_at=?
+                   WHERE virtuals_id=?""",
+                [(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9],
+                  r[10], r[11], r[12], now, r[13]) for r in chunk]
             )
         await db.commit()
 

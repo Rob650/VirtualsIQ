@@ -803,6 +803,110 @@ async def trending_strip():
     return data
 
 
+# ---------------------------------------------------------------------------
+# Rankings endpoints (v1.1 phase-aware dual-ranking system)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/rankings/highest-upside", tags=["rankings"])
+async def rankings_highest_upside(
+    limit: int = Query(20, ge=1, le=100),
+    min_risk: float = Query(50.0, ge=0, le=100),
+):
+    """
+    Highest-upside agents sorted by composite score DESC.
+    Filtered to Risk >= min_risk (default 50) — eliminates the riskiest projects.
+    Returns all phases.
+    """
+    from database import _db as _db_ctx
+    async with _db_ctx() as db:
+        rows = await db.fetch_all(
+            """SELECT virtuals_id, name, ticker, image_url, agent_type,
+                      composite_score, quality_score, upside_score,
+                      momentum_score, risk_score, lifecycle_phase,
+                      momentum_break_active, phase1_upside, phase2_upside,
+                      phase3_upside, market_cap, holder_count, volume_24h,
+                      tier_classification, creation_date
+               FROM agents
+               WHERE risk_score >= ? OR risk_score IS NULL
+               ORDER BY composite_score DESC
+               LIMIT ?""",
+            (min_risk, limit)
+        )
+
+    return {
+        "ranking": "highest-upside",
+        "filter": {"min_risk": min_risk},
+        "count": len(rows),
+        "agents": [dict(r) for r in rows],
+    }
+
+
+@app.get("/api/rankings/safest-bets", tags=["rankings"])
+async def rankings_safest_bets(
+    limit: int = Query(20, ge=1, le=100),
+    min_quality: float = Query(70.0, ge=0, le=100),
+):
+    """
+    Safest bets: Phase 2 and Phase 3 projects only, sorted by Risk score DESC
+    (composite score as tiebreaker). Filtered to Quality >= min_quality (default 70).
+    """
+    from database import _db as _db_ctx
+    async with _db_ctx() as db:
+        rows = await db.fetch_all(
+            """SELECT virtuals_id, name, ticker, image_url, agent_type,
+                      composite_score, quality_score, upside_score,
+                      momentum_score, risk_score, lifecycle_phase,
+                      momentum_break_active, phase2_upside, phase3_upside,
+                      market_cap, holder_count, volume_24h,
+                      tier_classification, creation_date
+               FROM agents
+               WHERE (lifecycle_phase = 2 OR lifecycle_phase = 3 OR lifecycle_phase IS NULL)
+                 AND (quality_score >= ? OR quality_score IS NULL)
+               ORDER BY risk_score DESC NULLS LAST, composite_score DESC
+               LIMIT ?""",
+            (min_quality, limit)
+        )
+
+    return {
+        "ranking": "safest-bets",
+        "filter": {"min_quality": min_quality, "phases": [2, 3]},
+        "count": len(rows),
+        "agents": [dict(r) for r in rows],
+    }
+
+
+@app.get("/api/rankings/phase1-watchlist", tags=["rankings"])
+async def rankings_phase1_watchlist(
+    limit: int = Query(20, ge=1, le=100),
+):
+    """
+    Phase 1 projects only (launched within last 21 days), sorted by Phase 1
+    Upside score DESC. No risk filter — this is the speculation watchlist.
+    """
+    from database import _db as _db_ctx
+    async with _db_ctx() as db:
+        rows = await db.fetch_all(
+            """SELECT virtuals_id, name, ticker, image_url, agent_type,
+                      composite_score, quality_score, upside_score,
+                      momentum_score, risk_score, lifecycle_phase,
+                      phase1_upside, phase2_upside, phase3_upside,
+                      market_cap, holder_count, volume_24h,
+                      tier_classification, creation_date
+               FROM agents
+               WHERE lifecycle_phase = 1
+               ORDER BY phase1_upside DESC NULLS LAST, composite_score DESC
+               LIMIT ?""",
+            (limit,)
+        )
+
+    return {
+        "ranking": "phase1-watchlist",
+        "filter": {"phase": 1},
+        "count": len(rows),
+        "agents": [dict(r) for r in rows],
+    }
+
+
 @app.get("/api/category-summary/{category}")
 async def category_summary(category: str):
     """Category landing page data."""
