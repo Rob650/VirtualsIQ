@@ -459,7 +459,7 @@ async def _daily_refresh_loop():
 # ---------------------------------------------------------------------------
 
 async def _run_daily_sync():
-    """Full daily sync: ingest → enrich → score → snapshot → AI re-analysis."""
+    """Full daily sync: ingest → enrich → holders → score → snapshot → rebuild overviews → AI re-analysis."""
     if _sync_status["status"] == "running":
         logger.warning("Daily sync already running — skipping")
         return
@@ -477,11 +477,49 @@ async def _run_daily_sync():
         await enrich_top_agents_dexscreener(top_n=100)
         logger.info("Daily sync: DexScreener enrichment complete")
 
+        await refresh_holder_counts(limit=100)
+        enrichment_state["last_holder_refresh"] = datetime.utcnow().isoformat()
+        logger.info("Daily sync: holder counts refreshed")
+
         score_count = await bulk_score_agents()
         logger.info(f"Daily sync: scored {score_count} agents")
 
         await _take_daily_snapshots()
         logger.info("Daily sync: score snapshots saved")
+
+        # Rebuild overviews that still have placeholder/template text
+        from database import get_all_agents, update_overview_only
+        from collections import defaultdict
+        agents = await get_all_agents()
+        category_map: dict = defaultdict(list)
+        for a in agents:
+            cat = (a.get("agent_type") or "Other").strip().lower()
+            category_map[cat].append(a)
+        rebuilt = 0
+        for agent in agents:
+            ov = agent.get("overview_json") or {}
+            if isinstance(ov, str):
+                try:
+                    ov = json.loads(ov)
+                except Exception:
+                    ov = {}
+            full_text = " ".join(str(v) for v in ov.values()).lower()
+            needs_rebuild = (
+                "pending full analysis" in full_text
+                or "pending a comprehensive" in full_text
+                or _is_template_overview(ov)
+            )
+            if not needs_rebuild:
+                continue
+            cat = (agent.get("agent_type") or "Other").strip().lower()
+            peers = category_map.get(cat, [])
+            new_ov = _build_data_driven_overview({**agent, "overview_json": ov}, category_peers=peers)
+            try:
+                await update_overview_only(str(agent.get("virtuals_id", "")), new_ov)
+                rebuilt += 1
+            except Exception as ov_err:
+                logger.error(f"Daily sync: rebuild-overview failed for {agent.get('virtuals_id')}: {ov_err}")
+        logger.info(f"Daily sync: rebuilt {rebuilt} pending overviews")
 
         asyncio.create_task(_auto_analyze_all())
         logger.info("Daily sync: AI re-analysis task queued")
