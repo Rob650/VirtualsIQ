@@ -1166,7 +1166,12 @@ async def admin_run_daily_sync(background_tasks: BackgroundTasks):
 @app.get("/api/admin/sync-status")
 async def admin_sync_status():
     """Return the current status of the APScheduler daily sync."""
-    return {**_sync_status}
+    return {
+        "last_sync_at": _sync_status["last_run_completed"],
+        "is_running": _sync_status["status"] == "running",
+        "last_duration_seconds": _sync_status["last_run_duration_seconds"],
+        **_sync_status,
+    }
 
 
 @app.post("/api/admin/backfill-categories")
