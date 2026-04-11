@@ -12,6 +12,9 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+
 import math
 import statistics
 
@@ -126,6 +129,18 @@ enrichment_state: dict = {
 # ---------------------------------------------------------------------------
 
 jobs: dict[str, dict] = {}
+
+# ---------------------------------------------------------------------------
+# Daily sync status
+# ---------------------------------------------------------------------------
+
+_sync_status: dict = {
+    "status": "idle",
+    "last_run_started": None,
+    "last_run_completed": None,
+    "last_run_error": None,
+    "last_run_duration_seconds": None,
+}
 
 
 def create_job(agent_id: str) -> str:
@@ -440,6 +455,53 @@ async def _daily_refresh_loop():
 
 
 # ---------------------------------------------------------------------------
+# Scheduled daily sync
+# ---------------------------------------------------------------------------
+
+async def _run_daily_sync():
+    """Full daily sync: ingest → enrich → score → snapshot → AI re-analysis."""
+    if _sync_status["status"] == "running":
+        logger.warning("Daily sync already running — skipping")
+        return
+
+    started = datetime.utcnow()
+    _sync_status["status"] = "running"
+    _sync_status["last_run_started"] = started.isoformat()
+    _sync_status["last_run_error"] = None
+    logger.info("APScheduler daily sync starting...")
+
+    try:
+        count = await preload_all_agents()
+        logger.info(f"Daily sync: {count} agents refreshed from Virtuals API")
+
+        await enrich_top_agents_dexscreener(top_n=100)
+        logger.info("Daily sync: DexScreener enrichment complete")
+
+        score_count = await bulk_score_agents()
+        logger.info(f"Daily sync: scored {score_count} agents")
+
+        await _take_daily_snapshots()
+        logger.info("Daily sync: score snapshots saved")
+
+        asyncio.create_task(_auto_analyze_all())
+        logger.info("Daily sync: AI re-analysis task queued")
+
+        completed = datetime.utcnow()
+        _sync_status["status"] = "idle"
+        _sync_status["last_run_completed"] = completed.isoformat()
+        _sync_status["last_run_duration_seconds"] = round(
+            (completed - started).total_seconds(), 1
+        )
+        logger.info(
+            f"Daily sync complete in {_sync_status['last_run_duration_seconds']}s"
+        )
+    except Exception as e:
+        logger.error(f"Daily sync failed: {e}", exc_info=True)
+        _sync_status["status"] = "error"
+        _sync_status["last_run_error"] = str(e)
+
+
+# ---------------------------------------------------------------------------
 # App lifespan
 # ---------------------------------------------------------------------------
 
@@ -487,8 +549,20 @@ async def lifespan(app: FastAPI):
     new_agent_task = asyncio.create_task(_new_agent_scan_loop())
     daily_task = asyncio.create_task(_daily_refresh_loop())
 
+    # APScheduler: daily sync at 03:00 UTC
+    scheduler = AsyncIOScheduler(timezone="UTC")
+    scheduler.add_job(
+        _run_daily_sync,
+        CronTrigger(hour=3, minute=0),
+        id="daily_sync",
+        replace_existing=True,
+    )
+    scheduler.start()
+    logger.info("APScheduler started — daily sync scheduled at 03:00 UTC")
+
     yield
 
+    scheduler.shutdown(wait=False)
     for task in [preload_task, price_task, holder_task, new_agent_task, daily_task]:
         task.cancel()
         try:
@@ -1041,6 +1115,20 @@ async def admin_refresh_analysis(force: bool = Query(False)):
         "message": f"Analysis {'(forced, all agents)' if force else '(stale only, >7 days)'} queued",
     }
 
+
+@app.post("/api/admin/run-daily-sync")
+async def admin_run_daily_sync(background_tasks: BackgroundTasks):
+    """Manually trigger the full daily sync pipeline (ingest → score → snapshot → AI analysis)."""
+    if _sync_status["status"] == "running":
+        return {"status": "already_running", "message": "Daily sync is already in progress"}
+    background_tasks.add_task(_run_daily_sync)
+    return {"status": "queued", "message": "Daily sync queued — check /api/admin/sync-status for progress"}
+
+
+@app.get("/api/admin/sync-status")
+async def admin_sync_status():
+    """Return the current status of the APScheduler daily sync."""
+    return {**_sync_status}
 
 
 @app.post("/api/admin/backfill-categories")

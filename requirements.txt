@@ -9,3 +9,4 @@ httpx==0.28.0
 beautifulsoup4==4.12.3
 playwright==1.49.0
 python-multipart==0.0.18
+apscheduler>=3.10
